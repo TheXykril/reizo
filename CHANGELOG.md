@@ -14,6 +14,9 @@ compatibility.
 
 ### Added
 
+- With OneConfig (for example in OneClient): the recording indicator is also a HUD element
+  that can be placed in OneConfig's HUD editor, and the OneConfig page has the shadow recording
+  settings.
 - Effects for replays and exports (timeline → Effects): exposure, contrast, saturation,
   temperature, vignette and letterbox, keyframed over time.
 - Exports are rendered at the chosen size (for example 4K from a smaller window) instead of
