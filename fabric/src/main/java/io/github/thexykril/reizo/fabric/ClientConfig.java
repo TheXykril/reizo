@@ -38,6 +38,18 @@ public final class ClientConfig {
    */
   public String toggleModifier = "shift";
 
+  /**
+   * Shadow recording: keep the last {@link #shadowSeconds} of play in memory, so it can be saved
+   * after something happened without having recorded (like a replay buffer).
+   */
+  public boolean shadowEnabled = false;
+
+  /** How much play a shadow save covers at least, in seconds (30 to 600). */
+  public int shadowSeconds = 120;
+
+  /** Memory the shadow buffer may use, in MB; the oldest play is dropped first. */
+  public int shadowMemoryMb = 512;
+
   /** FFmpeg executable for video export; empty uses "ffmpeg" from the system PATH. */
   public String ffmpegPath = "";
 

@@ -24,6 +24,7 @@ public final class RecorderKeys {
   private static KeyMapping toggle;
   private static KeyMapping pause;
   private static KeyMapping marker;
+  private static KeyMapping saveShadow;
   private static KeyMapping replayCamera;
   private static KeyMapping replayPause;
   private static KeyMapping replaySlower;
@@ -74,6 +75,14 @@ public final class RecorderKeys {
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping(
                 "key.reizo.marker",
+                InputConstants.Type.KEYSYM,
+                InputConstants.UNKNOWN.getValue(),
+                category));
+
+    saveShadow =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
+                "key.reizo.save_shadow",
                 InputConstants.Type.KEYSYM,
                 InputConstants.UNKNOWN.getValue(),
                 category));
@@ -159,6 +168,9 @@ public final class RecorderKeys {
     }
     while (marker.consumeClick()) {
       client.addMarker("Marker");
+    }
+    while (saveShadow.consumeClick()) {
+      client.saveShadow();
     }
     handleReplay(mc);
   }

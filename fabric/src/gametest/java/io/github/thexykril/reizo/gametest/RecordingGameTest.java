@@ -70,7 +70,80 @@ public final class RecordingGameTest implements FabricClientGameTest {
     Path archive = recordFromJoin(context);
     playBack(context, archive);
     recordMidSessionWhileWalking(context);
+    saveShadowAfterWalking(context);
     browseAndPlay(context);
+  }
+
+  /**
+   * Shadow recording: with it on, walking is kept in memory without recording, and the pause menu's
+   * "Save last" button writes it as a recording that starts with a world snapshot.
+   */
+  private void saveShadowAfterWalking(ClientGameTestContext context) {
+    context.runOnClient(
+        mc -> {
+          RecorderClient.get().config().shadowEnabled = true;
+          RecorderClient.get().config().shadowSeconds = 30;
+          RecorderClient.get().applyShadowSettings();
+        });
+    java.util.concurrent.CompletableFuture<Path> saved;
+    RegistryAccess registries;
+    try (TestSingleplayerContext world = context.worldBuilder().create()) {
+      world.getClientWorld().waitForChunksDownload();
+      context.waitFor(mc -> !RecorderClient.get().shadow().isEmpty(), 20 * 5);
+      long snapshotBytes = context.computeOnClient(mc -> RecorderClient.get().shadow().bytes());
+      context.getInput().holdKeyFor(options -> options.keyUp, 40);
+      context.waitTicks(5);
+      check(
+          context.computeOnClient(mc -> RecorderClient.get().session()) == null,
+          "shadow must not start a recording");
+      registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
+      context.runOnClient(
+          mc -> mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+      context.waitTicks(2);
+      saved =
+          context.computeOnClient(
+              mc -> {
+                var button =
+                    net.fabricmc.fabric.api.client.screen.v1.Screens.getButtons(mc.screen).stream()
+                        .filter(
+                            b ->
+                                b.getMessage().getContents()
+                                        instanceof
+                                        net.minecraft.network.chat.contents.TranslatableContents t
+                                    && t.getKey().equals("reizo.menu.save_shadow"))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("no shadow save button"));
+                check(button.active, "shadow save button is inactive");
+                // The button saves and closes the menu; call the same method to get its result.
+                mc.setScreen(null);
+                return RecorderClient.get().saveShadow();
+              });
+      LOGGER.info("Shadow buffer after join: {} KB", snapshotBytes / 1024);
+    }
+    context.waitFor(mc -> saved.isDone(), 20 * 30);
+    Path archive = saved.join();
+    check(archive != null, "shadow save wrote nothing");
+    Stats stats = verifyArchive(archive, registries);
+    RecordingMetadata meta = metadata(archive);
+    check(meta.startSnapshot && !meta.completeFromJoin, "shadow save must start with a snapshot");
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
+        "shadow snapshot has no chunks: " + stats.packetNames);
+    check(stats.localPlayerFrames >= 10, "too few local player frames: " + stats.localPlayerFrames);
+    check(
+        stats.lastPlayer.distanceSq(stats.firstPlayer) > 1.0, "player did not move in shadow save");
+    check(meta.durationMs >= 2000, "shadow save too short: " + meta.durationMs);
+    context.runOnClient(
+        mc -> {
+          RecorderClient.get().config().shadowEnabled = false;
+          RecorderClient.get().applyShadowSettings();
+          check(RecorderClient.get().shadow() == null, "shadow not turned off");
+        });
+    LOGGER.info(
+        "saveShadowAfterWalking OK: {} -> {} ({} ms)",
+        archive.getFileName(),
+        stats,
+        meta.durationMs);
   }
 
   /**

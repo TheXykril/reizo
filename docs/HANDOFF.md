@@ -84,7 +84,11 @@ screen, effects, audio, shadow recording, multi-version.
 - Export settings (`ExportSettingsScreen`, `core.export.ExportFormat`): formats come from
   `ffmpeg -hide_banner -encoders`, cached per FFmpeg path. Hardware encoders are offered but never
   run here (no GPU); VAAPI uses `/dev/dri/renderD128` and `format=nv12,hwupload`.
-- Next: rendering at output size (frames are still the window size, scaled by FFmpeg), shadow recording (#16), audio (#17), effects (#15), recorded
+- Shadow recording (ADR 0011): `core.recording.ShadowBuffer` holds segments (world snapshot plus
+  frames), owned by `CaptureController` (`setShadow`, `prepareShadowSave`). `RecorderClient`
+  starts segments in its tick and saves through `saveShadow()` on a background thread. The
+  snapshot hitch per segment is unmeasured on real hardware.
+- Next: rendering at output size (frames are still the window size, scaled by FFmpeg), audio (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected

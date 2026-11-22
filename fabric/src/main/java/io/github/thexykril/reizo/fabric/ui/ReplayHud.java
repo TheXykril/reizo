@@ -86,7 +86,7 @@ public final class ReplayHud {
     }
   }
 
-  static String time(long ms) {
+  public static String time(long ms) {
     return RecordingIndicator.formatElapsed(ms);
   }
 
