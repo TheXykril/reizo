@@ -16,6 +16,7 @@ import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.export.ExportControls;
 import io.github.thexykril.reizo.fabric.export.ExportSession;
+import io.github.thexykril.reizo.fabric.playback.PathVisualizer;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
@@ -302,6 +303,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
     checkCameraPath(context);
     checkTimeline(context);
+    checkFreeCamera(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -593,6 +595,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(1);
     check(!ReplayPlayback.current().clock().isRunning(), "Space did not pause the replay");
     int seeks = ReplayPlayback.current().seeksDone();
+    var cameraBefore = context.computeOnClient(mc -> mc.player.position());
     context.getInput().setCursorPos((at[2] + 0.5) * scale, (at[3] + 0.5) * scale);
     context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
     context.waitFor(
@@ -601,6 +604,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
           return r.seeksDone() > seeks && !r.isReconfiguring() && mc.level != null;
         },
         20 * 30);
+    context.waitTicks(2);
+    var cameraAfter = context.computeOnClient(mc -> mc.player.position());
+    check(
+        cameraAfter.distanceTo(cameraBefore) < 0.5,
+        "backwards seek moved the free camera: " + cameraBefore + " -> " + cameraAfter);
     long now = ReplayPlayback.current().clock().timeMs();
     // Seeks never go before the first play packet (the world starts there).
     long expected = Math.max(ReplayPlayback.current().script().startMs(), duration / 4);
@@ -623,6 +631,66 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(1);
     LOGGER.info(
         "checkTimeline OK: keyframe dragged {} -> {}, ruler seek to {}", middle, moved, now);
+  }
+
+  /**
+   * Roll and FOV keys on the free camera, stored in a new keyframe, and the camera path drawn in
+   * the world (screenshot only: gizmos have no state to assert on).
+   */
+  private void checkFreeCamera(ClientGameTestContext context) {
+    check(ReplayCamera.mode() == ReplayCamera.Mode.FREE, "camera not free: " + ReplayCamera.mode());
+    context.getInput().holdKeyFor(GLFW.GLFW_KEY_I, 5);
+    context.waitTicks(1);
+    float roll = ReplayEditor.freeRoll();
+    check(roll >= 8 && roll <= 12, "holding I did not roll right: " + roll);
+    check(
+        ReplayEditor.rollNow() == roll,
+        "roll not applied to the camera: " + ReplayEditor.rollNow());
+    float setting = context.computeOnClient(mc -> mc.options.fov().get().floatValue());
+    context.getInput().holdKeyFor(GLFW.GLFW_KEY_MINUS, 10);
+    context.waitTicks(1);
+    float fov = ReplayEditor.fovNow();
+    check(fov < setting - 7 && fov > setting - 13, "holding - did not zoom in: " + fov);
+    CameraKeyframe k =
+        context.computeOnClient(
+            mc -> {
+              ReplayEditor.path().clear();
+              return ReplayEditor.addKeyframe(mc);
+            });
+    check(
+        k != null && k.roll() == roll && k.fov() == fov,
+        "keyframe did not store roll and FOV: " + k);
+    context.getInput().pressKey(GLFW.GLFW_KEY_0);
+    context.waitTicks(1);
+    check(
+        ReplayEditor.freeRoll() == 0 && Float.isNaN(ReplayEditor.fovNow()),
+        "0 did not reset the camera");
+
+    // A path in front of the camera, curving through three keyframes, for the screenshot.
+    long duration = ReplayPlayback.current().script().durationMs();
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.path().clear();
+          var eye = mc.player.getEyePosition();
+          var look = mc.player.getLookAngle();
+          var flat = look.multiply(1, 0, 1).normalize();
+          var side = new net.minecraft.world.phys.Vec3(-flat.z, 0, flat.x);
+          for (int i = 0; i < 3; i++) {
+            var p =
+                eye.add(look.scale(5 + i)).add(side.scale((i - 1) * 2)).add(0, (i - 1) * 0.5, 0);
+            ReplayEditor.putKeyframe(
+                new CameraKeyframe(
+                    duration * i / 2, p.x, p.y, p.z, mc.player.getYRot() + 30 * (i - 1), 0, 0, 70));
+          }
+        });
+    check(PathVisualizer.isVisible(), "path display off by default");
+    context.waitTicks(3);
+    context.takeScreenshot("reizo-path-display");
+    context.getInput().pressKey(GLFW.GLFW_KEY_G);
+    context.waitTicks(1);
+    check(!PathVisualizer.isVisible(), "G did not hide the path");
+    context.getInput().pressKey(GLFW.GLFW_KEY_G);
+    LOGGER.info("checkFreeCamera OK: roll {} and FOV {} stored in {}", roll, fov, k);
   }
 
   private static List<Long> keyframeTimes() {

@@ -71,6 +71,7 @@ public final class RecorderClient implements ClientModInitializer {
     io.github.thexykril.reizo.fabric.ui.MenuButtons.register();
     RecordingIndicator.register(this);
     io.github.thexykril.reizo.fabric.ui.ReplayHud.register();
+    io.github.thexykril.reizo.fabric.playback.PathVisualizer.register();
     DebugCommands.register(this);
 
     ClientConfigurationConnectionEvents.START.register(

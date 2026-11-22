@@ -34,6 +34,17 @@ public final class ReplayEditor {
   private static Project project;
   private static CameraPath path = new CameraPath();
   private static boolean pathPlaying;
+
+  /** Roll (degrees) and FOV of the free camera while the path does not drive it; NaN = none. */
+  private static float freeRoll;
+
+  private static float freeFov = Float.NaN;
+
+  /** Free camera FOV limits. */
+  static final float MIN_FOV = 10;
+
+  static final float MAX_FOV = 150;
+
   private static final EditHistory<TimelineState> history = new EditHistory<>(200);
 
   private ReplayEditor() {}
@@ -63,10 +74,12 @@ public final class ReplayEditor {
     }
     path = project.cameraPath();
     history.clear();
+    resetFreeCamera();
   }
 
   static void close() {
     history.clear();
+    resetFreeCamera();
     project = null;
     path = new CameraPath();
     pathPlaying = false;
@@ -117,8 +130,8 @@ public final class ReplayEditor {
             camera.getZ(),
             camera.getYRot(),
             camera.getXRot(),
-            0f,
-            mc.options.fov().get().floatValue());
+            freeRoll,
+            Float.isNaN(freeFov) ? mc.options.fov().get().floatValue() : freeFov);
     path.put(k);
     save();
     return k;
@@ -174,6 +187,61 @@ public final class ReplayEditor {
       return null;
     }
     return path.sample(server.replayTimeMs());
+  }
+
+  /** Roll of the free camera in degrees (0 = level). */
+  public static float freeRoll() {
+    return freeRoll;
+  }
+
+  /** FOV of the free camera, or NaN for the FOV setting. */
+  public static float freeFov() {
+    return freeFov;
+  }
+
+  /** Rolls the free camera by some degrees, wrapped to -180..180. */
+  public static void rollBy(float degrees) {
+    float r = freeRoll + degrees;
+    r = ((r + 180) % 360 + 360) % 360 - 180;
+    freeRoll = r;
+  }
+
+  /** Widens (positive) or narrows the free camera's FOV, starting from the FOV setting. */
+  public static void zoomBy(float degrees, float settingFov) {
+    float base = Float.isNaN(freeFov) ? settingFov : freeFov;
+    freeFov = Math.max(MIN_FOV, Math.min(MAX_FOV, base + degrees));
+  }
+
+  /** Levels the free camera and returns it to the FOV setting. */
+  public static void resetFreeCamera() {
+    freeRoll = 0;
+    freeFov = Float.NaN;
+  }
+
+  /**
+   * Roll in degrees to apply to the camera this frame: the path's while it plays, else the free
+   * camera's in free mode, else NaN (leave the camera alone).
+   */
+  public static float rollNow() {
+    CameraKeyframe k = cameraNow();
+    if (k != null) {
+      return k.roll();
+    }
+    return freeCameraActive() && freeRoll != 0 ? freeRoll : Float.NaN;
+  }
+
+  /** FOV to apply this frame, or NaN for the normal FOV. Same rules as {@link #rollNow()}. */
+  public static float fovNow() {
+    CameraKeyframe k = cameraNow();
+    if (k != null) {
+      return k.fov();
+    }
+    return freeCameraActive() ? freeFov : Float.NaN;
+  }
+
+  private static boolean freeCameraActive() {
+    ReplayServer server = ReplayPlayback.current();
+    return server != null && !server.isManual() && ReplayCamera.mode() == ReplayCamera.Mode.FREE;
   }
 
   /** Keeps the camera player (and so chunk loading and culling) where the path camera is. */

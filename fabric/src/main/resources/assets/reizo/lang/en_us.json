@@ -88,5 +88,15 @@
   "reizo.timeline.redo": "Redo",
   "reizo.timeline.export": "Export",
   "reizo.timeline.markers": "Markers",
-  "reizo.timeline.camera": "Camera"
+  "reizo.timeline.camera": "Camera",
+  "key.reizo.roll_left": "Roll camera left",
+  "key.reizo.roll_right": "Roll camera right",
+  "key.reizo.fov_in": "Zoom in (narrower FOV)",
+  "key.reizo.fov_out": "Zoom out (wider FOV)",
+  "key.reizo.camera_reset": "Reset camera roll and FOV",
+  "key.reizo.path_display": "Show/hide camera path",
+  "reizo.camera.roll_fov": "Roll %s°  ·  FOV %s",
+  "reizo.camera.reset": "Camera level, FOV reset",
+  "reizo.path.shown": "Camera path shown",
+  "reizo.path.hidden": "Camera path hidden"
 }

@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-22 by Claude (timeline editor).
+Last updated: 2026-11-22 by Claude (path display, roll/FOV).
 
 ## 1. Current project phase
 
@@ -58,7 +58,8 @@ screen, effects, audio, shadow recording, multi-version.
 ## 3. Current branch and commit
 
 - `main`: everything up to the OneConfig page (#28–#36 merged 2026-11-22).
-- `feat/timeline-editor`: timeline editor (#13 first slice), PR open against `main`.
+- `main` also has the timeline editor (#37).
+- `feat/path-visualization`: path display, free camera roll/FOV, camera kept across seeks; PR open.
   Merge workflow for stacked PRs: squash-merge, then merge `origin/main` into the next branch and
   resolve with `git checkout --ours -- .` after checking `git diff --quiet origin/main <merged head>`.
 
@@ -75,7 +76,11 @@ screen, effects, audio, shadow recording, multi-version.
   modifiers 0, so screens must also read `Minecraft.hasControlDown()`/`hasShiftDown()`.
 - Seeks are clamped to `ReplayScript.startMs()` (the first play packet). Before that there is no
   world, and a paused replay seeked there stayed on the reconfiguration screen.
-- Next: camera path visualization and roll/FOV keys, export settings
+- Path display (`PathVisualizer`) uses vanilla gizmos from `WorldRenderEvents.END_EXTRACTION`,
+  wrapped in `levelRenderer.collectPerFrameGizmos()`: frames rendered outside `runTick` (the
+  gametest screenshot path) have no collection open, and per-tick gizmos are not drained while the
+  world is frozen (paused replay).
+- Next: export settings
   UI and rendering at output size, shadow recording (#16), audio (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
@@ -108,6 +113,11 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, path display and roll/FOV (branch `feat/path-visualization`):
+- `./gradlew build`: pass (72 unit tests). Gametests: pass (twice for the camera restore), adding
+  `checkFreeCamera` and a camera-position check after a backwards seek. Screenshot
+  `reizo-path-display` checked: curve, boxes, arrows and the current-position dot are drawn.
 
 2026-11-22, cloud box, timeline editor (branch `feat/timeline-editor`):
 - `./gradlew build`: pass (72 unit tests). Gametests: pass, adding `checkTimeline` (Y opens the
