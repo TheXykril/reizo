@@ -55,7 +55,7 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 
 ## M8 — More Minecraft versions
 
-Plan: [ADR 0007](DECISIONS/0007-multi-version-strategy.md) (proposed). Starts only after M1–M4 work
+Plan: [ADR 0007](DECISIONS/0007-multi-version-strategy.md) (accepted). Starts only after M1–M4 work
 on 1.21.11.
 
 - Stonecutter multi-version build, then Minecraft 26.3 (newest, OneClient mod's target) (#19)

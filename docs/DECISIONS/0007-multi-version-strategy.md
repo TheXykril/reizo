@@ -1,7 +1,6 @@
 # 0007: Multi-version strategy (1.8.9 to newest)
 
-Status: Proposed (2026-11-22). Needs the owner's review. It extends ADR 0001 and 0002 and does not
-replace them.
+Status: Accepted (owner, 2026-11-22). It extends ADR 0001 and 0002 and does not replace them.
 
 ## Context
 
