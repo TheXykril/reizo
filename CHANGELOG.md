@@ -31,7 +31,7 @@ compatibility.
   per-tick local player state.
 - Configuration cache so recordings started mid-session still contain registries and the login
   packet.
-- F9 start/stop key, optional pause and marker keys, HUD recording indicator, toasts.
+- Start/stop key, optional pause and marker keys, HUD recording indicator, toasts.
 - Auto-record on join setting (`config/reizo.json`).
 - Unit tests for format, sessions, storage and recovery; in-game client gametests that record a
   singleplayer world and decode every recorded packet with Minecraft's own codecs.
