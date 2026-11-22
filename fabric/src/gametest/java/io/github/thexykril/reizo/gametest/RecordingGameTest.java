@@ -21,6 +21,7 @@ import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
+import io.github.thexykril.reizo.fabric.ui.TimelineScreen;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.nio.file.Files;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -299,6 +301,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> ReplayPlayback.current().seeksDone() == 2, 20 * 5);
     context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
     checkCameraPath(context);
+    checkTimeline(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -518,6 +521,112 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(2);
     check(!ReplayEditor.isPathPlaying(), "B did not stop the camera path");
     LOGGER.info("checkCameraPath OK: camera on the path at {}", expected);
+  }
+
+  /**
+   * Opens the timeline editor with its key and edits with real mouse and key input: drag a
+   * keyframe, undo and redo, set the export region, seek from the ruler.
+   */
+  private void checkTimeline(ClientGameTestContext context) {
+    long duration = ReplayPlayback.current().script().durationMs();
+    long middle = duration / 2;
+    context.runOnClient(
+        mc ->
+            ReplayEditor.putKeyframe(
+                new CameraKeyframe(middle, mc.player.getX(), mc.player.getEyeY(), 0, 0, 0, 0, 70)));
+    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> mc.screen instanceof TimelineScreen),
+        "Y did not open the timeline");
+    double scale = context.computeOnClient(mc -> (double) mc.getWindow().getGuiScale());
+    int[] at =
+        context.computeOnClient(
+            mc -> {
+              TimelineScreen s = (TimelineScreen) mc.screen;
+              return new int[] {
+                s.xOf(middle), s.cameraTrackY(), s.xOf(duration / 4), s.rulerTrackY()
+              };
+            });
+    // Drag the middle keyframe 30 GUI pixels to the left.
+    context.getInput().setCursorPos((at[0] + 0.5) * scale, (at[1] + 0.5) * scale);
+    context.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(1);
+    for (int i = 0; i < 3; i++) {
+      context.getInput().moveCursor(-10 * scale, 0);
+      context.waitTicks(1);
+    }
+    context.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+    List<Long> afterDrag = keyframeTimes();
+    check(afterDrag.size() == 3, "drag changed the keyframe count: " + afterDrag);
+    long moved = afterDrag.get(1);
+    check(moved < middle - 100, "keyframe was not dragged left: " + middle + " -> " + moved);
+    Set<Long> selected =
+        context.computeOnClient(mc -> ((TimelineScreen) mc.screen).selectedTimes());
+    check(selected.equals(Set.of(moved)), "dragged keyframe not selected: " + selected);
+
+    context.getInput().holdControl();
+    context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+    context.getInput().releaseControl();
+    context.waitTicks(1);
+    check(keyframeTimes().get(1) == middle, "Ctrl+Z did not undo the drag: " + keyframeTimes());
+    context.getInput().holdControl();
+    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().releaseControl();
+    context.waitTicks(1);
+    check(keyframeTimes().get(1) == moved, "Ctrl+Y did not redo the drag: " + keyframeTimes());
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_I);
+    context.waitTicks(1);
+    long in = ReplayEditor.inMs();
+    check(in >= 0, "I did not set the export start");
+    context.takeScreenshot("reizo-timeline");
+    context.getInput().holdShift();
+    context.getInput().pressKey(GLFW.GLFW_KEY_I);
+    context.getInput().releaseShift();
+    context.waitTicks(1);
+    check(ReplayEditor.inMs() == -1, "Shift+I did not clear the export start");
+
+    // Space pauses; then a click on the ruler at a quarter of the recording seeks there.
+    context.getInput().pressKey(GLFW.GLFW_KEY_SPACE);
+    context.waitTicks(1);
+    check(!ReplayPlayback.current().clock().isRunning(), "Space did not pause the replay");
+    int seeks = ReplayPlayback.current().seeksDone();
+    context.getInput().setCursorPos((at[2] + 0.5) * scale, (at[3] + 0.5) * scale);
+    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.waitFor(
+        mc -> {
+          ReplayServer r = ReplayPlayback.current();
+          return r.seeksDone() > seeks && !r.isReconfiguring() && mc.level != null;
+        },
+        20 * 30);
+    long now = ReplayPlayback.current().clock().timeMs();
+    // Seeks never go before the first play packet (the world starts there).
+    long expected = Math.max(ReplayPlayback.current().script().startMs(), duration / 4);
+    check(
+        Math.abs(now - expected) < Math.max(250, duration / 20),
+        "ruler click seeked to " + now + ", expected about " + expected);
+    var saved =
+        context.computeOnClient(
+            mc -> {
+              try {
+                return ReplayEditor.store().load(ReplayEditor.project().id);
+              } catch (java.io.IOException e) {
+                throw new AssertionError(e);
+              }
+            });
+    check(
+        saved.cameraKeyframes.size() == 3 && saved.cameraKeyframes.get(1).t == moved,
+        "project not saved after the timeline edit");
+    context.runOnClient(mc -> mc.setScreen(null));
+    context.waitTicks(1);
+    LOGGER.info(
+        "checkTimeline OK: keyframe dragged {} -> {}, ruler seek to {}", middle, moved, now);
+  }
+
+  private static List<Long> keyframeTimes() {
+    return ReplayEditor.path().keyframes().stream().map(CameraKeyframe::timeMs).toList();
   }
 
   /**

@@ -6,8 +6,16 @@ compatibility.
 
 ## [Unreleased]
 
+### Fixed
+
+- Seeking a paused replay to before its world had loaded left the client on the "reconfiguring"
+  screen. Seeks now start no earlier than the recording's first world packet.
+
 ### Added
 
+- Timeline editor for replays (Y or the pause menu): a panel with a time ruler, markers, camera
+  keyframes and the export region. Drag keyframes, box-select, copy and paste, undo and redo,
+  zoom and scroll, click to seek, and set the export start and end with I and O.
 - Optional OneConfig page (for example in OneClient): open replays, start/stop recording and
   change Reizo's settings from OneConfig. Reizo works the same without OneConfig.
 - Basic playback: a recording is played back into the client world through a loopback replay

@@ -36,6 +36,7 @@ public final class RecorderKeys {
   private static KeyMapping keyframeRemove;
   private static KeyMapping pathToggle;
   private static KeyMapping pathSmoothing;
+  private static KeyMapping timeline;
 
   /** How far the seek keys jump. */
   static final long SEEK_STEP_MS = 5_000;
@@ -107,6 +108,10 @@ public final class RecorderKeys {
     pathSmoothing =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping("key.reizo.path_smoothing", GLFW.GLFW_KEY_J, replay));
+    // Y is unused by vanilla.
+    timeline =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.timeline", GLFW.GLFW_KEY_Y, replay));
   }
 
   /** Called once per client tick. */
@@ -155,6 +160,11 @@ public final class RecorderKeys {
     }
     seekKeys(mc, active);
     pathKeys(mc, active);
+    while (timeline.consumeClick()) {
+      if (active && mc.screen == null) {
+        mc.setScreen(new TimelineScreen());
+      }
+    }
   }
 
   private static void pathKeys(Minecraft mc, boolean active) {

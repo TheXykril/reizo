@@ -78,6 +78,13 @@ public final class MenuButtons {
     if (ReplayPlayback.isActive()) {
       buttons.add(
           Button.builder(
+                  Component.translatable("reizo.menu.timeline"),
+                  b -> client.setScreen(new TimelineScreen()))
+              .bounds(4, y, 120, 20)
+              .build());
+      y += 24;
+      buttons.add(
+          Button.builder(
                   Component.translatable("reizo.menu.export"),
                   b -> {
                     client.setScreen(null);

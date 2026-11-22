@@ -94,12 +94,22 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - Path visualization in the world, Bézier handles, look-at tracking, camera shake, depth of field:
   **planned**.
 
-## Timeline editor (planned, M4)
+## Timeline editor (M4)
 
-Tracks (Lunar: effects, video, sound), zoom/scroll, trim/split ("cutting tool"), unlink media,
-move between tracks, keyframe editing with interpolation and fade per keyframe, multi-select
-keyframes, text/image overlays, media library with folders, undo/redo, shortcuts, copy/paste,
-autosave, recovery, non-destructive projects. Status: **planned**.
+- **Timeline panel during a replay (Y, or "Timeline editor" in the pause menu):** **partial**,
+  evidence UT (`TimelineTest`: zoom around the cursor, scrolling limits, ruler spacing, undo/redo,
+  group move, copy/paste, box selection) and GT (`checkTimeline`: Y opens it; a mouse drag moves a
+  keyframe; Ctrl+Z and Ctrl+Y undo and redo it; I sets and Shift+I clears the export start; a click
+  on the ruler seeks; the project is saved; screenshot `reizo-timeline`). Not visually checked by a
+  person yet.
+  - Tracks: time ruler, markers, camera keyframes, export region (in/out), overview bar.
+  - Mouse: click the ruler to seek, drag keyframes (Shift adds to the selection), box-select,
+    double-click a keyframe to go to it, wheel zooms around the cursor, Shift+wheel scrolls.
+  - Keys: Space, N, Delete, Ctrl+Z/Y, Ctrl+C/V (paste at the playhead), Ctrl+A, I/O, F, ← →.
+  - Buttons: play/pause, add, delete, path on/off, smoothing, in, out, undo, redo, export.
+  - Every change autosaves to the project; undo covers keyframes, smoothing and the export region.
+- Effect, video and sound tracks, trim/split, per-keyframe interpolation and fades, text/image
+  overlays, media library: **planned**.
 
 ## Visual effects (planned, M5)
 
@@ -126,7 +136,7 @@ replay ("Export video"). Evidence GT (`exportVideo`: 20 fps export of a replay, 
 | MKV, MOV, WebM; HEVC, VP9, AV1 | ✓ | partial: any FFmpeg codec via project `render.codec` and file name; only libx264 tested |
 | NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: command options exist, untested (no GPU in CI) |
 | Resolution, frame rate, quality | ✓ | partial: project `render` settings (FFmpeg scales from window size); no UI yet |
-| Render region (in/out) | ✓ (Jul 2026) | partial: project `inMs`/`outMs`; no UI yet |
+| Render region (in/out) | ✓ (Jul 2026) | partial: I and O in the timeline editor set it (GT); an export with a region is not tested yet |
 | Progress, cancel | ? | implemented: progress in the window title, Esc cancels |
 | Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |
 | Frame sequence, screenshot export, render queue, presets | ? | planned |
