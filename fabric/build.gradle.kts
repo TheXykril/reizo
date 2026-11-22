@@ -48,6 +48,9 @@ fabricApi {
 // lockstep with client frames. A small window keeps frames cheap enough for the world to load.
 loom.runs.matching { it.name == "clientGameTest" }.configureEach {
     programArgs("--width", "320", "--height", "240")
+    // Playback feeds the client from a raw socket, so packets are not sent through a Connection
+    // the gametest framework can count; its packet synchronizer would report a false error.
+    vmArgs("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
 }
 
 dependencies {

@@ -22,6 +22,7 @@ public final class PacketTap {
 
   private static volatile CaptureController controller;
   private static volatile boolean errorLogged;
+  private static volatile boolean suppressed;
 
   private PacketTap() {}
 
@@ -29,15 +30,23 @@ public final class PacketTap {
     controller = c;
   }
 
+  /** While true (a replay is playing), nothing is captured. */
+  public static void setSuppressed(boolean value) {
+    suppressed = value;
+  }
+
   /** Cheap pre-check on the network thread: is this a client decoder for a recorded phase? */
   public static boolean wants(ProtocolInfo<?> info) {
-    return controller != null && info.flow() == PacketFlow.CLIENTBOUND && phaseOf(info) != null;
+    return controller != null
+        && !suppressed
+        && info.flow() == PacketFlow.CLIENTBOUND
+        && phaseOf(info) != null;
   }
 
   public static void captured(ProtocolInfo<?> info, byte[] packetBytes) {
     CaptureController c = controller;
     ProtocolPhase phase = phaseOf(info);
-    if (c == null || phase == null) {
+    if (c == null || phase == null || suppressed) {
       return;
     }
     try {

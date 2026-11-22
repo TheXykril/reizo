@@ -3,13 +3,14 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-22 by Claude (initial setup session).
+Last updated: 2026-11-22 by Claude (playback first slice).
 
 ## 1. Current project phase
 
-M1 "Recording foundation", first slice done. Vertical slice progress: steps 1–4 (launch dev
-client, start, record, stop and save) work and are covered by automated in-game tests. Steps 5–9
-(open, play, free camera, project, export) are not started.
+M1 "Recording foundation" first slice done; M2 started. Vertical slice: steps 1–4 (launch dev
+client, start, record, stop and save) and a first version of steps 5–6 (open and play a recording
+into the client world, dev command only) work and are covered by automated in-game tests. Free
+camera, project and export are not started.
 
 ## 2. Latest completed tasks
 
@@ -21,18 +22,26 @@ client, start, record, stop and save) work and are covered by automated in-game 
   pause, markers), storage (locks, packaging, recovery), capture controller (config cache).
 - `fabric`: decoder mixin capture, local player sampler, F9 toggle + pause/marker keys, HUD
   indicator, toasts, auto-record on join, startup recovery, debug commands (dev only).
-- Tests: 34 unit tests; 2 client gametests.
-- Docs: AGENTS.md, CLAUDE.md, docs/*, 6 ADRs, templates.
+- Playback first slice (#7, ADR 0008): `core.playback` (PlaybackClock, ReplayScript) and
+  `fabric.playback` (ReplayServer on 127.0.0.1, ReplayPlayback), `/reizo-debug play [file]`,
+  capture suppressed during replays.
+- Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
+- CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
+- Tests: 37 unit tests; 3 client gametest scenarios (record from join, play back, record
+  mid-session).
+- Docs: AGENTS.md, CLAUDE.md, docs/*, 8 ADRs, templates.
 
 ## 3. Current branch and commit
 
-- `main`: all work above, squash-merged from PR #20 on 2026-11-22 (commit dad38a1).
-- `docs/multi-version-plan`: ADR 0007 (accepted), PR #26.
+- `main`: recording foundation (#20), CI fix (#27), ADR 0007 (#26), all merged 2026-11-22.
+- `feat/playback-replay-server`: playback first slice (this session's PR).
   Check `git log --oneline` for the exact head commit.
 
 ## 4. Active implementation work
 
-CI in-game test job fails on GitHub runners (world load timeout, see section 7). Being fixed.
+Playback first slice on branch `feat/playback-replay-server` (PR open). Next pieces of #7:
+recorded player reconstruction from `LOCAL_PLAYER` frames; then #9 free camera, #8 seeking, #10
+replay browser (the real entry point instead of the debug command).
 
 ## 5. Files and modules affected
 
@@ -48,12 +57,6 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 
 ## 7. Known bugs and blockers
 
-- **CI in-game tests time out on GitHub runners** ("Timeout loading world", spawn area stuck at
-  16%), on ubuntu-26.04 and on 24.04. Thread dumps show the render thread busy in software
-  rendering (texture upload, `glfwSwapBuffers`). The integrated server runs in lockstep with
-  client ticks, so it never finishes loading. Reproduced in the cloud box by pinning the run to one
-  core. Passes with 2+ cores in the cloud and on Hyperion. Fix in progress: cheaper rendering
-  settings in the test.
 - **Mid-session recordings are incomplete:** chunks/entities loaded before start are missing
   (flagged `completeFromJoin=false`, toast warns). Fix = world snapshots (M2 issue).
 - Fabric's play DISCONNECT event fires on the Netty thread and Minecraft drops queued client tasks
@@ -68,6 +71,13 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, playback slice (branch `feat/playback-replay-server`):
+- `./gradlew build`: pass (37 unit tests).
+- `xvfb-run -a ./gradlew :fabric:runClientGameTest`: pass. `playBack`: 94/94 play packets delivered
+  over 3.7 s, 49 chunks loaded, replay player has the recorded UUID, replay not recorded,
+  connection closed cleanly on disconnect.
+- Not tested: playback of multiplayer recordings, long recordings, manual visual check.
 
 2026-11-22, cloud box (Ubuntu 24.04, JDK 21.0.13, Mesa llvmpipe under Xvfb):
 - `./gradlew build`: pass (34 unit tests, 0 failures).
@@ -106,8 +116,8 @@ None at the end of this session (everything pushed to `feat/recording-foundation
 2. Owner on Hyperion (Arch/Hyprland): run and paste results of
    `java -version; gh auth status; ffmpeg -hide_banner -encoders | grep -E "264|265|av1|vaapi|nvenc|qsv"; glxinfo -B | head -20; vainfo 2>&1 | head; nvidia-smi 2>&1 | head -5`
    then `./gradlew :fabric:runClient` and walk through docs/TESTING.md manual checklist.
-3. Next agent: M1 issues #4 "Multiplayer recording gametest" and #2 "Pause-menu recording controls",
-   then start M2 #7 "Replay world".
+3. Next agent: finish #7 (recorded player reconstruction, spectator-style camera player), then #9,
+   #8, #10. M1 leftovers: #4 "Multiplayer recording gametest", #2 "Pause-menu recording controls".
 
 ## 11. Relevant GitHub issues and pull requests
 

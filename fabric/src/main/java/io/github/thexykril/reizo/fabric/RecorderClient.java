@@ -13,6 +13,7 @@ import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingStorage;
 import io.github.thexykril.reizo.fabric.capture.LocalPlayerSampler;
 import io.github.thexykril.reizo.fabric.capture.PacketTap;
+import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.ui.DebugCommands;
 import io.github.thexykril.reizo.fabric.ui.RecorderKeys;
 import io.github.thexykril.reizo.fabric.ui.RecordingIndicator;
@@ -69,7 +70,7 @@ public final class RecorderClient implements ClientModInitializer {
 
     ClientConfigurationConnectionEvents.START.register(
         (handler, client) -> {
-          if (config.autoRecordOnJoin && session() == null) {
+          if (config.autoRecordOnJoin && session() == null && !ReplayPlayback.isActive()) {
             client.execute(this::startRecording);
           }
         });
@@ -92,6 +93,10 @@ public final class RecorderClient implements ClientModInitializer {
     return config;
   }
 
+  public RecordingStorage storage() {
+    return storage;
+  }
+
   /** Toggles recording on or off. Client thread only. */
   public void toggleRecording() {
     if (session() != null) {
@@ -103,6 +108,9 @@ public final class RecorderClient implements ClientModInitializer {
 
   public void startRecording() {
     Minecraft mc = Minecraft.getInstance();
+    if (ReplayPlayback.isActive()) {
+      return; // never record a replay
+    }
     if (!capture.canRecord()) {
       toast("reizo.toast.not_connected", null);
       return;
