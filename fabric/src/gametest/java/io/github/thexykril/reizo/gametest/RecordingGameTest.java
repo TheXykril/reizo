@@ -24,12 +24,15 @@ import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.GraphicsPreset;
+import net.minecraft.client.Options;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.GameProtocols;
+import net.minecraft.server.level.ParticleStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,8 +48,29 @@ public final class RecordingGameTest implements FabricClientGameTest {
 
   @Override
   public void runTest(ClientGameTestContext context) {
+    useCheapRendering(context);
     recordFromJoin(context);
     recordMidSessionWhileWalking(context);
+  }
+
+  /**
+   * CI runners render in software (llvmpipe) on few cores. The client gametest runs the integrated
+   * server in lockstep with client ticks, so expensive frames starve world loading until it times
+   * out. The test checks recording, not visuals, so render as cheaply as possible.
+   */
+  private static void useCheapRendering(ClientGameTestContext context) {
+    context.runOnClient(
+        mc -> {
+          Options options = mc.options;
+          options.applyGraphicsPreset(GraphicsPreset.FAST);
+          options.enableVsync().set(false);
+          options.framerateLimit().set(10);
+          options.renderDistance().set(2);
+          options.simulationDistance().set(5);
+          options.mipmapLevels().set(0);
+          options.biomeBlendRadius().set(0);
+          options.particles().set(ParticleStatus.MINIMAL);
+        });
   }
 
   /** Auto-record on join: the recording must hold the complete connection, including chunks. */

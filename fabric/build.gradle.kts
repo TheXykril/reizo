@@ -44,6 +44,12 @@ fabricApi {
     }
 }
 
+// CI runners render in software on few cores, and the gametest runs the integrated server in
+// lockstep with client frames. A small window keeps frames cheap enough for the world to load.
+loom.runs.matching { it.name == "clientGameTest" }.configureEach {
+    programArgs("--width", "320", "--height", "240")
+}
+
 dependencies {
     minecraft("com.mojang:minecraft:${libs.versions.minecraft.get()}")
     mappings(loom.officialMojangMappings())
