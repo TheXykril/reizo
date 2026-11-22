@@ -81,6 +81,19 @@ class PlaybackTest {
   }
 
   @Test
+  void scriptStartsAtTheFirstPlayPacket() {
+    // The clock starts with the configuration phase; the world arrives later.
+    ReplayScript script =
+        ReplayScript.of(
+            List.of(
+                Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}),
+                Frame.packet(800, ProtocolPhase.PLAY, new byte[] {10}),
+                Frame.packet(2000, ProtocolPhase.PLAY, new byte[] {11})));
+    assertEquals(800, script.startMs());
+    assertEquals(0, script.due(700).size(), "nothing to show before the world starts");
+  }
+
+  @Test
   void scriptSplitsPhasesAndReleasesPacketsByTime() {
     List<Frame> frames =
         List.of(

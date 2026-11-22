@@ -89,6 +89,14 @@ public final class ReplayScript {
     return playPacketCount;
   }
 
+  /**
+   * Time of the first timeline entry (the first play packet) in milliseconds. A recording's clock
+   * starts at the configuration phase, so the world only exists from here on: seeks go no earlier.
+   */
+  public long startMs() {
+    return timeline.get(0).timeMs();
+  }
+
   /** Time of the last timeline entry in milliseconds. */
   public long durationMs() {
     return timeline.get(timeline.size() - 1).timeMs();

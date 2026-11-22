@@ -9,6 +9,8 @@ import io.github.thexykril.reizo.core.camera.CameraPath;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.project.Project;
 import io.github.thexykril.reizo.core.project.ProjectStore;
+import io.github.thexykril.reizo.core.timeline.EditHistory;
+import io.github.thexykril.reizo.core.timeline.TimelineState;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -32,6 +34,7 @@ public final class ReplayEditor {
   private static Project project;
   private static CameraPath path = new CameraPath();
   private static boolean pathPlaying;
+  private static final EditHistory<TimelineState> history = new EditHistory<>(200);
 
   private ReplayEditor() {}
 
@@ -59,9 +62,11 @@ public final class ReplayEditor {
       project.recordingId = meta.id;
     }
     path = project.cameraPath();
+    history.clear();
   }
 
   static void close() {
+    history.clear();
     project = null;
     path = new CameraPath();
     pathPlaying = false;
@@ -100,7 +105,8 @@ public final class ReplayEditor {
     if (server == null || camera == null || project == null) {
       return null;
     }
-    long t = Math.min(server.clock().timeMs(), server.script().durationMs());
+    long t = Math.min(server.replayTimeMs(), server.script().durationMs());
+    recordUndo();
     CameraKeyframe near = path.removeNearest(t, KEYFRAME_TOLERANCE_MS);
     long at = near != null ? near.timeMs() : t;
     CameraKeyframe k =
@@ -120,6 +126,7 @@ public final class ReplayEditor {
 
   /** Puts a keyframe as given (tests, future editor UI). */
   public static void putKeyframe(CameraKeyframe k) {
+    recordUndo();
     path.put(k);
     save();
   }
@@ -130,18 +137,19 @@ public final class ReplayEditor {
     if (server == null) {
       return null;
     }
-    CameraKeyframe removed = path.removeNearest(server.clock().timeMs(), KEYFRAME_TOLERANCE_MS);
-    if (removed != null) {
-      if (path.isEmpty()) {
-        pathPlaying = false;
-      }
-      save();
+    CameraKeyframe near = nearest(server.replayTimeMs(), KEYFRAME_TOLERANCE_MS);
+    if (near == null) {
+      return null;
     }
-    return removed;
+    recordUndo();
+    path.remove(near.timeMs());
+    changed();
+    return near;
   }
 
   /** Cycles interpolation, then easing: catmull-rom, linear, each with and without easing. */
   public static String cycleSmoothing() {
+    recordUndo();
     if (path.easing() == CameraPath.Easing.LINEAR) {
       path.setEasing(CameraPath.Easing.EASE_IN_OUT);
     } else {
@@ -177,6 +185,103 @@ public final class ReplayEditor {
       mc.player.setYRot(k.yaw());
       mc.player.setXRot(k.pitch());
     }
+  }
+
+  /** The keyframe nearest to a time within a tolerance, or null. */
+  public static CameraKeyframe nearest(long timeMs, long toleranceMs) {
+    CameraKeyframe best = null;
+    for (CameraKeyframe k : path.keyframes()) {
+      long d = Math.abs(k.timeMs() - timeMs);
+      if (d <= toleranceMs && (best == null || d < Math.abs(best.timeMs() - timeMs))) {
+        best = k;
+      }
+    }
+    return best;
+  }
+
+  /** Everything the timeline edits, as an immutable snapshot. */
+  public static TimelineState state() {
+    return project == null
+        ? TimelineState.of(path, -1, -1)
+        : TimelineState.of(path, project.inMs, project.outMs);
+  }
+
+  /**
+   * Records the current state for undo. Call once before a change (for a drag: once when it
+   * starts), then {@link #changed()} after it.
+   */
+  public static void recordUndo() {
+    history.record(state());
+  }
+
+  /** Saves after a change made directly on {@link #path()} or the project. */
+  public static void changed() {
+    if (path.isEmpty()) {
+      pathPlaying = false;
+    }
+    save();
+  }
+
+  public static boolean undo() {
+    return restore(history.undo(state()));
+  }
+
+  public static boolean redo() {
+    return restore(history.redo(state()));
+  }
+
+  public static boolean canUndo() {
+    return history.canUndo();
+  }
+
+  public static boolean canRedo() {
+    return history.canRedo();
+  }
+
+  private static boolean restore(TimelineState s) {
+    if (s == null) {
+      return false;
+    }
+    s.applyTo(path);
+    if (project != null) {
+      project.inMs = s.inMs();
+      project.outMs = s.outMs();
+    }
+    changed();
+    return true;
+  }
+
+  /** Start of the export region, or -1 for the start of the recording. */
+  public static long inMs() {
+    return project == null ? -1 : project.inMs;
+  }
+
+  /** End of the export region, or -1 for the end of the recording. */
+  public static long outMs() {
+    return project == null ? -1 : project.outMs;
+  }
+
+  /**
+   * Sets the export region's start (or end); -1 clears it. An end before the start (or a start
+   * after the end) clears the other side, so the region is never inverted.
+   */
+  public static void setRegion(boolean start, long timeMs) {
+    if (project == null) {
+      return;
+    }
+    recordUndo();
+    if (start) {
+      project.inMs = timeMs;
+      if (timeMs >= 0 && project.outMs >= 0 && project.outMs <= timeMs) {
+        project.outMs = -1;
+      }
+    } else {
+      project.outMs = timeMs;
+      if (timeMs >= 0 && project.inMs >= 0 && project.inMs >= timeMs) {
+        project.inMs = -1;
+      }
+    }
+    changed();
   }
 
   private static void save() {

@@ -340,7 +340,9 @@ public final class ReplayServer implements AutoCloseable {
    * between are sent at once; backwards, the replay is rebuilt from the start. Any thread.
    */
   public void seek(long timeMs) {
-    pendingSeek.set(Math.max(0, Math.min(timeMs, script.durationMs())));
+    // Never before the first play packet: the world (the login packet) only starts there, and a
+    // paused replay would otherwise wait on the reconfiguration screen forever.
+    pendingSeek.set(Math.max(script.startMs(), Math.min(timeMs, script.durationMs())));
   }
 
   /** Number of seeks carried out so far. For tests. */

@@ -40,7 +40,7 @@ public final class ReplayHud {
   private static void render(GuiGraphics g) {
     ReplayServer server = ReplayPlayback.current();
     Minecraft mc = Minecraft.getInstance();
-    if (server == null || mc.options.hideGui) {
+    if (server == null || mc.options.hideGui || mc.screen instanceof TimelineScreen) {
       return;
     }
     long duration = Math.max(1, server.script().durationMs());

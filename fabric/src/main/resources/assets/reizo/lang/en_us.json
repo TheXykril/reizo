@@ -73,5 +73,20 @@
   "reizo.export.done": "Video exported",
   "reizo.export.failed": "Export failed",
   "reizo.export.cancelled": "Export cancelled",
-  "reizo.export.no_ffmpeg": "FFmpeg not found: install it or set its path in reizo.json"
+  "reizo.export.no_ffmpeg": "FFmpeg not found: install it or set its path in reizo.json",
+  "key.reizo.timeline": "Open timeline editor",
+  "reizo.menu.timeline": "Timeline editor",
+  "reizo.timeline.title": "Timeline",
+  "reizo.timeline.add": "+ Key",
+  "reizo.timeline.delete": "Delete",
+  "reizo.timeline.path_on": "Path: on",
+  "reizo.timeline.path_off": "Path: off",
+  "reizo.timeline.smooth": "Smooth",
+  "reizo.timeline.in": "In",
+  "reizo.timeline.out": "Out",
+  "reizo.timeline.undo": "Undo",
+  "reizo.timeline.redo": "Redo",
+  "reizo.timeline.export": "Export",
+  "reizo.timeline.markers": "Markers",
+  "reizo.timeline.camera": "Camera"
 }

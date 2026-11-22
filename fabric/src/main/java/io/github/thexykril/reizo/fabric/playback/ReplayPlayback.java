@@ -66,6 +66,17 @@ public final class ReplayPlayback {
     return target;
   }
 
+  /** Seeks the running replay to a time, clamped to the recording. Returns the target. */
+  public static long seekTo(long timeMs) {
+    ReplayServer server = current;
+    if (server == null) {
+      return 0;
+    }
+    long target = Math.max(0, Math.min(timeMs, server.script().durationMs()));
+    server.seek(target);
+    return target;
+  }
+
   /** Seeks the running replay to the next (direction 1) or previous (-1) marker. */
   public static boolean seekToMarker(int direction) {
     ReplayServer server = current;
