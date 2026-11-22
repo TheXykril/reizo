@@ -13,6 +13,8 @@ import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
+import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
+import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.nio.file.Files;
@@ -25,6 +27,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.GraphicsPreset;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.ProtocolInfo;
@@ -49,7 +52,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
   @Override
   public void runTest(ClientGameTestContext context) {
     useCheapRendering(context);
-    recordFromJoin(context);
+    Path archive = recordFromJoin(context);
+    playBack(context, archive);
     recordMidSessionWhileWalking(context);
   }
 
@@ -74,7 +78,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
   }
 
   /** Auto-record on join: the recording must hold the complete connection, including chunks. */
-  private void recordFromJoin(ClientGameTestContext context) {
+  private Path recordFromJoin(ClientGameTestContext context) {
     context.runOnClient(mc -> RecorderClient.get().config().autoRecordOnJoin = true);
     RecordingSession session;
     RegistryAccess registries;
@@ -104,6 +108,51 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(meta.markers.size() == 1, "marker missing");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
     LOGGER.info("recordFromJoin OK: {} -> {}", archive.getFileName(), stats);
+    return archive;
+  }
+
+  /**
+   * Plays the join recording back: the client must enter the recorded world through the replay
+   * server, receive every play packet, load the recorded chunks, and not record the replay.
+   */
+  private void playBack(ClientGameTestContext context, Path archive) {
+    RecordingMetadata meta = metadata(archive);
+    context.runOnClient(
+        mc -> {
+          try {
+            ReplayPlayback.start(mc, archive);
+          } catch (java.io.IOException e) {
+            throw new AssertionError("could not start replay", e);
+          }
+        });
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.script().finished()
+              && mc.level != null
+              && mc.player != null
+              && mc.level.getChunkSource().getLoadedChunksCount() > 0;
+        },
+        20 * 120);
+    ReplayServer replay = context.computeOnClient(mc -> ReplayPlayback.current());
+    int chunks = context.computeOnClient(mc -> mc.level.getChunkSource().getLoadedChunksCount());
+    String playerUuid = context.computeOnClient(mc -> mc.player.getUUID().toString());
+    check(
+        replay.playPacketsSent() == replay.script().playPacketCount(),
+        "sent " + replay.playPacketsSent() + " of " + replay.script().playPacketCount());
+    check(playerUuid.equals(meta.localPlayerUuid), "replay player is " + playerUuid);
+    check(
+        context.computeOnClient(mc -> RecorderClient.get().session()) == null,
+        "the replay was being recorded");
+    context.waitTicks(20);
+    check(
+        context.computeOnClient(mc -> mc.level != null && ReplayPlayback.isActive()),
+        "replay connection dropped");
+
+    context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    LOGGER.info("playBack OK: {} play packets, {} chunks loaded", replay.playPacketsSent(), chunks);
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

@@ -1,0 +1,80 @@
+/*
+ * Copyright (C) 2026 Reizo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package io.github.thexykril.reizo.core.playback;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.github.thexykril.reizo.core.format.Frame;
+import io.github.thexykril.reizo.core.format.FrameType;
+import io.github.thexykril.reizo.core.format.ProtocolPhase;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import org.junit.jupiter.api.Test;
+
+class PlaybackTest {
+  private static final long MS = 1_000_000L;
+
+  @Test
+  void clockStartsPausedAndFollowsSpeed() {
+    AtomicLong now = new AtomicLong(5_000 * MS);
+    PlaybackClock clock = new PlaybackClock(now::get);
+    now.addAndGet(100 * MS);
+    assertEquals(0, clock.timeMs());
+    assertFalse(clock.isRunning());
+
+    clock.resume();
+    now.addAndGet(100 * MS);
+    assertEquals(100, clock.timeMs());
+
+    clock.setSpeed(2.0);
+    now.addAndGet(100 * MS);
+    assertEquals(300, clock.timeMs());
+
+    clock.pause();
+    now.addAndGet(1_000 * MS);
+    assertEquals(300, clock.timeMs());
+
+    clock.resume();
+    now.addAndGet(50 * MS);
+    assertEquals(400, clock.timeMs());
+    assertThrows(IllegalArgumentException.class, () -> clock.setSpeed(0));
+  }
+
+  @Test
+  void scriptSplitsPhasesAndReleasesPacketsByTime() {
+    List<Frame> frames =
+        List.of(
+            Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}),
+            Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {2}),
+            Frame.packet(0, ProtocolPhase.PLAY, new byte[] {10}),
+            Frame.of(0, FrameType.LIVE_START, new byte[0]),
+            Frame.packet(50, ProtocolPhase.PLAY, new byte[] {11}),
+            Frame.of(60, FrameType.MARKER, new byte[] {0}),
+            Frame.packet(100, ProtocolPhase.PLAY, new byte[] {12}));
+    ReplayScript script = ReplayScript.of(frames);
+
+    assertEquals(2, script.configuration().size());
+    assertArrayEquals(new byte[] {2}, script.configuration().get(1));
+    assertEquals(3, script.playPacketCount());
+    assertEquals(100, script.durationMs());
+
+    List<byte[]> first = script.due(0);
+    assertEquals(1, first.size());
+    assertArrayEquals(new byte[] {10}, first.get(0));
+    assertEquals(0, script.due(49).size());
+    assertEquals(2, script.due(1_000).size());
+    assertTrue(script.finished());
+  }
+
+  @Test
+  void scriptRejectsRecordingsWithoutPlayPackets() {
+    List<Frame> frames = List.of(Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}));
+    assertThrows(IllegalArgumentException.class, () -> ReplayScript.of(frames));
+  }
+}

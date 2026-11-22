@@ -1,0 +1,340 @@
+/*
+ * Copyright (C) 2026 Reizo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package io.github.thexykril.reizo.fabric.playback;
+
+import com.mojang.authlib.GameProfile;
+import io.github.thexykril.reizo.core.playback.PlaybackClock;
+import io.github.thexykril.reizo.core.playback.ReplayScript;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.network.ProtocolInfo;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
+import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
+import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.GameProtocols;
+import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
+import net.minecraft.network.protocol.handshake.HandshakeProtocols;
+import net.minecraft.network.protocol.login.ClientboundLoginFinishedPacket;
+import net.minecraft.network.protocol.login.LoginProtocols;
+import net.minecraft.network.protocol.login.ServerboundHelloPacket;
+import net.minecraft.network.protocol.login.ServerboundLoginAcknowledgedPacket;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Plays a recording back to the local client over a loopback socket (ADR 0008).
+ *
+ * <p>The client connects to it like to any server. The replay server answers the login itself, then
+ * writes the recorded configuration packets and, once the client has switched to the play protocol,
+ * the recorded play packets at their recorded times. Packets are written as the exact bytes that
+ * were captured, so the client decodes them with its own codecs, as it did when recording. Packets
+ * the client sends are read and discarded, except for the few acknowledgements that mark a protocol
+ * switch.
+ *
+ * <p>No compression and no encryption are negotiated, so a frame is {@code varint(length)} followed
+ * by the packet id and body. The socket listens on the loopback address only and accepts a single
+ * connection.
+ */
+public final class ReplayServer implements AutoCloseable {
+  private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Replay");
+  private static final int ACCEPT_TIMEOUT_MS = 30_000;
+  private static final long KEEP_ALIVE_INTERVAL_MS = 5_000;
+  private static final int MAX_SERVERBOUND_FRAME = 2 * 1024 * 1024;
+  private static final AtomicInteger THREAD_IDS = new AtomicInteger();
+
+  private final ReplayScript script;
+  private final GameProfile profile;
+  private final PlaybackClock clock;
+  private final Supplier<RegistryAccess> registries;
+  private final Runnable onClosed;
+  private final ServerSocket listener;
+  private final CountDownLatch loginAcknowledged = new CountDownLatch(1);
+  private final CountDownLatch configurationFinished = new CountDownLatch(1);
+  private final CountDownLatch helloReceived = new CountDownLatch(1);
+
+  private volatile Socket socket;
+  private volatile boolean closed;
+  private volatile int playPacketsSent;
+
+  /**
+   * Opens the listening socket. Call {@link #start()} afterwards.
+   *
+   * @param registries the client's registries, or null while it has none; needed only to encode
+   *     keep-alive packets in the play phase
+   * @param onClosed runs once, on the replay thread, when the connection ends
+   */
+  public ReplayServer(
+      ReplayScript script,
+      GameProfile profile,
+      PlaybackClock clock,
+      Supplier<RegistryAccess> registries,
+      Runnable onClosed)
+      throws IOException {
+    this.script = script;
+    this.profile = profile;
+    this.clock = clock;
+    this.registries = registries;
+    this.onClosed = onClosed;
+    this.listener = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+  }
+
+  public int port() {
+    return listener.getLocalPort();
+  }
+
+  public PlaybackClock clock() {
+    return clock;
+  }
+
+  public ReplayScript script() {
+    return script;
+  }
+
+  /** Play packets written to the client so far. */
+  public int playPacketsSent() {
+    return playPacketsSent;
+  }
+
+  public void start() {
+    Thread t = new Thread(this::run, "Reizo-Replay-" + THREAD_IDS.incrementAndGet());
+    t.setDaemon(true);
+    t.start();
+  }
+
+  @Override
+  public void close() {
+    closed = true;
+    closeQuietly(listener);
+    Socket s = socket;
+    if (s != null) {
+      closeQuietly(s);
+    }
+  }
+
+  private void run() {
+    try {
+      listener.setSoTimeout(ACCEPT_TIMEOUT_MS);
+      try (Socket s = listener.accept()) {
+        closeQuietly(listener);
+        socket = s;
+        s.setTcpNoDelay(true);
+        Thread reader = new Thread(() -> readClient(s), Thread.currentThread().getName() + "-in");
+        reader.setDaemon(true);
+        reader.start();
+        OutputStream out = new BufferedOutputStream(s.getOutputStream());
+        serve(out);
+      }
+    } catch (SocketTimeoutException e) {
+      LOGGER.warn("Replay client did not connect within {} ms", ACCEPT_TIMEOUT_MS);
+    } catch (IOException e) {
+      if (!closed) {
+        LOGGER.info("Replay connection ended: {}", e.toString());
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (RuntimeException e) {
+      LOGGER.error("Replay failed", e);
+    } finally {
+      close();
+      onClosed.run();
+    }
+  }
+
+  private void serve(OutputStream out) throws IOException, InterruptedException {
+    awaitOrClosed(helloReceived);
+    writeFrame(
+        out, encode(LoginProtocols.CLIENTBOUND, new ClientboundLoginFinishedPacket(profile)));
+    out.flush();
+    awaitOrClosed(loginAcknowledged);
+
+    for (byte[] packet : script.configuration()) {
+      writeFrame(out, packet);
+    }
+    out.flush();
+    // Play packets must not arrive before the client has switched its decoder to the play
+    // protocol, which it confirms with its own finish-configuration packet.
+    awaitOrClosed(configurationFinished);
+
+    LOGGER.info(
+        "Replay running: {} play packets over {} ms",
+        script.playPacketCount(),
+        script.durationMs());
+    clock.resume();
+    long lastWrite = System.currentTimeMillis();
+    while (!closed) {
+      List<byte[]> due = script.due(clock.timeMs());
+      for (byte[] packet : due) {
+        writeFrame(out, packet);
+      }
+      long now = System.currentTimeMillis();
+      if (!due.isEmpty()) {
+        playPacketsSent += due.size();
+        out.flush();
+        lastWrite = now;
+      } else if (now - lastWrite >= KEEP_ALIVE_INTERVAL_MS) {
+        // The client drops a connection that stays silent for 30 s (paused or finished replay).
+        RegistryAccess access = registries.get();
+        if (access != null) {
+          writeFrame(out, encodePlay(access, new ClientboundKeepAlivePacket(now)));
+          out.flush();
+        }
+        lastWrite = now;
+      }
+      Thread.sleep(due.isEmpty() ? 5 : 1);
+    }
+  }
+
+  private void awaitOrClosed(CountDownLatch latch) throws InterruptedException, IOException {
+    while (!latch.await(100, TimeUnit.MILLISECONDS)) {
+      if (closed) {
+        throw new IOException("closed");
+      }
+    }
+  }
+
+  // ---- client -> replay server ----
+
+  private enum Phase {
+    HANDSHAKE,
+    LOGIN,
+    CONFIGURATION,
+    PLAY
+  }
+
+  /** Reads the client's packets. Only protocol switches matter; everything else is dropped. */
+  private void readClient(Socket s) {
+    Phase phase = Phase.HANDSHAKE;
+    try (DataInputStream in = new DataInputStream(s.getInputStream())) {
+      while (!closed) {
+        byte[] frame = readFrame(in);
+        switch (phase) {
+          case HANDSHAKE -> {
+            if (decode(HandshakeProtocols.SERVERBOUND, frame)
+                instanceof ClientIntentionPacket intent) {
+              LOGGER.debug("Replay client connected with intent {}", intent.intention());
+              phase = Phase.LOGIN;
+            }
+          }
+          case LOGIN -> {
+            Packet<?> p = decode(LoginProtocols.SERVERBOUND, frame);
+            if (p instanceof ServerboundHelloPacket) {
+              helloReceived.countDown();
+            } else if (p instanceof ServerboundLoginAcknowledgedPacket) {
+              phase = Phase.CONFIGURATION;
+              loginAcknowledged.countDown();
+            }
+          }
+          case CONFIGURATION -> {
+            if (decode(ConfigurationProtocols.SERVERBOUND, frame)
+                instanceof ServerboundFinishConfigurationPacket) {
+              phase = Phase.PLAY;
+              configurationFinished.countDown();
+            }
+          }
+          case PLAY -> {
+            // Movement, keep-alive answers and so on: nothing to do in a replay.
+          }
+        }
+      }
+    } catch (EOFException e) {
+      LOGGER.debug("Replay client disconnected");
+    } catch (IOException | RuntimeException e) {
+      if (!closed) {
+        LOGGER.info("Replay client connection ended: {}", e.toString());
+      }
+    } finally {
+      close();
+    }
+  }
+
+  // ---- encoding helpers ----
+
+  private static <T extends net.minecraft.network.PacketListener> Packet<? super T> decode(
+      ProtocolInfo<T> protocol, byte[] bytes) {
+    ByteBuf buf = Unpooled.wrappedBuffer(bytes);
+    return protocol.codec().decode(buf);
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static byte[] encode(ProtocolInfo<?> protocol, Packet<?> packet) {
+    ByteBuf buf = Unpooled.buffer();
+    try {
+      ((ProtocolInfo) protocol).codec().encode(buf, packet);
+      byte[] out = new byte[buf.readableBytes()];
+      buf.readBytes(out);
+      return out;
+    } finally {
+      buf.release();
+    }
+  }
+
+  private static byte[] encodePlay(
+      RegistryAccess access, Packet<? super ClientGamePacketListener> packet) {
+    ProtocolInfo<ClientGamePacketListener> play =
+        GameProtocols.CLIENTBOUND_TEMPLATE.bind(RegistryFriendlyByteBuf.decorator(access));
+    return encode(play, packet);
+  }
+
+  // ---- framing: varint(length) + bytes ----
+
+  private static void writeFrame(OutputStream out, byte[] packet) throws IOException {
+    int value = packet.length;
+    while ((value & ~0x7F) != 0) {
+      out.write((value & 0x7F) | 0x80);
+      value >>>= 7;
+    }
+    out.write(value);
+    out.write(packet);
+  }
+
+  private static byte[] readFrame(DataInputStream in) throws IOException {
+    int length = 0;
+    for (int shift = 0; ; shift += 7) {
+      int b = in.read();
+      if (b < 0) {
+        throw new EOFException();
+      }
+      length |= (b & 0x7F) << shift;
+      if ((b & 0x80) == 0) {
+        break;
+      }
+      if (shift >= 21) {
+        throw new IOException("frame length too long");
+      }
+    }
+    if (length <= 0 || length > MAX_SERVERBOUND_FRAME) {
+      throw new IOException("bad frame length " + length);
+    }
+    byte[] frame = new byte[length];
+    in.readFully(frame);
+    return frame;
+  }
+
+  private static void closeQuietly(AutoCloseable c) {
+    try {
+      c.close();
+    } catch (Exception ignored) {
+      // Closing during shutdown; nothing useful to do.
+    }
+  }
+}

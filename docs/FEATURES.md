@@ -24,7 +24,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Continuous across world/server switch | ✓ | ? | ? | ✗ | planned | — | Currently stops on disconnect |
 | Crash backup / recovery | ✓ | ? | ? | partial | implemented | UT | Max ~1 s loss; GT for real crash pending |
 | Shadow (rolling buffer) recording | ✓ 30 s–10 min | ? | ✓ 2 min | ✗ | planned | — | M5 |
-| World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; playback not built |
+| World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; basic playback (GT) |
 | Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; not yet replayed |
 | Inventory / equipment | ✓ | ✓ | ? | ✓ | partial | — | Present in recorded packets; untested on playback |
 | Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | — | Server-sent ones are in packets; client-only effects not captured |
@@ -34,10 +34,14 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Configurable storage location | ? | ✓ | ? | ✓ | implemented | — | `recordingsDirectory` setting |
 | Microphone / system audio capture | ✓ | ✗ | ? | ✗ | planned | — | M6, privacy notes required |
 
-## Playback (all planned, M2)
+## Playback (M2)
 
-Play/pause/seek, speed, frame step, timeline navigation, free camera, first/third person, follow
-entity, markers in timeline, Quick View. Status: **planned**.
+- **Play a recording into the client world:** **partial**, evidence GT (`playBack`: the recorded
+  world is entered through the replay server, all play packets delivered, chunks loaded, the replay
+  is not recorded). Started with the dev-only `/reizo-debug play [file]`. ADR 0008.
+- Play/pause and speed: clock exists (UT), not exposed in the UI yet. Status: **planned**.
+- Seek, frame step, timeline navigation, free camera, first/third person, follow entity, recorded
+  player reconstruction, markers in timeline, Quick View: **planned**.
 
 ## Cinematic camera (planned, M3)
 
