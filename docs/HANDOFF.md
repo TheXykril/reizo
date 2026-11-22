@@ -27,7 +27,7 @@ client, start, record, stop and save) work and are covered by automated in-game 
 ## 3. Current branch and commit
 
 - `main`: initial commit (license + README).
-- `feat/recording-foundation`: all work above, open as PR #1 (see section 11).
+- `feat/recording-foundation`: all work above, open as PR #20 (see section 11).
   Check `git log --oneline` for the exact head commit.
 
 ## 4. Active implementation work
@@ -66,7 +66,7 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 2026-11-22, cloud box (Ubuntu 24.04, JDK 21.0.13, Mesa llvmpipe under Xvfb):
 - `./gradlew build`: pass (34 unit tests, 0 failures).
 - `xvfb-run -a ./gradlew :fabric:runClientGameTest`: pass, 2/2
-  (`recordFromJoin`: config=34 play=248 packets, all decode; `recordMidSessionWhileWalking`:
+  (`recordFromJoin`: config=34 play=242 packets, all decode; `recordMidSessionWhileWalking`:
   45 local player frames, player moved, incomplete flag correct).
 - Recording size sample: 2.2 s mid-session walk = 23 KB archive (158 KB uncompressed stream).
 - Not tested: multiplayer server, real crash, real GPU/hardware, Wayland, OneClient pack, performance.
@@ -77,18 +77,19 @@ None at the end of this session (everything pushed to `feat/recording-foundation
 
 ## 10. Next recommended actions
 
-1. Owner: review and merge PR #1; delete the empty `TheXykril/rewind` repo.
+1. Owner: review and merge PR #20; delete the empty `TheXykril/rewind` repo.
 2. Owner on Hyperion (Arch/Hyprland): run and paste results of
    `java -version; gh auth status; ffmpeg -hide_banner -encoders | grep -E "264|265|av1|vaapi|nvenc|qsv"; glxinfo -B | head -20; vainfo 2>&1 | head; nvidia-smi 2>&1 | head -5`
    then `./gradlew :fabric:runClient` and walk through docs/TESTING.md manual checklist.
-3. Next agent: M1 issues "Multiplayer recording gametest" and "Pause-menu recording controls",
-   then start M2 "Replay world".
+3. Next agent: M1 issues #4 "Multiplayer recording gametest" and #2 "Pause-menu recording controls",
+   then start M2 #7 "Replay world".
 
 ## 11. Relevant GitHub issues and pull requests
 
 - Repository: https://github.com/TheXykril/reizo (private)
-- PR #1: initial recording foundation (branch `feat/recording-foundation`).
-- Milestones M1–M8 and backlog issues were created; see the Issues tab.
+- PR #20: initial recording foundation (branch `feat/recording-foundation`); tracks issue #1.
+- Milestones M1–M8 with issues #1–#19.
+
 
 ## 12. Warnings for the next agent
 
