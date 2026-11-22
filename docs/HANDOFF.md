@@ -71,6 +71,24 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 - Recording size sample: 2.2 s mid-session walk = 23 KB archive (158 KB uncompressed stream).
 - Not tested: multiplayer server, real crash, real GPU/hardware, Wayland, OneClient pack, performance.
 
+2026-11-22, Hyperion (owner laptop: Arch Linux, Hyprland on Wayland, Intel Arc Meteor Lake-P iGPU,
+i915 driver, no NVIDIA), branch `feat/recording-foundation` at c72bb9e:
+- Environment: JDK 21.0.13 (Arch `java-21-openjdk`) is present; the default `java` on PATH is
+  sdkman Temurin 25, and `java-27-openjdk` is also installed. FFmpeg has libx264, libx265,
+  SVT-AV1, VAAPI (h264/hevc/av1/vp9), QSV, Vulkan and NVENC/AMF encoders listed. `glxinfo` and
+  `vainfo` are not installed; `nvidia-smi` fails (no NVIDIA hardware).
+- Gotcha: `~/.gradle/gradle.properties` sets `org.gradle.java.home` to sdkman Java 25, which
+  overrides `JAVA_HOME`. Run Gradle with `-Dorg.gradle.java.home=/usr/lib/jvm/java-21-openjdk`.
+- `./gradlew build -x spotlessCheck`: pass (34 unit tests, 0 failures).
+- `spotlessJavaCheck` fails locally on every file with `NoSuchMethodError ...
+  Log$DeferredDiagnosticHandler.getDiagnostics()` even with the daemon on JDK 21.0.13 (CI passes
+  the same check on Temurin 21.0.13). Cause not found yet; likely a local classpath/JDK mix-up.
+- `./gradlew :fabric:runClient`: client starts on Wayland, "Recorder ready" logged. Only error is
+  the missing `libflite` narrator library (harmless). F9 not tested: nobody at the keyboard.
+- `:fabric:runClientGameTest`: first world loaded and "Recording started ... complete from join:
+  true" logged, then the run stalled at about 1 FPS in `glfwSwapBuffers` because the laptop
+  display was off (DPMS). Inconclusive; rerun with the screen on.
+
 ## 9. Uncommitted or unpushed changes
 
 None at the end of this session (everything pushed to `feat/recording-foundation`).
