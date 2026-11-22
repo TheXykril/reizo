@@ -15,3 +15,4 @@ in AGENTS.md needs an ADR.
 | [0007](0007-multi-version-strategy.md) | Multi-version strategy: modern Fabric family + 1.8.9 Ornithe | Accepted (owner) |
 | [0008](0008-playback-loopback-replay-server.md) | Playback through a loopback replay server | Accepted |
 | [0009](0009-frame-exact-export.md) | Frame-exact video export with a virtual clock and FFmpeg | Accepted |
+| [0010](0010-optional-oneconfig-page.md) | Optional OneConfig page through a compile-only entrypoint | Accepted |
