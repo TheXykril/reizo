@@ -405,6 +405,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         "effects pass ran without effects");
     context.runOnClient(
         mc -> {
+          ReplayEditor.recordUndo();
           ReplayEditor.effects()
               .put(0, Grade.NEUTRAL.withSaturation(0).withVignette(1).withLetterbox(2.39f));
           ReplayEditor.effectsChanged();
@@ -434,8 +435,10 @@ public final class RecordingGameTest implements FabricClientGameTest {
     }
     context.runOnClient(
         mc -> {
-          ReplayEditor.effects().remove(0);
-          ReplayEditor.effectsChanged();
+          // Undo covers effect keyframes too.
+          check(ReplayEditor.undo(), "nothing to undo");
+          check(ReplayEditor.effects().isEmpty(), "undo kept the effect keyframe");
+          check(ReplayEditor.project().effects.isEmpty(), "undo not saved to the project");
           mc.setScreen(null);
         });
     context.waitTicks(2);

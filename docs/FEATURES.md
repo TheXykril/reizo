@@ -123,10 +123,9 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - **Implemented** (GT: gray picture with letterbox bars from a keyframe; ADR 0012): exposure,
   contrast, saturation, temperature, vignette and letterbox (1.85, 2, 2.39), keyframed over replay
   time with linear blending, in the Effects panel (timeline → Effects). Shown in the replay and in
-  exports. No pass runs when the grade is neutral or outside replays. Not covered by undo yet.
+  exports. No pass runs when the grade is neutral or outside replays. Covered by the timeline's undo; effect keyframes show as purple squares on the marker track.
 - **Planned:** motion blur, depth of field, bloom, camera shake, chromatic aberration, blur,
-  fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV,
-  effect keyframes drawn on the timeline.
+  fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV.
 
 ## Audio (planned, M6)
 

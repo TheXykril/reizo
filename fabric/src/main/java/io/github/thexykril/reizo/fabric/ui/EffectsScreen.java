@@ -86,6 +86,7 @@ public final class EffectsScreen extends Screen {
   }
 
   private final java.util.List<ValueSlider> sliders = new java.util.ArrayList<>();
+  private long lastEditMs;
 
   @Override
   protected void init() {
@@ -152,6 +153,12 @@ public final class EffectsScreen extends Screen {
 
   /** Sets the keyframe at the edit time to {@code change} applied to the grade shown now. */
   void edit(java.util.function.UnaryOperator<Grade> change) {
+    // One undo step per slider drag: changes less than a moment apart belong together.
+    long now = System.currentTimeMillis();
+    if (now - lastEditMs > 700) {
+      ReplayEditor.recordUndo();
+    }
+    lastEditMs = now;
     EffectTrack track = ReplayEditor.effects();
     long t = editTime();
     track.put(t, change.apply(track.at(t)));
@@ -167,12 +174,15 @@ public final class EffectsScreen extends Screen {
       i++;
     }
     float next = all[(i + 1) % all.length];
+    lastEditMs = 0;
     edit(g -> g.withLetterbox(next));
   }
 
   private void removeHere() {
     long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
     if (near >= 0) {
+      ReplayEditor.recordUndo();
+      lastEditMs = 0;
       ReplayEditor.effects().remove(near);
       ReplayEditor.effectsChanged();
       refresh();

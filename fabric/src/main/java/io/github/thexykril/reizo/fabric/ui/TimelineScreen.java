@@ -216,6 +216,11 @@ public final class TimelineScreen extends Screen {
     renderRuler(g);
     renderRegion(g, rulerY, overviewY - 2);
     renderMarkers(g);
+    // Effect keyframes: small purple squares along the bottom of the marker track.
+    for (var k : ReplayEditor.effects().keyframes()) {
+      int ex = (int) Math.round(left + view.timeToX(k.timeMs()));
+      g.fill(ex - 2, markerY + 8, ex + 2, markerY + 12, 0xFFB070FF);
+    }
     renderKeyframes(g);
     if (drag == Drag.BOX) {
       int a = (int) (left + view.timeToX(dragStartTime));

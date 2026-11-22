@@ -296,8 +296,8 @@ public final class ReplayEditor {
   /** Everything the timeline edits, as an immutable snapshot. */
   public static TimelineState state() {
     return project == null
-        ? TimelineState.of(path, -1, -1)
-        : TimelineState.of(path, project.inMs, project.outMs);
+        ? TimelineState.of(path, effects, -1, -1)
+        : TimelineState.of(path, effects, project.inMs, project.outMs);
   }
 
   /**
@@ -337,9 +337,11 @@ public final class ReplayEditor {
       return false;
     }
     s.applyTo(path);
+    s.applyTo(effects);
     if (project != null) {
       project.inMs = s.inMs();
       project.outMs = s.outMs();
+      project.setEffects(effects);
     }
     changed();
     return true;

@@ -36,4 +36,4 @@ Option 2.
   blur, depth of field) will add passes and targets to the same renderer.
 - Iris and Sodium are untested with this pass; Iris replaces the world pipeline, but the main
   target and this pass come after it, so it is expected to work. To check on real hardware.
-- Effect edits are not in the timeline's undo history yet.
+- Effect keyframes are part of `TimelineState`, so the timeline's undo and redo cover them.
