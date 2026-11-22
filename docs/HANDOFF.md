@@ -34,6 +34,10 @@ camera, project and export are not started.
 - Replay browser (#10) and pause-menu recording buttons (#2), branch `feat/replay-browser`:
   `ReplayBrowserScreen`, `RenameScreen`, `MenuButtons` (Fabric screen events, no mixins), and
   `RecordingStorage.listRecordings/rename/delete` (unit tested).
+- Seeking (#8 first version), branch `feat/replay-seeking`: forward = clock jump; backward =
+  `ClientboundStartConfigurationPacket` restart and fast-forward (`ReplayServer.restart`), with
+  `ReplayPlayback.tick` waiting for the new level. `ReplayHud` time bar. Known gap: recordings
+  started mid-session have no chunks, so the client stays on the loading screen during playback.
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -85,6 +89,10 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, seeking (branch `feat/replay-seeking`):
+- `./gradlew build`: pass (42 unit tests). Gametests: pass, adding seek checks in
+  `checkReplayControls` (keys) and `checkSeeking` (positions after back/forward seeks).
 
 2026-11-22, cloud box, replay browser (branch `feat/replay-browser`):
 - `./gradlew build`: pass (40 unit tests). Gametests: pass, adding `browseAndPlay` (title screen

@@ -31,8 +31,10 @@ import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket;
 import net.minecraft.network.protocol.game.ClientboundTickingStatePacket;
 import net.minecraft.network.protocol.game.GameProtocols;
+import net.minecraft.network.protocol.game.ServerboundConfigurationAcknowledgedPacket;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.handshake.HandshakeProtocols;
 import net.minecraft.network.protocol.login.ClientboundLoginFinishedPacket;
@@ -70,7 +72,12 @@ public final class ReplayServer implements AutoCloseable {
   private final Runnable onClosed;
   private final ServerSocket listener;
   private final CountDownLatch loginAcknowledged = new CountDownLatch(1);
-  private final CountDownLatch configurationFinished = new CountDownLatch(1);
+  private final AtomicInteger configurationsFinished = new AtomicInteger();
+  private final AtomicInteger configurationAcks = new AtomicInteger();
+  private final java.util.concurrent.atomic.AtomicLong pendingSeek =
+      new java.util.concurrent.atomic.AtomicLong(-1);
+  private final AtomicInteger seeks = new AtomicInteger();
+  private volatile boolean reconfiguring;
   private final CountDownLatch helloReceived = new CountDownLatch(1);
 
   private final java.util.UUID recordedPlayerUuid;
@@ -198,15 +205,7 @@ public final class ReplayServer implements AutoCloseable {
     out.flush();
     awaitOrClosed(loginAcknowledged);
 
-    for (byte[] packet : script.configuration()) {
-      writeFrame(out, packet);
-    }
-    out.flush();
-    // Play packets must not arrive before the client has switched its decoder to the play
-    // protocol, which it confirms with its own finish-configuration packet.
-    awaitOrClosed(configurationFinished);
-
-    RegistryAccess access = awaitRegistries();
+    RegistryAccess access = configure(out, null);
     PlayTransformer transformer =
         new PlayTransformer(access, profile, recordedPlayerUuid, recordedPlayerName);
     this.transformer = transformer;
@@ -217,6 +216,23 @@ public final class ReplayServer implements AutoCloseable {
     clock.resume();
     long lastWrite = System.currentTimeMillis();
     while (!closed) {
+      long seek = pendingSeek.getAndSet(-1);
+      if (seek >= 0) {
+        if (seek < clock.timeMs()) {
+          // Backwards: the client's world cannot be undone, so build it again from the start and
+          // fast-forward to the target (the entries up to it are all due at once below).
+          access = restart(out, access);
+          transformer =
+              new PlayTransformer(access, profile, recordedPlayerUuid, recordedPlayerName);
+          this.transformer = transformer;
+          script.rewind();
+          playPacketsSent = 0;
+          tickStateChanged.set(true);
+        }
+        clock.seek(seek);
+        seeks.incrementAndGet();
+        LOGGER.debug("Replay seeked to {} ms", seek);
+      }
       List<ReplayScript.Entry> due = script.due(clock.timeMs());
       int written = 0;
       for (ReplayScript.Entry entry : due) {
@@ -258,12 +274,92 @@ public final class ReplayServer implements AutoCloseable {
     }
   }
 
+  /**
+   * Writes the recorded configuration phase and waits until the client is in the play phase with
+   * new registries (different from {@code previous}).
+   */
+  private RegistryAccess configure(OutputStream out, RegistryAccess previous)
+      throws IOException, InterruptedException {
+    int finishedBefore = configurationsFinished.get();
+    for (byte[] packet : script.configuration()) {
+      writeFrame(out, packet);
+    }
+    out.flush();
+    // Play packets must not arrive before the client has switched its decoder to the play
+    // protocol, which it confirms with its own finish-configuration packet.
+    awaitCount(configurationsFinished, finishedBefore + 1);
+    RegistryAccess access = awaitRegistries(previous);
+    LOGGER.info("Replay client is in the play phase");
+    return access;
+  }
+
+  /**
+   * Sends the client back to the configuration phase, the way a proxy switches servers, and
+   * configures it again. The client drops its world, so the replay starts over cleanly.
+   */
+  private RegistryAccess restart(OutputStream out, RegistryAccess access)
+      throws IOException, InterruptedException {
+    reconfiguring = true;
+    try {
+      int ackedBefore = configurationAcks.get();
+      LOGGER.info("Replay seeking back: asking the client to reconfigure");
+      writeFrame(out, encodePlay(access, ClientboundStartConfigurationPacket.INSTANCE));
+      out.flush();
+      awaitCount(configurationAcks, ackedBefore + 1);
+      LOGGER.info("Replay restarting for a backwards seek");
+      return configure(out, access);
+    } catch (IOException | InterruptedException | RuntimeException e) {
+      reconfiguring = false;
+      throw e;
+    }
+    // Stays true until the client shows the new world (restartDone), so the client tick does not
+    // mistake the missing world for the player leaving the replay.
+  }
+
+  /**
+   * Jumps to a replay time, in milliseconds (clamped to the recording). Forwards, the packets in
+   * between are sent at once; backwards, the replay is rebuilt from the start. Any thread.
+   */
+  public void seek(long timeMs) {
+    pendingSeek.set(Math.max(0, Math.min(timeMs, script.durationMs())));
+  }
+
+  /** Number of seeks carried out so far. For tests. */
+  public int seeksDone() {
+    return seeks.get();
+  }
+
+  /** Called on the client thread once the rebuilt world is shown after a backwards seek. */
+  public void restartDone() {
+    reconfiguring = false;
+  }
+
+  /** True while the client is being sent back through configuration for a backwards seek. */
+  public boolean isReconfiguring() {
+    return reconfiguring;
+  }
+
+  private void awaitCount(AtomicInteger counter, int atLeast)
+      throws InterruptedException, IOException {
+    long deadline = System.currentTimeMillis() + 30_000;
+    while (counter.get() < atLeast) {
+      if (closed) {
+        throw new IOException("closed");
+      }
+      if (System.currentTimeMillis() > deadline) {
+        throw new IOException("client did not answer the protocol switch");
+      }
+      Thread.sleep(5);
+    }
+  }
+
   /** The client's registries; it creates its play listener before confirming the switch. */
-  private RegistryAccess awaitRegistries() throws InterruptedException, IOException {
+  private RegistryAccess awaitRegistries(RegistryAccess previous)
+      throws InterruptedException, IOException {
     long deadline = System.currentTimeMillis() + 10_000;
     while (true) {
       RegistryAccess access = registries.get();
-      if (access != null) {
+      if (access != null && access != previous) {
         return access;
       }
       if (closed || System.currentTimeMillis() > deadline) {
@@ -328,11 +424,16 @@ public final class ReplayServer implements AutoCloseable {
             if (decode(ConfigurationProtocols.SERVERBOUND, frame)
                 instanceof ServerboundFinishConfigurationPacket) {
               phase = Phase.PLAY;
-              configurationFinished.countDown();
+              configurationsFinished.incrementAndGet();
             }
           }
           case PLAY -> {
-            // Movement, keep-alive answers and so on: nothing to do in a replay.
+            // Movement, keep-alive answers and so on are dropped. Only the answer to a restart
+            // (backwards seek) matters: after it the client speaks the configuration protocol.
+            if (peekId(frame) == CONFIGURATION_ACK_ID) {
+              phase = Phase.CONFIGURATION;
+              configurationAcks.incrementAndGet();
+            }
           }
         }
       }
@@ -348,6 +449,36 @@ public final class ReplayServer implements AutoCloseable {
   }
 
   // ---- encoding helpers ----
+
+  /** Packet id of the client's acknowledgement of a switch back to configuration. */
+  private static final int CONFIGURATION_ACK_ID = serverboundPlayId();
+
+  private static int serverboundPlayId() {
+    int[] found = {-1};
+    GameProtocols.SERVERBOUND_TEMPLATE
+        .details()
+        .listPackets(
+            (type, id) -> {
+              if (type.equals(ServerboundConfigurationAcknowledgedPacket.INSTANCE.type())) {
+                found[0] = id;
+              }
+            });
+    if (found[0] < 0) {
+      throw new IllegalStateException("configuration acknowledgement packet not found");
+    }
+    return found[0];
+  }
+
+  private static int peekId(byte[] bytes) {
+    int value = 0;
+    for (int i = 0, shift = 0; i < bytes.length && shift < 35; i++, shift += 7) {
+      value |= (bytes[i] & 0x7F) << shift;
+      if ((bytes[i] & 0x80) == 0) {
+        return value;
+      }
+    }
+    return -1;
+  }
 
   private static <T extends net.minecraft.network.PacketListener> Packet<? super T> decode(
       ProtocolInfo<T> protocol, byte[] bytes) {

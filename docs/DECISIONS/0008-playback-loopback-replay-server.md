@@ -61,6 +61,12 @@ Option 3.
 - **Camera modes** (`fabric.playback.ReplayCamera`): free (the spectator camera), the recorded
   player's view, and following behind the recorded player, using the client's camera entity and
   perspective.
+- **Seeking** (#8, first version: restart and fast-forward). Forwards, the clock jumps and every
+  packet up to the target is sent at once. Backwards, the server sends
+  `ClientboundStartConfigurationPacket`, the way a proxy moves a player between servers. The
+  client drops its world and acknowledges, and the server replays the configuration phase and then
+  the timeline from the start up to the target. The client tick does not end the replay while it
+  waits for the rebuilt world. Snapshots for fast seeking in long recordings come later.
 - The replay ends when the client leaves the replay world, detected on the client tick. The
   client's socket can stay half-open for up to 30 s, so neither the server nor the disconnect
   events see the close promptly.
@@ -77,7 +83,8 @@ Option 3.
   slower. Decoupling it needs a later change to how the camera player ticks.
 − The replay is a "remote server" to the client. Anything that behaves differently for
   multiplayer (for example the pause menu not pausing) needs handling in later slices.
-− Seeking backwards needs a restart or snapshots (#8). The script only moves forward.
+− A backwards seek rebuilds the world from the start, so its cost grows with the target time. The
+  client briefly shows the reconfiguring screen. Snapshots (#8) will fix both.
 − Not yet shown on the recorded player: sneaking/pose, held items and armor that the server never
   sent for the player itself. Free camera controls beyond spectator flight come in #9.
 − A loopback socket is opened while a replay plays (127.0.0.1 only, one connection, closed with the

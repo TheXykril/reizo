@@ -36,12 +36,58 @@ public final class ReplayPlayback {
   private static volatile ReplayServer current;
   private static volatile ClientPacketListener playListener;
   private static volatile boolean enteredWorld;
+  private static volatile RecordingMetadata metadata;
+  private static final Object NO_LEVEL = new Object();
+  private static Object levelBeforeRestart;
 
   private ReplayPlayback() {}
 
   /** The running replay, or null. */
   public static ReplayServer current() {
     return current;
+  }
+
+  /** Metadata of the running replay's recording, or null. */
+  public static RecordingMetadata metadata() {
+    return metadata;
+  }
+
+  /** Seeks the running replay by a number of milliseconds from its current time. */
+  public static long seekBy(long deltaMs) {
+    ReplayServer server = current;
+    if (server == null) {
+      return 0;
+    }
+    long duration = server.script().durationMs();
+    // The clock runs on past the end; count from the end then.
+    long now = Math.min(server.clock().timeMs(), duration);
+    long target = Math.max(0, Math.min(now + deltaMs, duration));
+    server.seek(target);
+    return target;
+  }
+
+  /** Seeks the running replay to the next (direction 1) or previous (-1) marker. */
+  public static boolean seekToMarker(int direction) {
+    ReplayServer server = current;
+    RecordingMetadata meta = metadata;
+    if (server == null || meta == null || meta.markers.isEmpty()) {
+      return false;
+    }
+    long now = server.clock().timeMs();
+    Long best = null;
+    for (RecordingMetadata.Marker m : meta.markers) {
+      // A small margin so "previous" does not land on a marker just passed.
+      if (direction > 0 && m.timeMs > now + 250 && (best == null || m.timeMs < best)) {
+        best = (long) m.timeMs;
+      } else if (direction < 0 && m.timeMs < now - 1000 && (best == null || m.timeMs > best)) {
+        best = (long) m.timeMs;
+      }
+    }
+    if (best == null) {
+      return false;
+    }
+    server.seek(best);
+    return true;
   }
 
   public static boolean isActive() {
@@ -95,6 +141,7 @@ public final class ReplayPlayback {
             },
             ReplayPlayback::onServerClosed);
     current = server;
+    metadata = meta;
     ReplayCamera.reset();
     playListener = null;
     enteredWorld = false;
@@ -156,7 +203,7 @@ public final class ReplayPlayback {
    */
   public static void onPlayDisconnect(ClientPacketListener listener) {
     ReplayServer server = current;
-    if (server != null && listener == playListener) {
+    if (server != null && listener == playListener && !server.isReconfiguring()) {
       server.close();
     }
   }
@@ -171,6 +218,19 @@ public final class ReplayPlayback {
       return;
     }
     boolean inWorld = mc.level != null && mc.getConnection() != null;
+    if (server.isReconfiguring()) {
+      // A backwards seek rebuilds the world: it is gone until the new login packet arrives.
+      if (levelBeforeRestart == null) {
+        // First tick of the restart: remember the old world to tell the new one apart.
+        levelBeforeRestart = mc.level == null ? NO_LEVEL : mc.level;
+      } else if (inWorld && mc.level != levelBeforeRestart) {
+        LOGGER.info("Replay world rebuilt after a backwards seek");
+        server.restartDone();
+        ReplayCamera.reset();
+      }
+      return;
+    }
+    levelBeforeRestart = null;
     if (inWorld) {
       enteredWorld = true;
       ReplayCamera.tick(mc);
@@ -209,6 +269,7 @@ public final class ReplayPlayback {
 
   private static void onServerClosed() {
     current = null;
+    metadata = null;
     playListener = null;
     ReplayCamera.reset();
     PacketTap.setSuppressed(false);
