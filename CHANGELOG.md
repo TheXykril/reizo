@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Effects for replays and exports (timeline → Effects): exposure, contrast, saturation,
+  temperature, vignette and letterbox, keyframed over time.
 - Exports are rendered at the chosen size (for example 4K from a smaller window) instead of
   being upscaled from the window.
 - Shadow recording (off by default; Settings or OneConfig): keeps the last 30 s to 10 min of

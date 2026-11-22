@@ -5,6 +5,7 @@
 package io.github.thexykril.reizo.gametest;
 
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
+import io.github.thexykril.reizo.core.effects.Grade;
 import io.github.thexykril.reizo.core.export.ExportFormat;
 import io.github.thexykril.reizo.core.format.Frame;
 import io.github.thexykril.reizo.core.format.FrameStreamReader;
@@ -17,6 +18,7 @@ import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.export.ExportControls;
 import io.github.thexykril.reizo.fabric.export.ExportSession;
+import io.github.thexykril.reizo.fabric.playback.EffectRenderer;
 import io.github.thexykril.reizo.fabric.playback.PathVisualizer;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
@@ -379,7 +381,71 @@ public final class RecordingGameTest implements FabricClientGameTest {
     checkCameraPath(context);
     checkTimeline(context);
     checkFreeCamera(context);
+    checkEffects(context);
     LOGGER.info("checkReplayControls OK");
+  }
+
+  /**
+   * Effects: the timeline's Effects button opens the panel; a keyframe with no saturation, full
+   * vignette and a 2.39 letterbox turns the picture gray with black bars, and is saved in the
+   * project.
+   */
+  private void checkEffects(ClientGameTestContext context) {
+    context.runOnClient(
+        mc -> mc.setScreen(new io.github.thexykril.reizo.fabric.ui.TimelineScreen()));
+    context.waitTicks(2);
+    context.runOnClient(mc -> pressButton(mc, "reizo.timeline.effects"));
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc -> mc.screen instanceof io.github.thexykril.reizo.fabric.ui.EffectsScreen),
+        "Effects button did not open the effects panel");
+    check(
+        context.computeOnClient(mc -> EffectRenderer.lastApplied() == null),
+        "effects pass ran without effects");
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.recordUndo();
+          ReplayEditor.effects()
+              .put(0, Grade.NEUTRAL.withSaturation(0).withVignette(1).withLetterbox(2.39f));
+          ReplayEditor.effectsChanged();
+        });
+    context.waitTicks(3);
+    Path shot = context.takeScreenshot("reizo-effects");
+    check(
+        context.computeOnClient(mc -> EffectRenderer.lastApplied() != null),
+        "effects pass did not run");
+    check(
+        context.computeOnClient(mc -> ReplayEditor.project().effects.size() == 1),
+        "effect keyframe not stored in the project");
+    try {
+      java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(shot.toFile());
+      int x = img.getWidth() * 3 / 4;
+      int mid = img.getRGB(x, img.getHeight() / 2);
+      int r = (mid >> 16) & 0xFF;
+      int g = (mid >> 8) & 0xFF;
+      int b = mid & 0xFF;
+      check(
+          Math.abs(r - g) <= 3 && Math.abs(g - b) <= 3 && r + g + b > 30,
+          "picture is not gray: " + r + "," + g + "," + b);
+      int top = img.getRGB(x, 1) & 0xFFFFFF;
+      check(top == 0, "no letterbox bar at the top: " + Integer.toHexString(top));
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+    context.runOnClient(
+        mc -> {
+          // Undo covers effect keyframes too.
+          check(ReplayEditor.undo(), "nothing to undo");
+          check(ReplayEditor.effects().isEmpty(), "undo kept the effect keyframe");
+          check(ReplayEditor.project().effects.isEmpty(), "undo not saved to the project");
+          mc.setScreen(null);
+        });
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> EffectRenderer.lastApplied() == null),
+        "effects pass still running after removing the keyframe");
+    LOGGER.info("checkEffects OK");
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

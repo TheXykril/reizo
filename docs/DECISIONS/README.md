@@ -17,3 +17,4 @@ in AGENTS.md needs an ADR.
 | [0009](0009-frame-exact-export.md) | Frame-exact video export with a virtual clock and FFmpeg | Accepted |
 | [0010](0010-optional-oneconfig-page.md) | Optional OneConfig page through a compile-only entrypoint | Accepted |
 | [0011](0011-shadow-recording-buffer.md) | Shadow recording with snapshot segments in memory | Accepted |
+| [0012](0012-effects-pass.md) | Effects as one full-screen pass after the world | Accepted |

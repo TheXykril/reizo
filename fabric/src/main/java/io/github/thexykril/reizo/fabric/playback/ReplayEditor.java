@@ -33,6 +33,8 @@ public final class ReplayEditor {
   private static ProjectStore store;
   private static Project project;
   private static CameraPath path = new CameraPath();
+  private static io.github.thexykril.reizo.core.effects.EffectTrack effects =
+      new io.github.thexykril.reizo.core.effects.EffectTrack();
   private static boolean pathPlaying;
 
   /** Roll (degrees) and FOV of the free camera while the path does not drive it; NaN = none. */
@@ -73,6 +75,7 @@ public final class ReplayEditor {
       project.recordingId = meta.id;
     }
     path = project.cameraPath();
+    effects = project.effects();
     history.clear();
     resetFreeCamera();
   }
@@ -82,7 +85,30 @@ public final class ReplayEditor {
     resetFreeCamera();
     project = null;
     path = new CameraPath();
+    effects = new io.github.thexykril.reizo.core.effects.EffectTrack();
     pathPlaying = false;
+  }
+
+  /** The effect keyframes of the open project. Call {@link #effectsChanged()} after a change. */
+  public static io.github.thexykril.reizo.core.effects.EffectTrack effects() {
+    return effects;
+  }
+
+  /** Stores the effect keyframes in the project and saves it. */
+  public static void effectsChanged() {
+    if (project != null) {
+      project.setEffects(effects);
+      save();
+    }
+  }
+
+  /** The grade at the current replay time; neutral without a replay or effects. */
+  public static io.github.thexykril.reizo.core.effects.Grade gradeNow() {
+    ReplayServer server = ReplayPlayback.current();
+    if (server == null || effects.isEmpty()) {
+      return io.github.thexykril.reizo.core.effects.Grade.NEUTRAL;
+    }
+    return effects.at(server.replayTimeMs());
   }
 
   public static Project project() {
@@ -270,8 +296,8 @@ public final class ReplayEditor {
   /** Everything the timeline edits, as an immutable snapshot. */
   public static TimelineState state() {
     return project == null
-        ? TimelineState.of(path, -1, -1)
-        : TimelineState.of(path, project.inMs, project.outMs);
+        ? TimelineState.of(path, effects, -1, -1)
+        : TimelineState.of(path, effects, project.inMs, project.outMs);
   }
 
   /**
@@ -311,9 +337,11 @@ public final class ReplayEditor {
       return false;
     }
     s.applyTo(path);
+    s.applyTo(effects);
     if (project != null) {
       project.inMs = s.inMs();
       project.outMs = s.outMs();
+      project.setEffects(effects);
     }
     changed();
     return true;

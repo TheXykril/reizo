@@ -134,6 +134,19 @@ class TimelineTest {
   }
 
   @Test
+  void stateRoundTripsEffects() {
+    var track = new io.github.thexykril.reizo.core.effects.EffectTrack();
+    var gray = io.github.thexykril.reizo.core.effects.Grade.NEUTRAL.withSaturation(0);
+    track.put(100, gray);
+    TimelineState s = TimelineState.of(path(1000), track, -1, -1);
+    track.remove(100);
+    track.put(900, gray);
+    s.applyTo(track);
+    assertEquals(1, track.size());
+    assertEquals(gray, track.at(100));
+  }
+
+  @Test
   void moveShiftsAGroupAndClampsToTheRecording() {
     CameraPath p = path(1000, 2000, 5000);
     Set<Long> moved = KeyframeEdits.move(p, Set.of(1000L, 2000L), 500, 10_000);

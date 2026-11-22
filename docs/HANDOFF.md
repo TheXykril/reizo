@@ -91,7 +91,11 @@ screen, effects, audio, shadow recording, multi-version.
 - Exports render at the output size: `WindowMixin` makes `Window.getWidth/getHeight` return
   `ExportSession.renderOverride()` and the export calls `mc.resizeDisplay()` at start and end.
   `presentTexture` blits 1:1, so the window shows only the bottom-left of a larger frame.
-- Next: audio (#17), effects (#15), recorded
+- Effects (ADR 0012): `core.effects.Grade`/`EffectTrack`, stored as `Project.effects`.
+  `EffectRenderer.afterWorld` runs from `GameRendererMixin` after `doEntityOutline`: copies the
+  main color texture and draws it back through `reizo:pipeline/grade` (shader
+  `assets/reizo/shaders/post/grade.fsh`, UBO `ReizoGrade`). Panel: `ui/EffectsScreen`.
+- Next: more effects (bloom, DoF, motion blur), audio (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected

@@ -40,7 +40,7 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 
 ## M5 — Effects, overlays, shadow recording
 
-- Post-processing pipeline (only active in editor/export), effect tracks with keyframed intensity
+- ✓ (first slice, ADR 0012) Post-processing pipeline (only active in editor/export), effect tracks with keyframed intensity
 - Text/image overlays, transitions, letterboxing, HUD elements in POV
 - ✓ Shadow recording (rolling buffer, save last N minutes; ADR 0011)
 

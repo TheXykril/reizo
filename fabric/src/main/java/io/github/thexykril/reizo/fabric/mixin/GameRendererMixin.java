@@ -10,9 +10,13 @@ import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** While a replay's camera path plays, its field of view replaces the player's. */
+/**
+ * While a replay's camera path plays, its field of view replaces the player's. During a replay the
+ * project's effects are applied to the world picture before the HUD is drawn.
+ */
 @Mixin(GameRenderer.class)
 abstract class GameRendererMixin {
   @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
@@ -22,5 +26,18 @@ abstract class GameRendererMixin {
     if (!Float.isNaN(fov) && useFovSetting) {
       cir.setReturnValue(fov);
     }
+  }
+
+  @Inject(
+      method = "render",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V",
+              shift = At.Shift.AFTER))
+  private void reizo$effects(
+      net.minecraft.client.DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.playback.EffectRenderer.afterWorld(
+        net.minecraft.client.Minecraft.getInstance());
   }
 }
