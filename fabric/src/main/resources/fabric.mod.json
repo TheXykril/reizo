@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "reizo",
+  "version": "${version}",
+  "name": "Reizo",
+  "description": "Record Minecraft gameplay, replay it with a free camera, and edit it into videos. Independent project; not affiliated with Lunar Client, Polyfrost or Mojang.",
+  "authors": ["Reizo contributors"],
+  "contact": {},
+  "license": "GPL-3.0-or-later",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["io.github.thexykril.reizo.fabric.RecorderClient"]
+  },
+  "mixins": ["reizo.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "oneconfig": "*"
+  }
+}

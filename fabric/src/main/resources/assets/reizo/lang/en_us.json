@@ -1,0 +1,15 @@
+{
+  "key.category.reizo.recorder": "Recorder",
+  "key.reizo.toggle": "Start / stop recording",
+  "key.reizo.pause": "Pause / resume recording",
+  "key.reizo.marker": "Add marker",
+  "reizo.toast.started": "Recording started",
+  "reizo.toast.started_partial": "Started mid-session: already loaded chunks are not included yet",
+  "reizo.toast.not_connected": "Join a world or server to record",
+  "reizo.toast.start_failed": "Could not start recording",
+  "reizo.toast.saving": "Saving recording…",
+  "reizo.toast.saved": "Recording saved",
+  "reizo.toast.save_failed": "Saving failed; it will be recovered on next launch",
+  "reizo.toast.marker": "Marker added",
+  "reizo.toast.recovered": "Recovered recordings after a crash"
+}
