@@ -3,6 +3,11 @@
   "key.reizo.toggle": "Start / stop recording",
   "key.reizo.pause": "Pause / resume recording",
   "key.reizo.marker": "Add marker",
+  "key.category.reizo.replay": "Replay",
+  "key.reizo.replay_camera": "Switch camera",
+  "key.reizo.replay_pause": "Pause / resume replay",
+  "key.reizo.replay_slower": "Slower",
+  "key.reizo.replay_faster": "Faster",
   "reizo.toast.started": "Recording started",
   "reizo.toast.started_partial": "Started mid-session: already loaded chunks are not included yet",
   "reizo.toast.not_connected": "Join a world or server to record",
@@ -11,5 +16,11 @@
   "reizo.toast.saved": "Recording saved",
   "reizo.toast.save_failed": "Saving failed; it will be recovered on next launch",
   "reizo.toast.marker": "Marker added",
-  "reizo.toast.recovered": "Recovered recordings after a crash"
+  "reizo.toast.recovered": "Recovered recordings after a crash",
+  "reizo.replay.camera.free": "Camera: free",
+  "reizo.replay.camera.pov": "Camera: player view",
+  "reizo.replay.camera.follow": "Camera: follow player",
+  "reizo.replay.paused": "Replay paused",
+  "reizo.replay.playing": "Replay playing",
+  "reizo.replay.speed": "Speed: %sx"
 }

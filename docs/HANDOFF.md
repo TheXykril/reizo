@@ -28,6 +28,9 @@ camera, project and export are not started.
 - Recorded player in playback (#7 part 2, branch `feat/playback-recorded-player`, stacked on
   #28): `PlayTransformer` rewrites login/respawn for a spectator camera, drops packets aimed at the
   camera, and drives a separate recorded-player entity from `LOCAL_PLAYER` samples.
+- Replay camera and controls (#7/#9, branch `feat/replay-camera-controls`, stacked on #29):
+  `ReplayCamera` (free / POV / follow on V), pause (K) and speed (`[` `]`) via the replay server's
+  `ClientboundTickingStatePacket` (recorded tick rate × speed, frozen when paused).
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -38,15 +41,17 @@ camera, project and export are not started.
 
 - `main`: recording foundation (#20), CI fix (#27), ADR 0007 (#26), all merged 2026-11-22.
 - `feat/playback-replay-server`: playback first slice, PR #28 (awaiting the owner's OK to merge).
-- `feat/playback-recorded-player`: recorded player + spectator camera, stacked on #28.
+- `feat/playback-recorded-player`: recorded player + spectator camera, PR #29 stacked on #28.
+- `feat/replay-camera-controls`: camera modes, pause and speed, stacked on #29.
   Check `git log --oneline` for the exact head commit.
 
 ## 4. Active implementation work
 
 Playback first slice on branch `feat/playback-replay-server` (PR open). Recorded player is
-done on `feat/playback-recorded-player` (stacked PR). Next: recorded player pose/sneak (needs entity
-data accessors) and equipment, then #9 free camera, #8 seeking, #10 replay browser (the real entry
-point instead of the debug command).
+done on `feat/playback-recorded-player` (stacked PR), camera modes, pause and speed on
+`feat/replay-camera-controls` (stacked PR). Next: recorded player pose/sneak (needs entity data
+accessors) and equipment, free camera speed decoupled from replay speed, #8 seeking, #10 replay
+browser (the real entry point instead of the debug command).
 
 ## 5. Files and modules affected
 
@@ -76,6 +81,11 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, camera and controls (branch `feat/replay-camera-controls`):
+- `./gradlew build`: pass (37 unit tests). Gametests: pass, all scenarios plus
+  `checkReplayControls` (V cycles POV/follow/free with matching camera entity and perspective; K
+  freezes the client tick manager; `]` sets tick rate 40, `[` back to 20).
 
 2026-11-22, cloud box, recorded player (branch `feat/playback-recorded-player`):
 - `./gradlew build`: pass (37 unit tests). Gametests: pass, all 5 scenarios. `playBackWalk`:

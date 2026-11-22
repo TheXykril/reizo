@@ -12,6 +12,8 @@ compatibility.
   server (ADR 0008). Dev-only entry point `/reizo-debug play [file]`.
 - Playback shows the recorded player as its own entity, moving as recorded, while you watch as a
   spectator camera.
+- Replay controls: V switches the camera between free, the recorded player's view and following
+  the player; K pauses and resumes; `[` and `]` change the speed (1/8x to 8x).
 - Gradle multi-project build: `core` (Minecraft-independent engine) and `fabric` (Minecraft 1.21.11
   client mod), Spotless formatting, GitHub Actions CI.
 - Recording stream format v1: CRC-checked blocks, tolerant scanning for crash recovery

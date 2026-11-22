@@ -95,6 +95,7 @@ public final class ReplayPlayback {
             },
             ReplayPlayback::onServerClosed);
     current = server;
+    ReplayCamera.reset();
     playListener = null;
     enteredWorld = false;
     PacketTap.setSuppressed(true);
@@ -105,6 +106,41 @@ public final class ReplayPlayback {
     LOGGER.info("Playing {} ({} ms)", archivePath.getFileName(), script.durationMs());
     ConnectScreen.startConnecting(
         new TitleScreen(), mc, new ServerAddress("127.0.0.1", server.port()), data, false, null);
+  }
+
+  /** Playback speeds the speed keys step through. */
+  static final double[] SPEEDS = {0.125, 0.25, 0.5, 1, 2, 4, 8};
+
+  /** Pauses or resumes the running replay. Returns true if it is now paused. */
+  public static boolean togglePause() {
+    ReplayServer server = current;
+    if (server == null) {
+      return false;
+    }
+    boolean pause = server.clock().isRunning();
+    server.setPaused(pause);
+    return pause;
+  }
+
+  /**
+   * Steps the speed of the running replay up or down one step. Returns the new speed, or 0 when no
+   * replay is running.
+   */
+  public static double stepSpeed(int direction) {
+    ReplayServer server = current;
+    if (server == null) {
+      return 0;
+    }
+    double speed = server.clock().speed();
+    int index = 0;
+    for (int i = 0; i < SPEEDS.length; i++) {
+      if (Math.abs(SPEEDS[i] - speed) < Math.abs(SPEEDS[index] - speed)) {
+        index = i;
+      }
+    }
+    index = Math.max(0, Math.min(SPEEDS.length - 1, index + Integer.signum(direction)));
+    server.setSpeed(SPEEDS[index]);
+    return SPEEDS[index];
   }
 
   /** Called when any connection enters the play phase; the replay needs its registries. */
@@ -137,6 +173,7 @@ public final class ReplayPlayback {
     boolean inWorld = mc.level != null && mc.getConnection() != null;
     if (inWorld) {
       enteredWorld = true;
+      ReplayCamera.tick(mc);
     } else if (enteredWorld) {
       server.close();
     }
@@ -173,6 +210,7 @@ public final class ReplayPlayback {
   private static void onServerClosed() {
     current = null;
     playListener = null;
+    ReplayCamera.reset();
     PacketTap.setSuppressed(false);
     LOGGER.info("Replay stopped");
   }

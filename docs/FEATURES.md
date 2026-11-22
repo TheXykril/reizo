@@ -44,10 +44,16 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   position within 0.5 blocks; also works for mid-session recordings). Movement, rotation, head
   rotation and arm swing only. Sneaking, held items and armor are not shown yet.
 - **Spectator camera during playback:** **partial**, evidence GT (camera is in spectator mode with
-  its own identity). Plain spectator flight only; free camera tools are #9.
-- Play/pause and speed: clock exists (UT), not exposed in the UI yet. Status: **planned**.
-- Seek, frame step, timeline navigation, free camera, first/third person, follow entity, recorded
-  player reconstruction, markers in timeline, Quick View: **planned**.
+  its own identity). Plain spectator flight; no speed or roll controls yet.
+- **Camera modes free / player view / follow (V key):** **partial**, evidence GT
+  (`checkReplayControls`: the key cycles the modes, the camera entity and perspective match). Not
+  visually checked by a person yet.
+- **Pause and speed (K, `[` and `]`):** **partial**, evidence GT (`checkReplayControls`: pause
+  freezes the client world's ticking, speed 2x sets its tick rate to 40). Speeds 1/8x to 8x. The
+  free camera also moves faster or slower with the speed, because the client's own tick rate
+  changes (to be decoupled later).
+- Seek, frame step, timeline navigation, follow any entity, recorded player pose and equipment,
+  markers in timeline, Quick View: **planned**.
 
 ## Cinematic camera (planned, M3)
 
