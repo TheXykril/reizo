@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-22 by Claude (path display, roll/FOV).
+Last updated: 2026-11-22 by Claude (export settings).
 
 ## 1. Current project phase
 
@@ -59,7 +59,8 @@ screen, effects, audio, shadow recording, multi-version.
 
 - `main`: everything up to the OneConfig page (#28–#36 merged 2026-11-22).
 - `main` also has the timeline editor (#37).
-- `feat/path-visualization`: path display, free camera roll/FOV, camera kept across seeks; PR open.
+- `main` also has the path display and free camera roll/FOV (#38).
+- `feat/export-settings`: export settings screen and more encoders; PR open.
   Merge workflow for stacked PRs: squash-merge, then merge `origin/main` into the next branch and
   resolve with `git checkout --ours -- .` after checking `git diff --quiet origin/main <merged head>`.
 
@@ -80,8 +81,10 @@ screen, effects, audio, shadow recording, multi-version.
   wrapped in `levelRenderer.collectPerFrameGizmos()`: frames rendered outside `runTick` (the
   gametest screenshot path) have no collection open, and per-tick gizmos are not drained while the
   world is frozen (paused replay).
-- Next: export settings
-  UI and rendering at output size, shadow recording (#16), audio (#17), effects (#15), recorded
+- Export settings (`ExportSettingsScreen`, `core.export.ExportFormat`): formats come from
+  `ffmpeg -hide_banner -encoders`, cached per FFmpeg path. Hardware encoders are offered but never
+  run here (no GPU); VAAPI uses `/dev/dri/renderD128` and `format=nv12,hwupload`.
+- Next: rendering at output size (frames are still the window size, scaled by FFmpeg), shadow recording (#16), audio (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected
@@ -113,6 +116,11 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, export settings (branch `feat/export-settings`):
+- `./gradlew build`: pass (75 unit tests). Gametests: pass, adding the settings screen from the
+  pause menu and `exportRegionVp9` (24 VP9 frames for 1150..3450 ms at 10 fps). By hand: the
+  libx265 (with scaling), libsvtav1 and libvpx-vp9 command options encode 30 test frames.
 
 2026-11-22, cloud box, path display and roll/FOV (branch `feat/path-visualization`):
 - `./gradlew build`: pass (72 unit tests). Gametests: pass (twice for the camera restore), adding

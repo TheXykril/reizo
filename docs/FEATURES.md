@@ -132,18 +132,21 @@ mixdown. Status: **planned**.
 
 ## Export (M4/M5)
 
-Frame-exact export through the user's FFmpeg (ADR 0009). Started from the pause menu during a
-replay ("Export video"). Evidence GT (`exportVideo`: 20 fps export of a replay, 93 planned frames,
-93 frames in the MP4 by ffprobe) and UT (`ExportTest`).
+Frame-exact export through the user's FFmpeg (ADR 0009). "Export video" in the pause menu (or
+Export in the timeline) opens the export settings: size, frame rate, quality, format (only the
+encoders the installed FFmpeg has), file name and the In/Out range. Evidence GT (`exportVideo`: the settings screen opens from the pause menu and offers H.264 and VP9;
+20 fps H.264 export, 93 planned frames, 93 frames in the MP4 by ffprobe; `exportRegionVp9`: VP9 in
+WebM of the middle half at 10 fps, codec and frame count checked by ffprobe) and UT (`ExportTest`:
+options per encoder, VAAPI upload chain, encoder list parsing).
 
 | Feature | Lunar | Status |
 | --- | --- | --- |
 | Deterministic frame-by-frame rendering | ✓ | implemented (GT) |
 | MP4 / H.264 (libx264) | ✓ | implemented (GT) |
-| MKV, MOV, WebM; HEVC, VP9, AV1 | ✓ | partial: any FFmpeg codec via project `render.codec` and file name; only libx264 tested |
-| NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: command options exist, untested (no GPU in CI) |
-| Resolution, frame rate, quality | ✓ | partial: project `render` settings (FFmpeg scales from window size); no UI yet |
-| Render region (in/out) | ✓ (Jul 2026) | partial: I and O in the timeline editor set it (GT); an export with a region is not tested yet |
+| MKV, WebM; HEVC, VP9, AV1 | ✓ | partial: H.264 and VP9/WebM tested in-game (GT); H.265 and SVT-AV1 options checked with a real FFmpeg by hand |
+| NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: offered when FFmpeg has them; command options unit tested; never run on a GPU (needs a check on Hyperion: VAAPI/QSV) |
+| Resolution, frame rate, quality | ✓ | partial: settings screen (GT opens it); frames are rendered at window size and scaled by FFmpeg, not rendered at the output size |
+| Render region (in/out) | ✓ (Jul 2026) | implemented (GT): I and O in the timeline; `exportRegionVp9` exports only that range |
 | Progress, cancel | ? | implemented: progress in the window title, Esc cancels |
 | Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |
 | Frame sequence, screenshot export, render queue, presets | ? | planned |

@@ -86,11 +86,7 @@ public final class MenuButtons {
       buttons.add(
           Button.builder(
                   Component.translatable("reizo.menu.export"),
-                  b -> {
-                    client.setScreen(null);
-                    io.github.thexykril.reizo.fabric.export.ExportControls.exportCurrent(
-                        client, null);
-                  })
+                  b -> client.setScreen(new ExportSettingsScreen(screen)))
               .bounds(4, y, 120, 20)
               .build());
       y += 24;

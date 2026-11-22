@@ -8,7 +8,6 @@ import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits;
 import io.github.thexykril.reizo.core.timeline.TimelineView;
-import io.github.thexykril.reizo.fabric.export.ExportControls;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
@@ -110,10 +109,7 @@ public final class TimelineScreen extends Screen {
     button(
         row,
         "reizo.timeline.export",
-        b -> {
-          onClose();
-          ExportControls.exportCurrent(Minecraft.getInstance(), null);
-        });
+        b -> Minecraft.getInstance().setScreen(new ExportSettingsScreen(this)));
     updateLabels();
     // Buttons as wide as their labels, wrapped onto more rows on narrow windows.
     int[] widths = new int[row.size()];
