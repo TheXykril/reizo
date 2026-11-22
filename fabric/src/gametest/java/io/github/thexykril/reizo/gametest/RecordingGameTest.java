@@ -36,6 +36,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.minecraft.server.level.ParticleStatus;
+import net.minecraft.world.level.GameType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,11 +138,29 @@ public final class RecordingGameTest implements FabricClientGameTest {
         20 * 120);
     ReplayServer replay = context.computeOnClient(mc -> ReplayPlayback.current());
     int chunks = context.computeOnClient(mc -> mc.level.getChunkSource().getLoadedChunksCount());
-    String playerUuid = context.computeOnClient(mc -> mc.player.getUUID().toString());
+    String cameraUuid = context.computeOnClient(mc -> mc.player.getUUID().toString());
+    boolean cameraIsSpectator =
+        context.computeOnClient(
+            mc -> mc.player.isSpectator() && mc.gameMode.getPlayerMode() == GameType.SPECTATOR);
+    // The recorded player is a separate entity with the recorded UUID, driven by the samples.
+    context.waitFor(
+        mc ->
+            mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId())
+                instanceof net.minecraft.world.entity.player.Player,
+        20 * 10);
+    String recordedUuid =
+        context.computeOnClient(
+            mc ->
+                mc.level
+                    .getEntity(ReplayPlayback.current().view().recordedEntityId())
+                    .getUUID()
+                    .toString());
     check(
         replay.playPacketsSent() == replay.script().playPacketCount(),
         "sent " + replay.playPacketsSent() + " of " + replay.script().playPacketCount());
-    check(playerUuid.equals(meta.localPlayerUuid), "replay player is " + playerUuid);
+    check(!cameraUuid.equals(meta.localPlayerUuid), "camera has the recorded player's UUID");
+    check(cameraIsSpectator, "camera is not a spectator");
+    check(recordedUuid.equals(meta.localPlayerUuid), "recorded player entity is " + recordedUuid);
     check(
         context.computeOnClient(mc -> RecorderClient.get().session()) == null,
         "the replay was being recorded");
@@ -151,6 +170,9 @@ public final class RecordingGameTest implements FabricClientGameTest {
         "replay connection dropped");
 
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    LOGGER.info("playBack: left the replay");
+    context.waitFor(mc -> mc.getConnection() == null, 20 * 30);
+    LOGGER.info("playBack: client connection gone");
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     LOGGER.info("playBack OK: {} play packets, {} chunks loaded", replay.playPacketsSent(), chunks);
   }
@@ -182,6 +204,47 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(moved > 1.0, "player did not move in recording (dist^2=" + moved + ")");
     check(meta.durationMs > 1000, "duration too short: " + meta.durationMs);
     LOGGER.info("recordMidSessionWhileWalking OK: {} -> {}", archive.getFileName(), stats);
+    playBackWalk(context, archive, stats);
+  }
+
+  /**
+   * Plays the walking recording back: the recorded player must be shown (even though this
+   * mid-session recording has no tab entry for it) and end where the recorded walk ended.
+   */
+  private void playBackWalk(ClientGameTestContext context, Path archive, Stats stats) {
+    context.runOnClient(
+        mc -> {
+          try {
+            ReplayPlayback.start(mc, archive);
+          } catch (java.io.IOException e) {
+            throw new AssertionError("could not start replay", e);
+          }
+        });
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.script().finished()
+              && replay.view() != null
+              && mc.level != null
+              && mc.level.getEntity(replay.view().recordedEntityId())
+                  instanceof net.minecraft.world.entity.player.Player;
+        },
+        20 * 120);
+    context.waitTicks(10); // let position interpolation settle
+    Pos shown =
+        context.computeOnClient(
+            mc -> {
+              var e = mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId());
+              return new Pos(e.getX(), e.getY(), e.getZ());
+            });
+    double offSq = shown.distanceSq(stats.lastPlayer);
+    check(offSq < 0.25, "recorded player at " + shown + ", walk ended at " + stats.lastPlayer);
+    context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    // Leaving a server ends on the multiplayer screen; tests must end on the title screen.
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+    LOGGER.info("playBackWalk OK: recorded player shown at {}", shown);
   }
 
   // ---- verification helpers ----

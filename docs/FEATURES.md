@@ -39,6 +39,12 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - **Play a recording into the client world:** **partial**, evidence GT (`playBack`: the recorded
   world is entered through the replay server, all play packets delivered, chunks loaded, the replay
   is not recorded). Started with the dev-only `/reizo-debug play [file]`. ADR 0008.
+- **Recorded player shown during playback:** **partial**, evidence GT (`playBack`, `playBackWalk`:
+  separate player entity with the recorded UUID; after a recorded walk it ends at the recorded end
+  position within 0.5 blocks; also works for mid-session recordings). Movement, rotation, head
+  rotation and arm swing only. Sneaking, held items and armor are not shown yet.
+- **Spectator camera during playback:** **partial**, evidence GT (camera is in spectator mode with
+  its own identity). Plain spectator flight only; free camera tools are #9.
 - Play/pause and speed: clock exists (UT), not exposed in the UI yet. Status: **planned**.
 - Seek, frame step, timeline navigation, free camera, first/third person, follow entity, recorded
   player reconstruction, markers in timeline, Quick View: **planned**.

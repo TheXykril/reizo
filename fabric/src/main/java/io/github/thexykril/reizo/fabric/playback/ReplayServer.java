@@ -72,6 +72,9 @@ public final class ReplayServer implements AutoCloseable {
   private final CountDownLatch configurationFinished = new CountDownLatch(1);
   private final CountDownLatch helloReceived = new CountDownLatch(1);
 
+  private final java.util.UUID recordedPlayerUuid;
+  private final String recordedPlayerName;
+  private volatile PlayTransformer transformer;
   private volatile Socket socket;
   private volatile boolean closed;
   private volatile int playPacketsSent;
@@ -79,19 +82,25 @@ public final class ReplayServer implements AutoCloseable {
   /**
    * Opens the listening socket. Call {@link #start()} afterwards.
    *
-   * @param registries the client's registries, or null while it has none; needed only to encode
-   *     keep-alive packets in the play phase
+   * @param profile the camera's profile (the client's own player in the replay)
+   * @param recordedPlayerUuid the recorded player, shown as a separate entity
+   * @param recordedPlayerName its name, used if the recording has no tab entry for it
+   * @param registries the client's play registries, or null while it has none
    * @param onClosed runs once, on the replay thread, when the connection ends
    */
   public ReplayServer(
       ReplayScript script,
       GameProfile profile,
+      java.util.UUID recordedPlayerUuid,
+      String recordedPlayerName,
       PlaybackClock clock,
       Supplier<RegistryAccess> registries,
       Runnable onClosed)
       throws IOException {
     this.script = script;
     this.profile = profile;
+    this.recordedPlayerUuid = recordedPlayerUuid;
+    this.recordedPlayerName = recordedPlayerName;
     this.clock = clock;
     this.registries = registries;
     this.onClosed = onClosed;
@@ -175,6 +184,10 @@ public final class ReplayServer implements AutoCloseable {
     // protocol, which it confirms with its own finish-configuration packet.
     awaitOrClosed(configurationFinished);
 
+    RegistryAccess access = awaitRegistries();
+    PlayTransformer transformer =
+        new PlayTransformer(access, profile, recordedPlayerUuid, recordedPlayerName);
+    this.transformer = transformer;
     LOGGER.info(
         "Replay running: {} play packets over {} ms",
         script.playPacketCount(),
@@ -182,27 +195,60 @@ public final class ReplayServer implements AutoCloseable {
     clock.resume();
     long lastWrite = System.currentTimeMillis();
     while (!closed) {
-      List<byte[]> due = script.due(clock.timeMs());
-      for (byte[] packet : due) {
-        writeFrame(out, packet);
+      List<ReplayScript.Entry> due = script.due(clock.timeMs());
+      int written = 0;
+      for (ReplayScript.Entry entry : due) {
+        List<byte[]> packets =
+            entry.kind() == ReplayScript.Kind.PLAY_PACKET
+                ? transformer.packet(entry.bytes())
+                : transformer.localPlayer(entry.bytes());
+        for (byte[] packet : packets) {
+          writeFrame(out, packet);
+          written++;
+        }
+        if (entry.kind() == ReplayScript.Kind.PLAY_PACKET) {
+          playPacketsSent++;
+        }
       }
       long now = System.currentTimeMillis();
-      if (!due.isEmpty()) {
-        playPacketsSent += due.size();
+      if (written > 0) {
         out.flush();
         lastWrite = now;
       } else if (now - lastWrite >= KEEP_ALIVE_INTERVAL_MS) {
         // The client drops a connection that stays silent for 30 s (paused or finished replay).
-        RegistryAccess access = registries.get();
-        if (access != null) {
-          writeFrame(out, encodePlay(access, new ClientboundKeepAlivePacket(now)));
-          out.flush();
-        }
+        writeFrame(out, encodePlay(access, new ClientboundKeepAlivePacket(now)));
+        out.flush();
         lastWrite = now;
       }
       Thread.sleep(due.isEmpty() ? 5 : 1);
     }
   }
+
+  /** The client's registries; it creates its play listener before confirming the switch. */
+  private RegistryAccess awaitRegistries() throws InterruptedException, IOException {
+    long deadline = System.currentTimeMillis() + 10_000;
+    while (true) {
+      RegistryAccess access = registries.get();
+      if (access != null) {
+        return access;
+      }
+      if (closed || System.currentTimeMillis() > deadline) {
+        throw new IOException("client registries not available");
+      }
+      Thread.sleep(10);
+    }
+  }
+
+  /** The packet transformer once the replay is in the play phase, else null. For tests. */
+  public PlayTransformerView view() {
+    PlayTransformer t = transformer;
+    return t == null
+        ? null
+        : new PlayTransformerView(t.recordedEntityId(), t.recordedPlayerAdded());
+  }
+
+  /** What tests may observe about the recorded player. */
+  public record PlayTransformerView(int recordedEntityId, boolean recordedPlayerAdded) {}
 
   private void awaitOrClosed(CountDownLatch latch) throws InterruptedException, IOException {
     while (!latch.await(100, TimeUnit.MILLISECONDS)) {

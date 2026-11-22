@@ -25,23 +25,28 @@ camera, project and export are not started.
 - Playback first slice (#7, ADR 0008): `core.playback` (PlaybackClock, ReplayScript) and
   `fabric.playback` (ReplayServer on 127.0.0.1, ReplayPlayback), `/reizo-debug play [file]`,
   capture suppressed during replays.
+- Recorded player in playback (#7 part 2, branch `feat/playback-recorded-player`, stacked on
+  #28): `PlayTransformer` rewrites login/respawn for a spectator camera, drops packets aimed at the
+  camera, and drives a separate recorded-player entity from `LOCAL_PLAYER` samples.
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
-- Tests: 37 unit tests; 3 client gametest scenarios (record from join, play back, record
-  mid-session).
+- Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
+  mid-session while walking, play back the walk).
 - Docs: AGENTS.md, CLAUDE.md, docs/*, 8 ADRs, templates.
 
 ## 3. Current branch and commit
 
 - `main`: recording foundation (#20), CI fix (#27), ADR 0007 (#26), all merged 2026-11-22.
-- `feat/playback-replay-server`: playback first slice (this session's PR).
+- `feat/playback-replay-server`: playback first slice, PR #28 (awaiting the owner's OK to merge).
+- `feat/playback-recorded-player`: recorded player + spectator camera, stacked on #28.
   Check `git log --oneline` for the exact head commit.
 
 ## 4. Active implementation work
 
-Playback first slice on branch `feat/playback-replay-server` (PR open). Next pieces of #7:
-recorded player reconstruction from `LOCAL_PLAYER` frames; then #9 free camera, #8 seeking, #10
-replay browser (the real entry point instead of the debug command).
+Playback first slice on branch `feat/playback-replay-server` (PR open). Recorded player is
+done on `feat/playback-recorded-player` (stacked PR). Next: recorded player pose/sneak (needs entity
+data accessors) and equipment, then #9 free camera, #8 seeking, #10 replay browser (the real entry
+point instead of the debug command).
 
 ## 5. Files and modules affected
 
@@ -71,6 +76,12 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, recorded player (branch `feat/playback-recorded-player`):
+- `./gradlew build`: pass (37 unit tests). Gametests: pass, all 5 scenarios. `playBackWalk`:
+  recorded player entity ended at the recorded end position (mid-session recording, synthesized tab
+  entry); `playBack`: camera is a spectator with its own UUID, recorded player has the recorded
+  UUID; leaving the replay ends it within a tick.
 
 2026-11-22, cloud box, playback slice (branch `feat/playback-replay-server`):
 - `./gradlew build`: pass (37 unit tests).
