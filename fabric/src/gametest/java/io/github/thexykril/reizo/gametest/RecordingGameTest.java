@@ -16,6 +16,7 @@ import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
+import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.nio.file.Files;
@@ -60,6 +61,44 @@ public final class RecordingGameTest implements FabricClientGameTest {
     Path archive = recordFromJoin(context);
     playBack(context, archive);
     recordMidSessionWhileWalking(context);
+    browseAndPlay(context);
+  }
+
+  /**
+   * Opens the replay browser from the title screen button, checks it lists the recordings made
+   * above, and plays the newest one with the Play button.
+   */
+  private void browseAndPlay(ClientGameTestContext context) {
+    context.waitFor(
+        mc -> mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen, 20 * 10);
+    context.runOnClient(
+        mc -> {
+          pressButton(mc, "reizo.menu.replays");
+        });
+    context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+    context.waitTicks(2);
+    context.takeScreenshot("reizo-replay-browser");
+    int listed = context.computeOnClient(mc -> ((ReplayBrowserScreen) mc.screen).entries().size());
+    check(listed >= 2, "browser lists " + listed + " recordings, expected at least 2");
+    context.runOnClient(
+        mc -> {
+          ReplayBrowserScreen browser = (ReplayBrowserScreen) mc.screen;
+          browser.select(0);
+          browser.pressPlay();
+        });
+    context.waitFor(
+        mc ->
+            ReplayPlayback.isActive()
+                && ReplayPlayback.current().script().finished()
+                && mc.level != null
+                && mc.player != null,
+        20 * 60);
+    context.waitTicks(10);
+    context.takeScreenshot("reizo-replay-playing");
+    context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+    LOGGER.info("browseAndPlay OK: {} recordings listed", listed);
   }
 
   /**
@@ -242,9 +281,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
     try (TestSingleplayerContext world = context.worldBuilder().create()) {
       world.getClientWorld().waitForChunksDownload();
       context.waitTicks(10);
-      context.runOnClient(mc -> RecorderClient.get().startRecording());
+      // Start from the pause menu's button (#2), the way a player would without the hotkey.
+      context.runOnClient(
+          mc -> mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+      context.waitTicks(2);
+      context.runOnClient(mc -> pressButton(mc, "reizo.menu.start_recording"));
       session = context.computeOnClient(mc -> RecorderClient.get().session());
-      check(session != null, "manual start failed");
+      check(session != null, "pause menu start failed");
+      check(context.computeOnClient(mc -> mc.screen == null), "pause menu still open");
       registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
       context.getInput().holdKeyFor(options -> options.keyUp, 40);
       context.waitTicks(5);
@@ -303,6 +347,18 @@ public final class RecordingGameTest implements FabricClientGameTest {
     // Leaving a server ends on the multiplayer screen; tests must end on the title screen.
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
     LOGGER.info("playBackWalk OK: recorded player shown at {}", shown);
+  }
+
+  /** Presses the button on the current screen whose label is the given translation key. */
+  private static void pressButton(Minecraft mc, String key) {
+    var button =
+        net.fabricmc.fabric.api.client.screen.v1.Screens.getButtons(mc.screen).stream()
+            .filter(
+                b -> b.getMessage().equals(net.minecraft.network.chat.Component.translatable(key)))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no '" + key + "' button on " + mc.screen));
+    ((net.minecraft.client.gui.components.Button) button)
+        .onPress(new net.minecraft.client.input.KeyEvent(GLFW.GLFW_KEY_ENTER, 0, 0));
   }
 
   // ---- verification helpers ----

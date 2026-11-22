@@ -31,6 +31,9 @@ camera, project and export are not started.
 - Replay camera and controls (#7/#9, branch `feat/replay-camera-controls`, stacked on #29):
   `ReplayCamera` (free / POV / follow on V), pause (K) and speed (`[` `]`) via the replay server's
   `ClientboundTickingStatePacket` (recorded tick rate × speed, frozen when paused).
+- Replay browser (#10) and pause-menu recording buttons (#2), branch `feat/replay-browser`:
+  `ReplayBrowserScreen`, `RenameScreen`, `MenuButtons` (Fabric screen events, no mixins), and
+  `RecordingStorage.listRecordings/rename/delete` (unit tested).
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -81,6 +84,11 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, replay browser (branch `feat/replay-browser`):
+- `./gradlew build`: pass (40 unit tests). Gametests: pass, adding `browseAndPlay` (title screen
+  button → browser lists recordings → Play starts the replay) and the pause menu "Start recording"
+  button starting the walking recording. Screenshots in `fabric/build/run/clientGameTest/screenshots`.
 
 2026-11-22, cloud box, camera and controls (branch `feat/replay-camera-controls`):
 - `./gradlew build`: pass (37 unit tests). Gametests: pass, all scenarios plus

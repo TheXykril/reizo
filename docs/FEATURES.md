@@ -16,7 +16,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Feature | Lunar | FB | HS | RM | Status | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Manual start/stop (hotkey) | Shift+R | ✓ | ✓ | ✓ | implemented | GT | F9 by default; Shift+R combo needs modifier-key support (#issue M1) |
-| Start/stop from pause menu | ✓ | ✓ | ? | ✓ | planned | — | M1 |
+| Start/stop from pause menu | ✓ | ✓ | ? | ✓ | implemented | GT | Top-left buttons: start/stop, pause/resume, Replays. Visual check pending |
 | Recording indicator + elapsed time | ✓ | ✓ | ? | ✓ | partial | — | HUD drawn; visual check on real hardware pending |
 | Pause / resume recording | ✓ | ✓ | ? | ✓ | implemented | UT | Clock freeze; packets keep flowing (see FORMAT.md). Key unbound by default |
 | Markers | ✓ | ✓ | ✓ | ✓ | implemented | UT, GT | Key unbound by default; label "Marker" |
@@ -38,7 +38,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 
 - **Play a recording into the client world:** **partial**, evidence GT (`playBack`: the recorded
   world is entered through the replay server, all play packets delivered, chunks loaded, the replay
-  is not recorded). Started with the dev-only `/reizo-debug play [file]`. ADR 0008.
+  is not recorded). Started from the replay browser (or the dev-only `/reizo-debug play`). ADR 0008.
 - **Recorded player shown during playback:** **partial**, evidence GT (`playBack`, `playBackWalk`:
   separate player entity with the recorded UUID; after a recorded walk it ends at the recorded end
   position within 0.5 blocks; also works for mid-session recordings). Movement, rotation, head
@@ -54,6 +54,15 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   changes (to be decoupled later).
 - Seek, frame step, timeline navigation, follow any entity, recorded player pose and equipment,
   markers in timeline, Quick View: **planned**.
+
+## Replay browser (#10)
+
+- **List, play, rename, delete, open folder:** **implemented**, evidence UT (`listRecordings`,
+  `rename`, `delete` in `RecordingStorageTest`) and GT (`browseAndPlay`: opened from the title
+  screen button, lists the recordings, Play starts the replay; screenshot `reizo-replay-browser`).
+  Opened from the title screen ("Replays", left of Multiplayer) and the pause menu. Recordings from
+  another Minecraft version are listed but cannot be played. Double-click plays.
+- Thumbnails, search, sorting options, Quick View: **planned**.
 
 ## Cinematic camera (planned, M3)
 

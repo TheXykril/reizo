@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.thexykril.reizo.core.format.Frame;
@@ -122,5 +123,55 @@ class RecordingStorageTest {
     assertEquals("a_b_c", RecordingStorage.sanitize("a/b\\c"));
     assertEquals("recording", RecordingStorage.sanitize(".."));
     assertEquals("recording", RecordingStorage.sanitize("   "));
+  }
+
+  private Path finishedRecording(RecordingStorage storage, String name) throws IOException {
+    RecordingMetadata meta = RecordingMetadata.create(name, 0L);
+    RecordingStorage.WorkingDirectory working = storage.createWorking(meta);
+    FrameStreamWriter writer = FrameStreamWriter.create(working.streamFile(), 1024);
+    writer.write(Frame.packet(0, ProtocolPhase.PLAY, new byte[] {1, 2, 3}));
+    writer.close();
+    working.close();
+    return storage.finalizeRecording(working.dir());
+  }
+
+  @Test
+  void listRecordingsSkipsUnreadableFiles() throws IOException {
+    RecordingStorage storage = storage();
+    Path good = finishedRecording(storage, "good");
+    Files.writeString(dir.resolve("broken.reizo"), "not a zip");
+    List<RecordingStorage.Entry> list = storage.listRecordings();
+    assertEquals(1, list.size());
+    assertEquals(good, list.get(0).path());
+    assertEquals("good", list.get(0).metadata().name);
+    assertTrue(list.get(0).sizeBytes() > 0);
+  }
+
+  @Test
+  void renameKeepsFileAndFrames() throws IOException {
+    RecordingStorage storage = storage();
+    Path p = finishedRecording(storage, "before");
+    storage.rename(p, "  after  ");
+    try (RecordingArchive archive = RecordingArchive.open(p);
+        FrameStreamReader reader = archive.openStream()) {
+      assertEquals("after", archive.metadata().name);
+      List<Frame> frames = reader.readAll();
+      assertEquals(1, frames.size());
+      assertEquals(3, frames.get(0).packetBytes().length);
+    }
+    assertFalse(Files.exists(p.resolveSibling(p.getFileName() + ".tmp")));
+    assertThrows(IllegalArgumentException.class, () -> storage.rename(p, " "));
+  }
+
+  @Test
+  void deleteOnlyAcceptsRecordingsInRoot(@TempDir Path other) throws IOException {
+    RecordingStorage storage = storage();
+    Path p = finishedRecording(storage, "gone");
+    Path outside = Files.writeString(other.resolve("x.reizo"), "x");
+    assertThrows(IllegalArgumentException.class, () -> storage.delete(outside));
+    assertThrows(IllegalArgumentException.class, () -> storage.delete(dir.resolve("../x.reizo")));
+    storage.delete(p);
+    assertFalse(Files.exists(p));
+    assertTrue(Files.exists(outside));
   }
 }
