@@ -31,6 +31,7 @@ import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundTickingStatePacket;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
 import net.minecraft.network.protocol.handshake.HandshakeProtocols;
@@ -75,6 +76,8 @@ public final class ReplayServer implements AutoCloseable {
   private final java.util.UUID recordedPlayerUuid;
   private final String recordedPlayerName;
   private volatile PlayTransformer transformer;
+  private final java.util.concurrent.atomic.AtomicBoolean tickStateChanged =
+      new java.util.concurrent.atomic.AtomicBoolean();
   private volatile Socket socket;
   private volatile boolean closed;
   private volatile int playPacketsSent;
@@ -117,6 +120,25 @@ public final class ReplayServer implements AutoCloseable {
 
   public ReplayScript script() {
     return script;
+  }
+
+  /**
+   * Pauses or resumes the replay. While paused no recorded packets are sent and the client's world
+   * is frozen (entities stop; the camera can still move). Any thread.
+   */
+  public void setPaused(boolean paused) {
+    if (paused) {
+      clock.pause();
+    } else {
+      clock.resume();
+    }
+    tickStateChanged.set(true);
+  }
+
+  /** Sets the playback speed; the client's tick rate follows, so the world moves at that speed. */
+  public void setSpeed(double speed) {
+    clock.setSpeed(speed);
+    tickStateChanged.set(true);
   }
 
   /** Play packets written to the client so far. */
@@ -209,6 +231,18 @@ public final class ReplayServer implements AutoCloseable {
         if (entry.kind() == ReplayScript.Kind.PLAY_PACKET) {
           playPacketsSent++;
         }
+      }
+      if (tickStateChanged.getAndSet(false) | transformer.takeRecordedTickStateChanged()) {
+        // The client's tick rate and freeze state follow the replay clock, on top of the
+        // recorded server's own tick state. The client clamps the rate to at least 1.
+        writeFrame(
+            out,
+            encodePlay(
+                access,
+                new ClientboundTickingStatePacket(
+                    (float) (transformer.recordedTickRate() * clock.speed()),
+                    transformer.recordedFrozen() || !clock.isRunning())));
+        written++;
       }
       long now = System.currentTimeMillis();
       if (written > 0) {

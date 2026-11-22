@@ -54,6 +54,13 @@ Option 3.
   - The recorded player is added as a separate player entity with the recorded entity id and
     UUID. The `LOCAL_PLAYER` samples drive its position, rotation, head rotation and arm swing.
   - A mid-session recording has no tab entry for the player, so a skinless one is added.
+- **Pause and speed.** The replay server owns the client's tick state: recorded
+  `ClientboundTickingStatePacket`s are dropped and remembered, and the server sends its own with the
+  recorded tick rate times the replay speed, frozen while the replay is paused. Vanilla then slows,
+  speeds or freezes the world on the client; players are not frozen, so the camera still moves.
+- **Camera modes** (`fabric.playback.ReplayCamera`): free (the spectator camera), the recorded
+  player's view, and following behind the recorded player, using the client's camera entity and
+  perspective.
 - The replay ends when the client leaves the replay world, detected on the client tick. The
   client's socket can stay half-open for up to 30 s, so neither the server nor the disconnect
   events see the close promptly.
@@ -65,7 +72,9 @@ Option 3.
 + Vanilla code handles login, configuration, registries and level setup, which keeps this
   version-light (ADR 0007).
 + The same bytes that were verified at record time are what the client decodes.
-+ Pause and speed can later be added on the server side (clock) together with the client tick rate.
++ Pause and speed use vanilla's tick rate handling, with no mixins.
+− The client's own tick rate follows the replay speed, so the free camera also flies faster or
+  slower. Decoupling it needs a later change to how the camera player ticks.
 − The replay is a "remote server" to the client. Anything that behaves differently for
   multiplayer (for example the pause menu not pausing) needs handling in later slices.
 − Seeking backwards needs a restart or snapshots (#8). The script only moves forward.

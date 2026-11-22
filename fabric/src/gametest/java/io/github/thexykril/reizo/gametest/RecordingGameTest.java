@@ -13,6 +13,7 @@ import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
+import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.netty.buffer.ByteBuf;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.GraphicsPreset;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -37,6 +39,7 @@ import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.world.level.GameType;
+import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +48,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>These verify the vertical slice up to "stop and save": packets are captured from the real
  * network pipeline, the file is finalized, and every recorded packet decodes again with Minecraft's
- * own codecs (byte-exact capture). Playback is not covered yet.
+ * own codecs (byte-exact capture). The recordings are then played back through the replay server,
+ * including the camera, pause and speed keys.
  */
 public final class RecordingGameTest implements FabricClientGameTest {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/GameTest");
@@ -168,6 +172,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(
         context.computeOnClient(mc -> mc.level != null && ReplayPlayback.isActive()),
         "replay connection dropped");
+    checkReplayControls(context);
 
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     LOGGER.info("playBack: left the replay");
@@ -175,6 +180,59 @@ public final class RecordingGameTest implements FabricClientGameTest {
     LOGGER.info("playBack: client connection gone");
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     LOGGER.info("playBack OK: {} play packets, {} chunks loaded", replay.playPacketsSent(), chunks);
+  }
+
+  /**
+   * Drives the replay keys with their default bindings: the camera key cycles free, player view and
+   * follow; the pause key freezes the client's world; the speed keys change its tick rate.
+   */
+  private void checkReplayControls(ClientGameTestContext context) {
+    int recordedId =
+        context.computeOnClient(mc -> ReplayPlayback.current().view().recordedEntityId());
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.waitTicks(2);
+    check(ReplayCamera.mode() == ReplayCamera.Mode.POV, "camera mode " + ReplayCamera.mode());
+    check(
+        context.computeOnClient(
+            mc ->
+                mc.getCameraEntity().getId() == recordedId
+                    && mc.options.getCameraType() == CameraType.FIRST_PERSON),
+        "player view does not look through the recorded player");
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.waitTicks(2);
+    check(ReplayCamera.mode() == ReplayCamera.Mode.FOLLOW, "camera mode " + ReplayCamera.mode());
+    check(
+        context.computeOnClient(
+            mc ->
+                mc.getCameraEntity().getId() == recordedId
+                    && mc.options.getCameraType() == CameraType.THIRD_PERSON_BACK),
+        "follow camera is not behind the recorded player");
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.waitTicks(2);
+    check(ReplayCamera.mode() == ReplayCamera.Mode.FREE, "camera mode " + ReplayCamera.mode());
+    check(
+        context.computeOnClient(
+            mc ->
+                mc.getCameraEntity() == mc.player
+                    && mc.options.getCameraType() == CameraType.FIRST_PERSON),
+        "free camera is not the spectator camera");
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_K);
+    context.waitFor(mc -> mc.level.tickRateManager().isFrozen(), 20 * 5);
+    check(!ReplayPlayback.current().clock().isRunning(), "replay clock still running");
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_RIGHT_BRACKET);
+    context.waitFor(mc -> mc.level.tickRateManager().tickrate() == 40f, 20 * 5);
+    context.getInput().pressKey(GLFW.GLFW_KEY_K);
+    context.waitFor(mc -> !mc.level.tickRateManager().isFrozen(), 20 * 5);
+    check(ReplayPlayback.current().clock().speed() == 2.0, "speed did not step to 2x");
+
+    context.getInput().pressKey(GLFW.GLFW_KEY_LEFT_BRACKET);
+    context.waitFor(mc -> mc.level.tickRateManager().tickrate() == 20f, 20 * 5);
+    LOGGER.info("checkReplayControls OK");
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

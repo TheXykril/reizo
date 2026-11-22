@@ -34,6 +34,7 @@ import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
+import net.minecraft.network.protocol.game.ClientboundTickingStatePacket;
 import net.minecraft.network.protocol.game.CommonPlayerSpawnInfo;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.minecraft.world.entity.EntityType;
@@ -88,6 +89,11 @@ final class PlayTransformer {
   private final int abilitiesId;
   private final int gameEventId;
   private final int respawnId;
+  private final int tickingStateId;
+  private volatile float recordedTickRate = 20f;
+  private volatile boolean recordedFrozen;
+  private final java.util.concurrent.atomic.AtomicBoolean recordedTickStateChanged =
+      new java.util.concurrent.atomic.AtomicBoolean();
 
   private boolean loginSeen;
   private boolean cameraPlaced;
@@ -113,6 +119,7 @@ final class PlayTransformer {
     this.combatKillId = idOf(new ClientboundPlayerCombatKillPacket(0, Component.empty()));
     this.abilitiesId = idOf(new ClientboundPlayerAbilitiesPacket(new Abilities()));
     this.playerInfoId = peekId(playerInfo(new UUID(0, 0), "x", GameType.SURVIVAL, false));
+    this.tickingStateId = idOf(new ClientboundTickingStatePacket(20f, false));
     this.gameEventId =
         idOf(new ClientboundGameEventPacket(ClientboundGameEventPacket.CHANGE_GAME_MODE, 0));
     Holder<net.minecraft.world.level.dimension.DimensionType> overworld =
@@ -137,6 +144,21 @@ final class PlayTransformer {
   /** Entity id of the recorded player, or -1 before the login packet. */
   int recordedEntityId() {
     return recordedEntityId;
+  }
+
+  /** The tick rate the recorded server last announced (20 unless it was changed). */
+  float recordedTickRate() {
+    return recordedTickRate;
+  }
+
+  /** Whether the recorded server had frozen its ticking (the tick freeze command). */
+  boolean recordedFrozen() {
+    return recordedFrozen;
+  }
+
+  /** True once after a recorded tick state packet was dropped. */
+  boolean takeRecordedTickStateChanged() {
+    return recordedTickStateChanged.getAndSet(false);
   }
 
   boolean recordedPlayerAdded() {
@@ -168,6 +190,15 @@ final class PlayTransformer {
         recordedPlayerInfoSeen = true;
       }
       return List.of(bytes);
+    }
+    if (id == tickingStateId) {
+      // The replay server sends the tick state itself, so the replay speed and pause apply on top
+      // of the recorded rate (see ReplayServer).
+      ClientboundTickingStatePacket p = (ClientboundTickingStatePacket) decode(bytes);
+      recordedTickRate = p.tickRate();
+      recordedFrozen = p.isFrozen();
+      recordedTickStateChanged.set(true);
+      return List.of();
     }
     if (id == gameEventId) {
       ClientboundGameEventPacket p = (ClientboundGameEventPacket) decode(bytes);
