@@ -14,6 +14,9 @@ compatibility.
 
 ### Added
 
+- Export settings screen (pause menu "Export video" or the timeline's Export): size, frame rate,
+  quality, format (H.264, H.265, VP9, AV1, and NVIDIA, VAAPI or Intel QSV hardware encoders when
+  FFmpeg has them), file name, and the In/Out range.
 - Camera path shown in the replay world (G toggles it): the curve, each keyframe with its view
   direction, and where the camera is now.
 - Free camera roll (hold U / I) and FOV (hold - / =), reset with 0. New keyframes store both.

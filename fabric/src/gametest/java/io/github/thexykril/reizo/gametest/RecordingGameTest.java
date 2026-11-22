@@ -5,6 +5,7 @@
 package io.github.thexykril.reizo.gametest;
 
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
+import io.github.thexykril.reizo.core.export.ExportFormat;
 import io.github.thexykril.reizo.core.format.Frame;
 import io.github.thexykril.reizo.core.format.FrameStreamReader;
 import io.github.thexykril.reizo.core.format.FrameType;
@@ -21,6 +22,7 @@ import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
+import io.github.thexykril.reizo.fabric.ui.ExportSettingsScreen;
 import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
 import io.github.thexykril.reizo.fabric.ui.TimelineScreen;
 import io.netty.buffer.ByteBuf;
@@ -707,6 +709,24 @@ public final class RecordingGameTest implements FabricClientGameTest {
       LOGGER.warn("exportVideo SKIPPED: ffmpeg not on PATH");
       return;
     }
+    // The pause menu's "Export video" opens the settings, which list what this FFmpeg can encode.
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
+    context.waitTicks(2);
+    context.runOnClient(mc -> pressButton(mc, "reizo.menu.export"));
+    context.waitTicks(2);
+    var offered =
+        context.computeOnClient(
+            mc ->
+                mc.screen instanceof ExportSettingsScreen e
+                    ? e.offeredFormats()
+                    : List.<ExportFormat>of());
+    check(
+        offered.contains(ExportFormat.H264) && offered.contains(ExportFormat.VP9),
+        "export settings did not offer H.264 and VP9: " + offered);
+    context.takeScreenshot("reizo-export-settings");
+    context.runOnClient(mc -> mc.setScreen(null));
+    context.waitTicks(1);
+
     java.util.concurrent.atomic.AtomicReference<ExportSession> result =
         new java.util.concurrent.atomic.AtomicReference<>();
     long duration = ReplayPlayback.current().script().durationMs();
@@ -744,6 +764,56 @@ public final class RecordingGameTest implements FabricClientGameTest {
         frames.strip().equals(Integer.toString(expected)),
         "video has " + frames.strip() + " frames, expected " + expected);
     LOGGER.info("exportVideo OK: {} frames in {}", expected, s.output());
+    exportRegionVp9(context, duration);
+  }
+
+  /** A second export: VP9 in WebM, only the middle half (the timeline's In/Out), at 10 fps. */
+  private void exportRegionVp9(ClientGameTestContext context, long duration) {
+    long in = duration / 4;
+    long out = duration * 3 / 4;
+    java.util.concurrent.atomic.AtomicReference<ExportSession> result =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.setRegion(true, in);
+          ReplayEditor.setRegion(false, out);
+          var render = ReplayEditor.project().render;
+          render.fps = 10;
+          render.codec = "libvpx-vp9";
+          render.crf = 40;
+          render.output = "gametest-region.mp4"; // the extension follows the format
+          check(ExportControls.exportCurrent(mc, result::set), "VP9 export did not start");
+        });
+    context.waitFor(mc -> result.get() != null, 20 * 240);
+    ExportSession s = result.get();
+    check(
+        s.state() == ExportSession.State.DONE, "VP9 export ended " + s.state() + ": " + s.error());
+    check(
+        s.output().getFileName().toString().equals("gametest-region.webm"),
+        "VP9 export file: " + s.output());
+    int expected = new io.github.thexykril.reizo.core.export.ExportPlan(in, out, 10).frameCount();
+    String probe =
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_frames",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=codec_name,nb_read_frames",
+            "-of",
+            "csv=p=0",
+            s.output().toString());
+    check(
+        probe.strip().equals("vp9," + expected),
+        "VP9 export probe: " + probe.strip() + ", expected vp9," + expected);
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.setRegion(true, -1);
+          ReplayEditor.setRegion(false, -1);
+        });
+    LOGGER.info("exportRegionVp9 OK: {} frames of {}..{} ms in {}", expected, in, out, s.output());
   }
 
   private static String run(String... command) {

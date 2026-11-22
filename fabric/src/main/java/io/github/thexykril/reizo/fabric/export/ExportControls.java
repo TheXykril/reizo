@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.export;
 
+import io.github.thexykril.reizo.core.export.ExportFormat;
 import io.github.thexykril.reizo.core.export.ExportPlan;
 import io.github.thexykril.reizo.core.export.FfmpegCommand;
 import io.github.thexykril.reizo.core.project.Project;
@@ -56,14 +57,15 @@ public final class ExportControls {
       out = duration;
     }
     Project.Render r = project.render;
+    ExportFormat format = ExportFormat.forEncoder(r.codec);
     String name =
-        r.output != null && !r.output.isBlank()
-            ? r.output
-            : safe(project.name) + "_" + LocalDateTime.now().format(FILE_DATE) + ".mp4";
+        format.fileName(
+            r.output != null && !r.output.isBlank()
+                ? r.output.strip()
+                : safe(project.name) + "_" + LocalDateTime.now().format(FILE_DATE));
     Path output = exportsDir().resolve(name);
     FfmpegCommand.Settings settings =
-        new FfmpegCommand.Settings(
-            r.codec == null ? "libx264" : r.codec, r.crf, "medium", r.width, r.height, "yuv420p");
+        new FfmpegCommand.Settings(format.encoder(), r.crf, "medium", r.width, r.height, "yuv420p");
     ExportSession.start(
         mc,
         new ExportPlan(in, out, r.fps),

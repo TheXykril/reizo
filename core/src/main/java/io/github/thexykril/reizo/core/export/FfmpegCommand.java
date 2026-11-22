@@ -37,8 +37,14 @@ public final class FfmpegCommand {
       throw new IllegalArgumentException("bad frame size " + inWidth + "x" + inHeight);
     }
     List<String> cmd = new ArrayList<>();
+    String codec = s.codec();
+    boolean vaapi = codec.endsWith("_vaapi");
     cmd.add(ffmpeg);
     cmd.addAll(List.of("-hide_banner", "-loglevel", "error", "-y"));
+    if (vaapi) {
+      // The usual first render node; frames are uploaded to it after scaling.
+      cmd.addAll(List.of("-vaapi_device", "/dev/dri/renderD128"));
+    }
     cmd.addAll(List.of("-f", "rawvideo", "-pix_fmt", "rgba"));
     cmd.addAll(List.of("-s", inWidth + "x" + inHeight, "-r", Integer.toString(fps)));
     cmd.addAll(List.of("-i", "-"));
@@ -47,18 +53,37 @@ public final class FfmpegCommand {
     int h = s.outHeight() > 0 ? s.outHeight() : inHeight;
     w -= w % 2;
     h -= h % 2;
+    List<String> filters = new ArrayList<>();
     if (w != inWidth || h != inHeight) {
-      cmd.addAll(List.of("-vf", "scale=" + w + ":" + h + ":flags=lanczos"));
+      filters.add("scale=" + w + ":" + h + ":flags=lanczos");
     }
-    cmd.addAll(List.of("-c:v", s.codec()));
-    if (s.codec().startsWith("libx26")) {
-      cmd.addAll(List.of("-preset", s.preset(), "-crf", Integer.toString(s.crf())));
-    } else if (s.codec().endsWith("_nvenc")) {
-      cmd.addAll(List.of("-preset", "p5", "-cq", Integer.toString(s.crf())));
-    } else if (s.codec().endsWith("_vaapi") || s.codec().endsWith("_qsv")) {
-      cmd.addAll(List.of("-global_quality", Integer.toString(s.crf())));
+    if (vaapi) {
+      filters.add("format=nv12");
+      filters.add("hwupload");
     }
-    cmd.addAll(List.of("-pix_fmt", s.pixelFormat()));
+    if (!filters.isEmpty()) {
+      cmd.addAll(List.of("-vf", String.join(",", filters)));
+    }
+    cmd.addAll(List.of("-c:v", codec));
+    String q = Integer.toString(s.crf());
+    if (codec.startsWith("libx26")) {
+      cmd.addAll(List.of("-preset", s.preset(), "-crf", q));
+    } else if (codec.equals("libvpx-vp9")) {
+      // Constant quality needs a zero bitrate target; row-mt and deadline keep it usable.
+      cmd.addAll(List.of("-crf", q, "-b:v", "0", "-row-mt", "1", "-deadline", "good"));
+    } else if (codec.equals("libsvtav1")) {
+      cmd.addAll(List.of("-crf", q, "-preset", "8"));
+    } else if (codec.endsWith("_nvenc")) {
+      cmd.addAll(List.of("-preset", "p5", "-rc", "vbr", "-cq", q, "-b:v", "0"));
+    } else if (vaapi) {
+      cmd.addAll(List.of("-rc_mode", "CQP", "-qp", q));
+    } else if (codec.endsWith("_qsv")) {
+      cmd.addAll(List.of("-global_quality", q));
+    }
+    if (!vaapi) {
+      // VAAPI frames are already in GPU memory as nv12; QSV wants nv12 too.
+      cmd.addAll(List.of("-pix_fmt", codec.endsWith("_qsv") ? "nv12" : s.pixelFormat()));
+    }
     if (output.getFileName().toString().endsWith(".mp4")) {
       cmd.addAll(List.of("-movflags", "+faststart"));
     }

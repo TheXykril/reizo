@@ -53,6 +53,66 @@ class ExportTest {
     assertTrue(line.endsWith("-movflags +faststart out.mp4"), line);
   }
 
+  private static String line(String codec, int crf, int outW, int outH, String file) {
+    return String.join(
+        " ",
+        FfmpegCommand.build(
+            "ffmpeg",
+            320,
+            240,
+            30,
+            new FfmpegCommand.Settings(codec, crf, "medium", outW, outH, "yuv420p"),
+            Path.of(file)));
+  }
+
+  @Test
+  void commandOptionsPerEncoder() {
+    String vp9 = line("libvpx-vp9", 31, 0, 0, "a.webm");
+    assertTrue(vp9.contains("-c:v libvpx-vp9 -crf 31 -b:v 0"), vp9);
+    assertTrue(vp9.contains("-pix_fmt yuv420p"), vp9);
+    String av1 = line("libsvtav1", 30, 0, 0, "a.mkv");
+    assertTrue(av1.contains("-c:v libsvtav1 -crf 30 -preset 8"), av1);
+    String nvenc = line("h264_nvenc", 22, 0, 0, "a.mp4");
+    assertTrue(nvenc.contains("-c:v h264_nvenc -preset p5 -rc vbr -cq 22 -b:v 0"), nvenc);
+    String qsv = line("h264_qsv", 23, 0, 0, "a.mp4");
+    assertTrue(qsv.contains("-global_quality 23 -pix_fmt nv12"), qsv);
+  }
+
+  @Test
+  void vaapiUploadsFramesAfterScaling() {
+    String vaapi = line("h264_vaapi", 24, 640, 480, "a.mp4");
+    assertTrue(vaapi.startsWith("ffmpeg -hide_banner -loglevel error -y -vaapi_device "), vaapi);
+    assertTrue(
+        vaapi.contains("-vf scale=640:480:flags=lanczos,format=nv12,hwupload -c:v h264_vaapi"),
+        vaapi);
+    assertTrue(vaapi.contains("-rc_mode CQP -qp 24"), vaapi);
+    assertFalse(vaapi.contains("-pix_fmt yuv420p"), vaapi);
+    String same = line("hevc_vaapi", 24, 0, 0, "a.mp4");
+    assertTrue(same.contains("-vf format=nv12,hwupload"), same);
+  }
+
+  @Test
+  void formatsFromEncoderList() {
+    String out =
+        String.join(
+            "\n",
+            "Encoders:",
+            " V..... = Video",
+            " ------",
+            " V....D libx264              libx264 H.264",
+            " V....D libvpx-vp9           libvpx VP9",
+            " A....D aac                  AAC",
+            " V....D h264_vaapi           H.264/AVC (VAAPI)");
+    assertEquals(
+        List.of(ExportFormat.H264, ExportFormat.VP9, ExportFormat.H264_VAAPI),
+        ExportFormat.available(out));
+    assertTrue(ExportFormat.available("").isEmpty());
+    assertEquals(ExportFormat.VP9, ExportFormat.forEncoder("libvpx-vp9"));
+    assertEquals(ExportFormat.H264, ExportFormat.forEncoder("unknown"));
+    assertEquals("clip.webm", ExportFormat.VP9.fileName("clip.mp4"));
+    assertEquals("clip.mkv", ExportFormat.AV1.fileName("clip"));
+  }
+
   @Test
   void commandWithoutScalingWhenSizesMatch() {
     List<String> cmd =
