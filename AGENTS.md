@@ -13,8 +13,8 @@ feature parity with Lunar Client's Rewind, with optional OneClient/OneConfig int
 
 ## Hard constraints
 
-1. **Repository stays private** until the owner explicitly approves making it public. Never change
-   visibility or publish releases.
+1. **The repository is public** (owner's decision, 2026-11-22). Never publish releases, and never
+   change visibility, without the owner's approval. Never commit secrets: anything pushed is public.
 2. **No proprietary or incompatible code.** Never copy, translate or closely port code from
    **Flashback** or **Hindsight** (both "All Rights Reserved") or Lunar Client. Their behavior and
    published design may inform ours; their source text may not. The owner also asked that we use

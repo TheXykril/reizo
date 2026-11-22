@@ -12,3 +12,4 @@ in AGENTS.md needs an ADR.
 | [0004](0004-capture-at-packet-decoder.md) | Capture packets at the client decoder | Accepted |
 | [0005](0005-clean-room-policy.md) | Clean-room policy for proprietary references | Accepted (owner) |
 | [0006](0006-recording-storage-and-recovery.md) | Block stream, working directories, lock-based recovery | Accepted |
+| [0007](0007-multi-version-strategy.md) | Multi-version strategy: modern Fabric family + 1.8.9 Ornithe | Accepted (owner) |
