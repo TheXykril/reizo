@@ -50,11 +50,13 @@ class PlaybackTest {
   void scriptSplitsPhasesAndReleasesPacketsByTime() {
     List<Frame> frames =
         List.of(
+            Frame.of(0, FrameType.LOCAL_PLAYER, new byte[] {9}),
             Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}),
             Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {2}),
             Frame.packet(0, ProtocolPhase.PLAY, new byte[] {10}),
             Frame.of(0, FrameType.LIVE_START, new byte[0]),
             Frame.packet(50, ProtocolPhase.PLAY, new byte[] {11}),
+            Frame.of(55, FrameType.LOCAL_PLAYER, new byte[] {7}),
             Frame.of(60, FrameType.MARKER, new byte[] {0}),
             Frame.packet(100, ProtocolPhase.PLAY, new byte[] {12}));
     ReplayScript script = ReplayScript.of(frames);
@@ -64,11 +66,14 @@ class PlaybackTest {
     assertEquals(3, script.playPacketCount());
     assertEquals(100, script.durationMs());
 
-    List<byte[]> first = script.due(0);
+    List<ReplayScript.Entry> first = script.due(0);
     assertEquals(1, first.size());
-    assertArrayEquals(new byte[] {10}, first.get(0));
+    assertArrayEquals(new byte[] {10}, first.get(0).bytes());
     assertEquals(0, script.due(49).size());
-    assertEquals(2, script.due(1_000).size());
+    List<ReplayScript.Entry> rest = script.due(1_000);
+    assertEquals(3, rest.size());
+    assertEquals(ReplayScript.Kind.LOCAL_PLAYER, rest.get(1).kind());
+    assertArrayEquals(new byte[] {7}, rest.get(1).bytes());
     assertTrue(script.finished());
   }
 

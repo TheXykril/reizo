@@ -34,6 +34,8 @@ public final class ReplayPlayback {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Replay");
 
   private static volatile ReplayServer current;
+  private static volatile ClientPacketListener playListener;
+  private static volatile boolean enteredWorld;
 
   private ReplayPlayback() {}
 
@@ -83,14 +85,18 @@ public final class ReplayPlayback {
     ReplayServer server =
         new ReplayServer(
             script,
-            profile(mc, meta),
+            cameraProfile(mc),
+            recordedPlayer(mc, meta),
+            meta.localPlayerName != null ? meta.localPlayerName : mc.getUser().getName(),
             new PlaybackClock(System::nanoTime),
             () -> {
-              ClientPacketListener connection = Minecraft.getInstance().getConnection();
-              return connection == null ? null : connection.registryAccess();
+              ClientPacketListener listener = playListener;
+              return listener == null ? null : listener.registryAccess();
             },
             ReplayPlayback::onServerClosed);
     current = server;
+    playListener = null;
+    enteredWorld = false;
     PacketTap.setSuppressed(true);
     server.start();
 
@@ -101,19 +107,72 @@ public final class ReplayPlayback {
         new TitleScreen(), mc, new ServerAddress("127.0.0.1", server.port()), data, false, null);
   }
 
-  private static GameProfile profile(Minecraft mc, RecordingMetadata meta) {
-    if (meta.localPlayerUuid != null && meta.localPlayerName != null) {
+  /** Called when any connection enters the play phase; the replay needs its registries. */
+  public static void onPlayInit(ClientPacketListener listener) {
+    if (current != null) {
+      playListener = listener;
+    }
+  }
+
+  /**
+   * Called when a play connection ends. Ends the replay when it was the replay's connection: the
+   * client may keep the socket half-open for a while, so the server cannot rely on seeing it close.
+   */
+  public static void onPlayDisconnect(ClientPacketListener listener) {
+    ReplayServer server = current;
+    if (server != null && listener == playListener) {
+      server.close();
+    }
+  }
+
+  /**
+   * Called every client tick. Ends the replay once the client has left the replay world, whichever
+   * way it left (the disconnect events above do not always fire promptly for a socket connection).
+   */
+  public static void tick(Minecraft mc) {
+    ReplayServer server = current;
+    if (server == null) {
+      return;
+    }
+    boolean inWorld = mc.level != null && mc.getConnection() != null;
+    if (inWorld) {
+      enteredWorld = true;
+    } else if (enteredWorld) {
+      server.close();
+    }
+  }
+
+  /** Called when a configuration-phase connection ends: a replay that never reached play. */
+  public static void onConfigurationDisconnect() {
+    ReplayServer server = current;
+    if (server != null && playListener == null) {
+      server.close();
+    }
+  }
+
+  /**
+   * The client's player in a replay is a camera, not the recorded player, so it gets its own UUID
+   * (the recorded player is a separate entity with the recorded UUID).
+   */
+  private static GameProfile cameraProfile(Minecraft mc) {
+    UUID id = UUID.nameUUIDFromBytes(("reizo-camera:" + mc.getUser().getName()).getBytes());
+    return new GameProfile(id, mc.getUser().getName());
+  }
+
+  private static UUID recordedPlayer(Minecraft mc, RecordingMetadata meta) {
+    if (meta.localPlayerUuid != null) {
       try {
-        return new GameProfile(UUID.fromString(meta.localPlayerUuid), meta.localPlayerName);
+        return UUID.fromString(meta.localPlayerUuid);
       } catch (IllegalArgumentException e) {
         LOGGER.warn("Recording has an invalid player UUID; using the current player");
       }
     }
-    return new GameProfile(mc.getUser().getProfileId(), mc.getUser().getName());
+    return mc.getUser().getProfileId();
   }
 
   private static void onServerClosed() {
     current = null;
+    playListener = null;
     PacketTap.setSuppressed(false);
     LOGGER.info("Replay stopped");
   }

@@ -74,8 +74,17 @@ public final class RecorderClient implements ClientModInitializer {
             client.execute(this::startRecording);
           }
         });
-    ClientConfigurationConnectionEvents.DISCONNECT.register((h, client) -> onDisconnect());
-    ClientPlayConnectionEvents.DISCONNECT.register((h, client) -> onDisconnect());
+    ClientConfigurationConnectionEvents.DISCONNECT.register(
+        (h, client) -> {
+          ReplayPlayback.onConfigurationDisconnect();
+          onDisconnect();
+        });
+    ClientPlayConnectionEvents.DISCONNECT.register(
+        (h, client) -> {
+          ReplayPlayback.onPlayDisconnect(h);
+          onDisconnect();
+        });
+    ClientPlayConnectionEvents.INIT.register((h, client) -> ReplayPlayback.onPlayInit(h));
     ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
     ClientLifecycleEvents.CLIENT_STARTED.register(client -> recoverAbandoned());
     ClientLifecycleEvents.CLIENT_STOPPING.register(client -> stopOnShutdown());
@@ -174,6 +183,7 @@ public final class RecorderClient implements ClientModInitializer {
   // ---- lifecycle ----
 
   private void onClientTick(Minecraft mc) {
+    ReplayPlayback.tick(mc);
     RecorderKeys.handle(this);
     RecordingSession s = session();
     if (s == null || mc.player == null || s.state() != RecordingSession.State.RECORDING) {

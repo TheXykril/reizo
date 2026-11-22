@@ -11,20 +11,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The packets of a recording, split the way a replay sends them: the configuration phase first (all
- * at once, before the clock starts), then play packets in time order.
+ * The content of a recording, split the way a replay uses it: the configuration phase first (all at
+ * once, before the clock starts), then a timeline of play packets and local player samples.
  *
- * <p>Only {@link FrameType#PACKET} frames take part. Other frame types (local player samples,
- * markers) are for the editor and are skipped here.
+ * <p>Markers and other frame types are for the editor and are skipped here.
  */
 public final class ReplayScript {
+  /** One timeline entry: either a raw play packet or a local player sample. */
+  public record Entry(int timeMs, Kind kind, byte[] bytes) {}
+
+  public enum Kind {
+    /** Raw play packet (id + body), as captured. */
+    PLAY_PACKET,
+    /** Encoded {@link io.github.thexykril.reizo.core.format.LocalPlayerState}. */
+    LOCAL_PLAYER
+  }
+
   private final List<byte[]> configuration;
-  private final List<Timed> play;
+  private final List<Entry> timeline;
+  private final int playPacketCount;
   private int next;
 
-  private ReplayScript(List<byte[]> configuration, List<Timed> play) {
+  private ReplayScript(List<byte[]> configuration, List<Entry> timeline) {
     this.configuration = configuration;
-    this.play = play;
+    this.timeline = timeline;
+    this.playPacketCount =
+        (int) timeline.stream().filter(e -> e.kind() == Kind.PLAY_PACKET).count();
   }
 
   /**
@@ -34,28 +46,37 @@ public final class ReplayScript {
    */
   public static ReplayScript of(List<Frame> frames) {
     List<byte[]> configuration = new ArrayList<>();
-    List<Timed> play = new ArrayList<>();
+    List<Entry> timeline = new ArrayList<>();
+    boolean sawPlay = false;
     for (Frame f : frames) {
-      if (f.type() != FrameType.PACKET) {
+      FrameType type = f.type();
+      if (type == FrameType.LOCAL_PLAYER) {
+        if (sawPlay) {
+          timeline.add(new Entry(f.timeMs(), Kind.LOCAL_PLAYER, f.payload()));
+        }
+        continue;
+      }
+      if (type != FrameType.PACKET) {
         continue;
       }
       if (f.packetPhase() == ProtocolPhase.CONFIGURATION) {
-        if (!play.isEmpty()) {
+        if (sawPlay) {
           // A second configuration phase (server transfer) is not supported yet: stop there.
           break;
         }
         configuration.add(f.packetBytes());
       } else {
-        play.add(new Timed(f.timeMs(), f.packetBytes()));
+        sawPlay = true;
+        timeline.add(new Entry(f.timeMs(), Kind.PLAY_PACKET, f.packetBytes()));
       }
     }
-    if (configuration.isEmpty() || play.isEmpty()) {
+    if (configuration.isEmpty() || !sawPlay) {
       throw new IllegalArgumentException(
           "recording has no "
               + (configuration.isEmpty() ? "configuration" : "play")
               + " packets; it cannot be played back");
     }
-    return new ReplayScript(List.copyOf(configuration), List.copyOf(play));
+    return new ReplayScript(List.copyOf(configuration), List.copyOf(timeline));
   }
 
   /** Configuration-phase packets (id + payload), in order. */
@@ -63,33 +84,31 @@ public final class ReplayScript {
     return configuration;
   }
 
-  /** Number of play packets. */
+  /** Number of play packets in the timeline. */
   public int playPacketCount() {
-    return play.size();
+    return playPacketCount;
   }
 
-  /** Time of the last play packet in milliseconds. */
+  /** Time of the last timeline entry in milliseconds. */
   public long durationMs() {
-    return play.get(play.size() - 1).timeMs();
+    return timeline.get(timeline.size() - 1).timeMs();
   }
 
-  /** True when every play packet has been handed out. */
+  /** True when every timeline entry has been handed out. */
   public synchronized boolean finished() {
-    return next >= play.size();
+    return next >= timeline.size();
   }
 
   /**
-   * Returns the play packets (id + payload) due at {@code timeMs} that have not been handed out
-   * yet, in order. Time never goes backwards here; seeking is a separate feature.
+   * Returns the timeline entries due at {@code timeMs} that have not been handed out yet, in order.
+   * Time never goes backwards here; seeking is a separate feature.
    */
-  public synchronized List<byte[]> due(long timeMs) {
-    List<byte[]> out = new ArrayList<>();
-    while (next < play.size() && play.get(next).timeMs() <= timeMs) {
-      out.add(play.get(next).bytes());
+  public synchronized List<Entry> due(long timeMs) {
+    List<Entry> out = new ArrayList<>();
+    while (next < timeline.size() && timeline.get(next).timeMs() <= timeMs) {
+      out.add(timeline.get(next));
       next++;
     }
     return out;
   }
-
-  private record Timed(int timeMs, byte[] bytes) {}
 }
