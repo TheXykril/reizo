@@ -78,11 +78,21 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   another Minecraft version are listed but cannot be played. Double-click plays.
 - Thumbnails, search, sorting options, Quick View: **planned**.
 
-## Cinematic camera (planned, M3)
+## Cinematic camera (M3)
 
-Position/rotation/FOV/roll keyframes, path visualization, linear/Catmull-Rom/Bézier
-interpolation, easing, look-at tracking, camera shake, depth of field. Lunar modes to match: POV,
-Free Camera, Follow, Force First Person, Force Third Person Back/Front. Status: **planned**.
+- **Camera keyframes and path playback:** **partial**, evidence UT (`CameraPathTest`: sorting,
+  replace, linear and Catmull-Rom through keyframes with continuous velocity, short-way yaw,
+  easing) and GT (`checkCameraPath`: N adds a keyframe at the camera; B plays the path; the
+  rendered camera is on the path at the replay time; the project is saved; screenshot
+  `reizo-camera-path`). Keys: N add, Delete remove nearest, B play/stop, J smoothing (Catmull-Rom
+  or linear, with or without ease in/out). Position, yaw and pitch come from the camera. Roll and
+  FOV are stored and applied (mixins on `Camera` and `GameRenderer.getFov`). There is no key to
+  set them yet: N stores roll 0 and the FOV setting.
+- **Projects:** **implemented**, evidence UT (`ProjectStoreTest`) and GT (saved project read back).
+  One project per recording, created on first replay, autosaved on every change to
+  `reizo/projects/<id>.reizoproj`. The recording is referenced, never copied.
+- Path visualization in the world, Bézier handles, look-at tracking, camera shake, depth of field:
+  **planned**.
 
 ## Timeline editor (planned, M4)
 

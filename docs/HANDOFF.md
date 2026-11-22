@@ -41,6 +41,10 @@ camera, project and export are not started.
 - Mid-session start snapshot, branch `feat/mid-session-snapshot`: `WorldSnapshot` (fabric) builds
   play packets from client state; `CaptureController.start(meta, snapshot)` appends them after the
   cached prelude; `RecordingMetadata.startSnapshot`.
+- Camera keyframes and projects (M3 start), branch `feat/camera-keyframes`: `core.camera`
+  (`CameraKeyframe`, `CameraPath`), `core.project` (`Project`, `ProjectStore`), fabric
+  `ReplayEditor` (project per recording, autosave), `CameraMixin` (per-frame position/rotation/roll
+  from the path), `GameRendererMixin` (FOV).
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -92,6 +96,9 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, camera keyframes (branch `feat/camera-keyframes`):
+- `./gradlew build`: pass (55 unit tests). Gametests: pass, adding `checkCameraPath`.
 
 2026-11-22, cloud box, start snapshot (branch `feat/mid-session-snapshot`):
 - `./gradlew build`: pass (44 unit tests). Gametests: pass; the walking (mid-session) replay now

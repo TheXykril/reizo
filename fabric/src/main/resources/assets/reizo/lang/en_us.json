@@ -12,6 +12,10 @@
   "key.reizo.replay_forward": "Forward 5 seconds",
   "key.reizo.replay_prev_marker": "Previous marker",
   "key.reizo.replay_next_marker": "Next marker",
+  "key.reizo.keyframe_add": "Add camera keyframe",
+  "key.reizo.keyframe_remove": "Remove nearest keyframe",
+  "key.reizo.path_toggle": "Play camera path on / off",
+  "key.reizo.path_smoothing": "Camera path smoothing",
   "reizo.toast.started": "Recording started",
   "reizo.toast.started_partial": "Started mid-session: already loaded chunks are not included yet",
   "reizo.toast.not_connected": "Join a world or server to record",
@@ -57,5 +61,11 @@
   "reizo.settings.toggle_modifier": "Start/stop key modifier",
   "reizo.settings.keys": "Key bindings…",
   "reizo.browser.settings": "Settings",
-  "reizo.replay.no_marker": "No marker in that direction"
+  "reizo.replay.no_marker": "No marker in that direction",
+  "reizo.path.keyframe_added": "Keyframe at %s (%s in path)",
+  "reizo.path.keyframe_removed": "Keyframe at %s removed",
+  "reizo.path.no_keyframe": "No keyframe near this time",
+  "reizo.path.on": "Camera path playing",
+  "reizo.path.off": "Camera path off",
+  "reizo.path.smoothing": "Path: %s"
 }

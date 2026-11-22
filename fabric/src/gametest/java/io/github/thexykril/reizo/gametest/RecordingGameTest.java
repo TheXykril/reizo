@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.gametest;
 
+import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.format.Frame;
 import io.github.thexykril.reizo.core.format.FrameStreamReader;
 import io.github.thexykril.reizo.core.format.FrameType;
@@ -14,6 +15,7 @@ import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
+import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
@@ -293,6 +295,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.getInput().pressKey(GLFW.GLFW_KEY_RIGHT);
     context.waitFor(mc -> ReplayPlayback.current().seeksDone() == 2, 20 * 5);
     context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
+    checkCameraPath(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -438,6 +441,80 @@ public final class RecordingGameTest implements FabricClientGameTest {
           var e = mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId());
           return new Pos(e.getX(), e.getY(), e.getZ());
         });
+  }
+
+  /**
+   * Camera path: N adds a keyframe at the camera, B plays the path, and the rendered camera then
+   * sits on the path at the replay time. The project is saved with the keyframes.
+   */
+  private void checkCameraPath(ClientGameTestContext context) {
+    context.getInput().pressKey(GLFW.GLFW_KEY_N);
+    context.waitTicks(2);
+    check(
+        ReplayEditor.path().size() == 1, "N did not add a keyframe: " + ReplayEditor.path().size());
+    double eyeY = context.computeOnClient(mc -> mc.player.getEyeY());
+    check(
+        Math.abs(ReplayEditor.path().keyframes().get(0).y() - eyeY) < 0.01,
+        "keyframe is not at the camera");
+
+    long duration = ReplayPlayback.current().script().durationMs();
+    ReplayEditor.path().clear();
+    context.runOnClient(
+        mc -> {
+          double x = mc.player.getX();
+          double y = mc.player.getEyeY() + 5;
+          double z = mc.player.getZ();
+          ReplayEditor.putKeyframe(new CameraKeyframe(0, x, y, z, 0, 30, 0, 50));
+          ReplayEditor.putKeyframe(new CameraKeyframe(duration, x + 10, y, z, 90, 30, 0, 50));
+        });
+    context.getInput().pressKey(GLFW.GLFW_KEY_B);
+    context.waitTicks(2);
+    check(ReplayEditor.isPathPlaying(), "B did not start the camera path");
+    // Pause halfway through the path (a backwards seek, so the world is rebuilt first).
+    context.runOnClient(
+        mc -> {
+          ReplayPlayback.current().setPaused(true);
+          ReplayPlayback.current().seek(duration / 2);
+        });
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return !replay.isReconfiguring()
+              && Math.abs(replay.clock().timeMs() - duration / 2) < 5
+              && mc.level != null
+              && mc.screen == null;
+        },
+        20 * 30);
+    context.waitTicks(5);
+    double[] cam =
+        context.computeOnClient(
+            mc -> {
+              var p = mc.gameRenderer.getMainCamera().position();
+              return new double[] {p.x, p.y, p.z, mc.gameRenderer.getMainCamera().yRot()};
+            });
+    CameraKeyframe expected = ReplayEditor.path().sample(ReplayPlayback.current().clock().timeMs());
+    check(
+        Math.abs(cam[0] - expected.x()) < 0.01
+            && Math.abs(cam[1] - expected.y()) < 0.01
+            && Math.abs(cam[2] - expected.z()) < 0.01,
+        "camera at " + java.util.Arrays.toString(cam) + ", path says " + expected);
+    check(Math.abs(cam[3] - expected.yaw()) < 0.01, "camera yaw " + cam[3] + " vs " + expected);
+    var saved =
+        context.computeOnClient(
+            mc -> {
+              try {
+                return ReplayEditor.store().load(ReplayEditor.project().id);
+              } catch (java.io.IOException e) {
+                throw new AssertionError(e);
+              }
+            });
+    check(saved.cameraKeyframes.size() == 2, "project not saved with the keyframes");
+    context.takeScreenshot("reizo-camera-path");
+    context.getInput().pressKey(GLFW.GLFW_KEY_B);
+    context.runOnClient(mc -> ReplayPlayback.current().setPaused(false));
+    context.waitTicks(2);
+    check(!ReplayEditor.isPathPlaying(), "B did not stop the camera path");
+    LOGGER.info("checkCameraPath OK: camera on the path at {}", expected);
   }
 
   /** Presses the button on the current screen whose label is the given translation key. */
