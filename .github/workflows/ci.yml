@@ -1,0 +1,97 @@
+name: CI
+
+# Runs only for pull requests, pushes to main and manual runs. Pushes to other branches do not
+# trigger it, there is no schedule, and documentation-only changes are skipped to save minutes.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build (compile, format check, unit tests, jar)
+        run: ./gradlew build --stacktrace
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: "**/build/reports/tests/"
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: mod-jar
+          path: fabric/build/libs/*.jar
+          retention-days: 7
+
+  gametest:
+    name: In-game tests (headless client)
+    # Pinned to the image the tests pass on. On ubuntu-26.04 (Mesa 26.0) software rendering was so
+    # slow that the test world never finished loading (run 45052144334 and the next three).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Xvfb and Mesa
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-utils
+          xvfb-run -a glxinfo -B | grep -E "OpenGL (renderer|version)|Accelerated" || true
+      - name: Run client gametests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          # Software rendering would otherwise take every core and starve the integrated server.
+          LP_NUM_THREADS: "2"
+        run: |
+          # Thread dumps of the game every 60 s, so a hang can be diagnosed. On CI, Loom itself wraps
+          # the game in xvfb-run, so match the java process, not the shell wrapper.
+          mkdir -p fabric/build/run/clientGameTest/logs
+          ( while sleep 60; do
+              for pid in $(pgrep -f '^/[^ ]*/bin/java .*devlaunchinjector'); do
+                { date; jcmd "$pid" Thread.print; } >> fabric/build/run/clientGameTest/logs/threads.txt 2>&1
+              done
+            done ) &
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClientGameTest --stacktrace
+      - name: Print game thread dumps
+        if: failure()
+        run: |
+          f=fabric/build/run/clientGameTest/logs/threads.txt
+          if [ -f "$f" ]; then
+            # Last dump only: the threads that matter for a hang.
+            awk '/^[A-Z][a-z][a-z] [A-Z][a-z][a-z] /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$f"
+          fi
+      - name: Upload gametest logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gametest-logs
+          path: fabric/build/run/clientGameTest/logs/
+          if-no-files-found: ignore
+          retention-days: 7
