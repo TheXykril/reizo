@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Exports are rendered at the chosen size (for example 4K from a smaller window) instead of
+  being upscaled from the window.
 - Shadow recording (off by default; Settings or OneConfig): keeps the last 30 s to 10 min of
   play in memory without recording, and "Save last …" in the pause menu or the save key writes
   it as a normal recording.

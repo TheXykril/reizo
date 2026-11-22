@@ -855,6 +855,9 @@ public final class RecordingGameTest implements FabricClientGameTest {
           render.codec = "libvpx-vp9";
           render.crf = 40;
           render.output = "gametest-region.mp4"; // the extension follows the format
+          // Larger than the 320x240 window: the game renders at this size for the export.
+          render.width = 640;
+          render.height = 360;
           check(ExportControls.exportCurrent(mc, result::set), "VP9 export did not start");
         });
     context.waitFor(mc -> result.get() != null, 20 * 240);
@@ -874,19 +877,65 @@ public final class RecordingGameTest implements FabricClientGameTest {
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=codec_name,nb_read_frames",
+            "stream=codec_name,width,height,nb_read_frames",
             "-of",
             "csv=p=0",
             s.output().toString());
     check(
-        probe.strip().equals("vp9," + expected),
-        "VP9 export probe: " + probe.strip() + ", expected vp9," + expected);
+        probe.strip().equals("vp9,640,360," + expected),
+        "VP9 export probe: " + probe.strip() + ", expected vp9,640,360," + expected);
+    // Rendered, not blank: the mean brightness of the middle frame (scaled to one gray pixel).
+    byte[] mean =
+        runBytes(
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            s.output().toString(),
+            "-vf",
+            "select=eq(n\\," + expected / 2 + "),scale=1:1",
+            "-frames:v",
+            "1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "-");
+    check(
+        mean.length == 1 && (mean[0] & 0xFF) > 20,
+        "export frame is blank: " + java.util.Arrays.toString(mean));
+    var size =
+        context.computeOnClient(
+            mc ->
+                mc.getMainRenderTarget().width
+                    + "x"
+                    + mc.getMainRenderTarget().height
+                    + " window "
+                    + mc.getWindow().getWidth()
+                    + "x"
+                    + mc.getWindow().getHeight());
+    check(size.startsWith("320x240"), "render size not restored after export: " + size);
     context.runOnClient(
         mc -> {
           ReplayEditor.setRegion(true, -1);
           ReplayEditor.setRegion(false, -1);
         });
     LOGGER.info("exportRegionVp9 OK: {} frames of {}..{} ms in {}", expected, in, out, s.output());
+  }
+
+  private static byte[] runBytes(String... command) {
+    try {
+      Process p =
+          new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+      byte[] out = p.getInputStream().readAllBytes();
+      p.waitFor(60, TimeUnit.SECONDS);
+      return out;
+    } catch (java.io.IOException e) {
+      throw new AssertionError("could not run " + command[0], e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(e);
+    }
   }
 
   private static String run(String... command) {
