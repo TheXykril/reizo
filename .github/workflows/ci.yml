@@ -66,10 +66,11 @@ jobs:
           # Software rendering would otherwise take every core and starve the integrated server.
           LP_NUM_THREADS: "2"
         run: |
-          # Thread dumps of the game every 60 s, so a hang can be diagnosed from the artifact.
+          # Thread dumps of the game every 60 s, so a hang can be diagnosed. On CI, Loom itself wraps
+          # the game in xvfb-run, so match the java process, not the shell wrapper.
           mkdir -p fabric/build/run/clientGameTest/logs
           ( while sleep 60; do
-              for pid in $(pgrep -f devlaunchinjector); do
+              for pid in $(pgrep -f '^/[^ ]*/bin/java .*devlaunchinjector'); do
                 { date; jcmd "$pid" Thread.print; } >> fabric/build/run/clientGameTest/logs/threads.txt 2>&1
               done
             done ) &
