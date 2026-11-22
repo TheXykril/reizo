@@ -108,6 +108,10 @@ public final class TimelineScreen extends Screen {
     button(row, "reizo.timeline.redo", b -> redo());
     button(
         row,
+        "reizo.timeline.effects",
+        b -> Minecraft.getInstance().setScreen(new EffectsScreen(this)));
+    button(
+        row,
         "reizo.timeline.export",
         b -> Minecraft.getInstance().setScreen(new ExportSettingsScreen(this)));
     updateLabels();

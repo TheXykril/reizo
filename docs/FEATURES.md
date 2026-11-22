@@ -118,11 +118,15 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - Effect, video and sound tracks, trim/split, per-keyframe interpolation and fades, text/image
   overlays, media library: **planned**.
 
-## Visual effects (planned, M5)
+## Visual effects (M5)
 
-Motion blur, depth of field, bloom, color correction, exposure, contrast, saturation, vignette,
-camera shake, chromatic aberration, blur, fades, letterboxing, keyframed intensity, chroma key,
-resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV. Status: **planned**.
+- **Implemented** (GT: gray picture with letterbox bars from a keyframe; ADR 0012): exposure,
+  contrast, saturation, temperature, vignette and letterbox (1.85, 2, 2.39), keyframed over replay
+  time with linear blending, in the Effects panel (timeline → Effects). Shown in the replay and in
+  exports. No pass runs when the grade is neutral or outside replays. Not covered by undo yet.
+- **Planned:** motion blur, depth of field, bloom, camera shake, chromatic aberration, blur,
+  fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV,
+  effect keyframes drawn on the timeline.
 
 ## Audio (planned, M6)
 

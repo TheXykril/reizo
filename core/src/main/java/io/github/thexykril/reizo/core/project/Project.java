@@ -9,6 +9,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.camera.CameraPath;
+import io.github.thexykril.reizo.core.effects.EffectTrack;
+import io.github.thexykril.reizo.core.effects.Grade;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,6 +49,20 @@ public final class Project {
 
   /** Export settings. */
   public Render render = new Render();
+
+  /** Effect keyframes (image grade over time); empty when the project has none. */
+  public List<Effect> effects = new ArrayList<>();
+
+  /** JSON form of an effect keyframe. */
+  public static final class Effect {
+    public long t;
+    public float exposure;
+    public float contrast = 1;
+    public float saturation = 1;
+    public float temperature;
+    public float vignette;
+    public float letterbox;
+  }
 
   /** JSON form of a camera keyframe (records are not Gson-friendly on all versions). */
   public static final class Keyframe {
@@ -115,6 +131,34 @@ public final class Project {
     }
   }
 
+  /** The effect track described by this project. */
+  public EffectTrack effects() {
+    EffectTrack track = new EffectTrack();
+    for (Effect e : effects) {
+      track.put(
+          e.t,
+          new Grade(e.exposure, e.contrast, e.saturation, e.temperature, e.vignette, e.letterbox));
+    }
+    return track;
+  }
+
+  /** Replaces the stored effect keyframes. */
+  public void setEffects(EffectTrack track) {
+    effects = new ArrayList<>();
+    for (EffectTrack.Keyframe k : track.keyframes()) {
+      Effect e = new Effect();
+      Grade g = k.grade();
+      e.t = k.timeMs();
+      e.exposure = g.exposure();
+      e.contrast = g.contrast();
+      e.saturation = g.saturation();
+      e.temperature = g.temperature();
+      e.vignette = g.vignette();
+      e.letterbox = g.letterbox();
+      effects.add(e);
+    }
+  }
+
   public String toJson() {
     return GSON.toJson(this);
   }
@@ -138,6 +182,9 @@ public final class Project {
     }
     if (p.cameraKeyframes == null) {
       p.cameraKeyframes = new ArrayList<>();
+    }
+    if (p.effects == null) {
+      p.effects = new ArrayList<>();
     }
     if (p.render == null) {
       p.render = new Render();
