@@ -52,6 +52,13 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   freezes the client world's ticking, speed 2x sets its tick rate to 40). Speeds 1/8x to 8x. The
   free camera also moves faster or slower with the speed, because the client's own tick rate
   changes (to be decoupled later).
+- **Recordings started mid-session show the world:** **implemented**, evidence UT
+  (`CaptureControllerTest`: snapshot after the prelude, not taken for complete starts) and GT
+  (`recordMidSessionWhileWalking`: chunks in the recording, decode with Minecraft's codecs;
+  `playBackWalk`: loading screen closes, chunks load; screenshot `reizo-mid-session-replay`). At
+  record start `WorldSnapshot` writes the dimension, chunks within render distance, entities with
+  data and equipment, tab list with skins, time, weather and world border. Missing: scoreboards,
+  boss bars, map data, block entities' extra client-only state, biome zoom seed.
 - **Seek (← / → by 5 s, `,` / `.` to markers) and the replay time bar:** **partial**, evidence
   GT (`checkReplayControls`: ← after the end rebuilds the world through a reconfiguration, chunks
   load again, the camera is still a spectator, and → seeks forward. `checkSeeking`: back to the

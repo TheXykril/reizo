@@ -118,11 +118,29 @@ public final class CaptureController {
    * @throws IllegalStateException if a recording is already running
    */
   public synchronized RecordingSession start(RecordingMetadata meta) throws IOException {
+    return start(meta, List::of);
+  }
+
+  /**
+   * Starts a recording like {@link #start(RecordingMetadata)}. When the start is mid-session, the
+   * {@code snapshot} is asked for play packets that rebuild what the client already has (chunks,
+   * entities, time, ...); they follow the cached prelude at time 0. It is not called for a start
+   * that is complete from join, and its packets do not make the recording complete.
+   */
+  public synchronized RecordingSession start(
+      RecordingMetadata meta, java.util.function.Supplier<List<byte[]>> snapshot)
+      throws IOException {
     if (session != null) {
       throw new IllegalStateException("A recording is already running");
     }
     meta.completeFromJoin = !cacheOverflowed && playPacketsThisConnection <= 1;
-    List<Frame> prelude = cacheOverflowed ? List.of() : List.copyOf(connectionCache);
+    List<Frame> prelude = new ArrayList<>(cacheOverflowed ? List.of() : connectionCache);
+    if (!meta.completeFromJoin && !cacheOverflowed) {
+      for (byte[] packet : snapshot.get()) {
+        prelude.add(Frame.packet(0, ProtocolPhase.PLAY, packet));
+      }
+      meta.startSnapshot = true;
+    }
     session = RecordingSession.start(storage, meta, settings, prelude, nanoClock);
     return session;
   }

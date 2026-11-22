@@ -81,6 +81,37 @@ class CaptureControllerTest {
   }
 
   @Test
+  void midSessionStartAppendsSnapshotAfterPrelude() throws Exception {
+    CaptureController c = controller();
+    c.onPacket(ProtocolPhase.CONFIGURATION, b(1));
+    c.onPacket(ProtocolPhase.PLAY, b(10)); // login
+    c.onPacket(ProtocolPhase.PLAY, b(11));
+    c.start(RecordingMetadata.create("mid", 0), () -> List.of(b(20), b(21)));
+    Path archive = c.stop().get(10, TimeUnit.SECONDS);
+    List<Frame> frames = read(archive);
+    // config 1, login 10, snapshot 20 21, LIVE_START
+    assertEquals(5, frames.size());
+    assertArrayEquals(b(20), frames.get(2).packetBytes());
+    assertEquals(ProtocolPhase.PLAY, frames.get(3).packetPhase());
+    assertArrayEquals(b(21), frames.get(3).packetBytes());
+    assertTrue(meta(archive).startSnapshot);
+    assertFalse(meta(archive).completeFromJoin);
+  }
+
+  @Test
+  void snapshotIsNotTakenForCompleteStarts() throws Exception {
+    CaptureController c = controller();
+    c.onPacket(ProtocolPhase.CONFIGURATION, b(1));
+    c.start(
+        RecordingMetadata.create("join", 0),
+        () -> {
+          throw new AssertionError("snapshot taken for a complete start");
+        });
+    Path archive = c.stop().get(10, TimeUnit.SECONDS);
+    assertFalse(meta(archive).startSnapshot);
+  }
+
+  @Test
   void startDuringConfigurationIsComplete() throws Exception {
     CaptureController c = controller();
     c.onPacket(ProtocolPhase.CONFIGURATION, b(1));
