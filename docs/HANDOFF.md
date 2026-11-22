@@ -38,6 +38,9 @@ camera, project and export are not started.
   `ClientboundStartConfigurationPacket` restart and fast-forward (`ReplayServer.restart`), with
   `ReplayPlayback.tick` waiting for the new level. `ReplayHud` time bar. Known gap: recordings
   started mid-session have no chunks, so the client stays on the loading screen during playback.
+- Mid-session start snapshot, branch `feat/mid-session-snapshot`: `WorldSnapshot` (fabric) builds
+  play packets from client state; `CaptureController.start(meta, snapshot)` appends them after the
+  cached prelude; `RecordingMetadata.startSnapshot`.
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -89,6 +92,10 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, start snapshot (branch `feat/mid-session-snapshot`):
+- `./gradlew build`: pass (44 unit tests). Gametests: pass; the walking (mid-session) replay now
+  loads chunks and leaves the loading screen.
 
 2026-11-22, cloud box, seeking (branch `feat/replay-seeking`):
 - `./gradlew build`: pass (42 unit tests). Gametests: pass, adding seek checks in

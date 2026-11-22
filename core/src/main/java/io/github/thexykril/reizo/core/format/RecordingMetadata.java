@@ -70,6 +70,13 @@ public final class RecordingMetadata {
    */
   public boolean completeFromJoin;
 
+  /**
+   * True when a mid-session recording begins with a snapshot of the client's world (chunks,
+   * entities, time) taken at the start, so playback shows the world even though the server sent it
+   * earlier. Older recordings without the field read as false.
+   */
+  public boolean startSnapshot;
+
   public List<Marker> markers = new ArrayList<>();
 
   /** Free-form diagnostics, e.g. counts of packets that failed to be captured. */

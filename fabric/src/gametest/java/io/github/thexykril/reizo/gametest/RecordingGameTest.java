@@ -332,6 +332,10 @@ public final class RecordingGameTest implements FabricClientGameTest {
     Stats stats = verifyArchive(archive, registries);
     RecordingMetadata meta = metadata(archive);
     check(!meta.completeFromJoin, "mid-session recording must be flagged incomplete");
+    check(meta.startSnapshot, "mid-session recording has no start snapshot");
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
+        "start snapshot has no chunks: " + stats.packetNames);
     check(
         stats.packetNames.getOrDefault("ClientboundLoginPacket", 0) == 1,
         "prelude must contain the login packet, got " + stats.packetNames);
@@ -367,7 +371,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
                   instanceof net.minecraft.world.entity.player.Player;
         },
         20 * 120);
+    // The start snapshot holds the chunks, so the world shows and the loading screen closes.
+    context.waitFor(
+        mc -> mc.screen == null && mc.level.getChunkSource().getLoadedChunksCount() > 0, 20 * 30);
     context.waitTicks(10); // let position interpolation settle
+    context.takeScreenshot("reizo-mid-session-replay");
     Pos shown =
         context.computeOnClient(
             mc -> {
@@ -393,8 +401,6 @@ public final class RecordingGameTest implements FabricClientGameTest {
     Object levelBefore = context.computeOnClient(mc -> mc.level);
     int seeksBefore = ReplayPlayback.current().seeksDone();
     long durationMs = ReplayPlayback.current().script().durationMs();
-    // This mid-session recording has no chunks, so the client stays on the loading screen and
-    // keys do not reach the game; the seek keys are covered in checkReplayControls.
     context.runOnClient(mc -> ReplayPlayback.seekBy(-durationMs));
     context.waitFor(
         mc -> {

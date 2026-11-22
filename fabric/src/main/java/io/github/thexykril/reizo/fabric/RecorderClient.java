@@ -135,7 +135,7 @@ public final class RecorderClient implements ClientModInitializer {
         RecordingMetadata.create(recordingName(mc), System.currentTimeMillis());
     fillMetadata(mc, meta);
     try {
-      capture.start(meta);
+      capture.start(meta, () -> io.github.thexykril.reizo.fabric.capture.WorldSnapshot.capture(mc));
       sampler.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
       toast(
