@@ -74,6 +74,14 @@ jobs:
               done
             done ) &
           xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClientGameTest --stacktrace
+      - name: Print game thread dumps
+        if: failure()
+        run: |
+          f=fabric/build/run/clientGameTest/logs/threads.txt
+          if [ -f "$f" ]; then
+            # Last dump only: the threads that matter for a hang.
+            awk '/^[A-Z][a-z][a-z] [A-Z][a-z][a-z] /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$f"
+          fi
       - name: Upload gametest logs
         if: always()
         uses: actions/upload-artifact@v4
