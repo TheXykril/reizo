@@ -113,17 +113,23 @@ Game audio (re-synthesized from recorded sound events), microphone, Simple Voice
 permitted; see privacy section to be written), per-track volume, mute/solo, fades, sync, preview,
 mixdown. Status: **planned**.
 
-## Export (planned, M4/M5)
+## Export (M4/M5)
+
+Frame-exact export through the user's FFmpeg (ADR 0009). Started from the pause menu during a
+replay ("Export video"). Evidence GT (`exportVideo`: 20 fps export of a replay, 93 planned frames,
+93 frames in the MP4 by ffprobe) and UT (`ExportTest`).
 
 | Feature | Lunar | Status |
 | --- | --- | --- |
-| MP4, MKV, MOV, WebM (Lunar also AVI, WebP) | ✓ | planned |
-| H.264, HEVC, VP9, AV1 | ✓ | planned |
-| NVENC / VAAPI / QSV hardware encode with libx264 fallback | NVENC + libx264 | planned |
-| Resolution, orientation, frame rate | ✓ | planned |
-| Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned |
-| Render region (in/out) | ✓ (Jul 2026) | planned |
-| Frame sequence, screenshot export, render queue, presets, progress, cancel | ? | planned |
+| Deterministic frame-by-frame rendering | ✓ | implemented (GT) |
+| MP4 / H.264 (libx264) | ✓ | implemented (GT) |
+| MKV, MOV, WebM; HEVC, VP9, AV1 | ✓ | partial: any FFmpeg codec via project `render.codec` and file name; only libx264 tested |
+| NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: command options exist, untested (no GPU in CI) |
+| Resolution, frame rate, quality | ✓ | partial: project `render` settings (FFmpeg scales from window size); no UI yet |
+| Render region (in/out) | ✓ (Jul 2026) | partial: project `inMs`/`outMs`; no UI yet |
+| Progress, cancel | ? | implemented: progress in the window title, Esc cancels |
+| Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |
+| Frame sequence, screenshot export, render queue, presets | ? | planned |
 
 ## OneClient integration (planned, M7)
 

@@ -44,7 +44,7 @@ public final class ReplayHud {
       return;
     }
     long duration = Math.max(1, server.script().durationMs());
-    long time = Math.min(server.clock().timeMs(), duration);
+    long time = Math.min(server.replayTimeMs(), duration);
     Font font = mc.font;
     int width = Math.min(360, g.guiWidth() - 20);
     int x = (g.guiWidth() - width) / 2;

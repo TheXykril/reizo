@@ -45,6 +45,10 @@ camera, project and export are not started.
   (`CameraKeyframe`, `CameraPath`), `core.project` (`Project`, `ProjectStore`), fabric
   `ReplayEditor` (project per recording, autosave), `CameraMixin` (per-frame position/rotation/roll
   from the path), `GameRendererMixin` (FOV).
+- Video export (#14 first slice, ADR 0009), branch `feat/video-export`: `core.export`
+  (`ExportPlan`, `FfmpegCommand`), `ReplayServer` manual mode + ping/pong frame sync,
+  `MinecraftMixin` virtual timer, `ExportSession`, `FrameEncoder`, `ExportControls`. CI installs
+  ffmpeg for the gametest.
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -96,6 +100,10 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, video export (branch `feat/video-export`):
+- `./gradlew build`: pass (59 unit tests). Gametests: pass, adding `exportVideo` (93/93 frames,
+  a middle frame shows the recorded player walking, HUD hidden).
 
 2026-11-22, cloud box, camera keyframes (branch `feat/camera-keyframes`):
 - `./gradlew build`: pass (55 unit tests). Gametests: pass, adding `checkCameraPath`.

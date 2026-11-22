@@ -28,6 +28,8 @@ import net.minecraft.network.ProtocolInfo;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.common.ClientboundKeepAlivePacket;
+import net.minecraft.network.protocol.common.ClientboundPingPacket;
+import net.minecraft.network.protocol.common.ServerboundPongPacket;
 import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.configuration.ServerboundFinishConfigurationPacket;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -78,6 +80,12 @@ public final class ReplayServer implements AutoCloseable {
       new java.util.concurrent.atomic.AtomicLong(-1);
   private final AtomicInteger seeks = new AtomicInteger();
   private volatile boolean reconfiguring;
+  private volatile boolean manual;
+  private volatile long manualTime;
+  private final java.util.concurrent.atomic.AtomicLong manualTarget =
+      new java.util.concurrent.atomic.AtomicLong(-1);
+  private final AtomicInteger syncRequest = new AtomicInteger();
+  private volatile int lastPong;
   private final CountDownLatch helloReceived = new CountDownLatch(1);
 
   private final java.util.UUID recordedPlayerUuid;
@@ -233,7 +241,11 @@ public final class ReplayServer implements AutoCloseable {
         seeks.incrementAndGet();
         LOGGER.debug("Replay seeked to {} ms", seek);
       }
-      List<ReplayScript.Entry> due = script.due(clock.timeMs());
+      long frameTarget = manualTarget.getAndSet(-1);
+      if (frameTarget >= 0) {
+        manualTime = frameTarget;
+      }
+      List<ReplayScript.Entry> due = script.due(manual ? manualTime : clock.timeMs());
       int written = 0;
       for (ReplayScript.Entry entry : due) {
         List<byte[]> packets =
@@ -256,8 +268,15 @@ public final class ReplayServer implements AutoCloseable {
             encodePlay(
                 access,
                 new ClientboundTickingStatePacket(
-                    (float) (transformer.recordedTickRate() * clock.speed()),
-                    transformer.recordedFrozen() || !clock.isRunning())));
+                    (float) (transformer.recordedTickRate() * (manual ? 1.0 : clock.speed())),
+                    transformer.recordedFrozen() || (!manual && !clock.isRunning()))));
+        written++;
+      }
+      int sync = syncRequest.getAndSet(0);
+      if (sync != 0) {
+        // Answered by the client on its main thread after every packet above: when the pong
+        // arrives, the client has applied everything up to the frame time.
+        writeFrame(out, encodePlay(access, new ClientboundPingPacket(sync)));
         written++;
       }
       long now = System.currentTimeMillis();
@@ -327,6 +346,40 @@ public final class ReplayServer implements AutoCloseable {
   /** Number of seeks carried out so far. For tests. */
   public int seeksDone() {
     return seeks.get();
+  }
+
+  /**
+   * Frame-by-frame mode for export. While on, the replay time is whatever {@link #advanceTo} last
+   * set (the wall clock is ignored), and the client's world is never frozen or sped up by the
+   * replay controls.
+   */
+  public void setManual(boolean on, long startMs) {
+    manualTime = startMs;
+    manual = on;
+    tickStateChanged.set(true);
+  }
+
+  /** The replay time the client is being shown: the frame time in manual mode, else the clock. */
+  public long replayTimeMs() {
+    return manual ? manualTime : clock.timeMs();
+  }
+
+  public boolean isManual() {
+    return manual;
+  }
+
+  /**
+   * In manual mode: sends every packet up to {@code timeMs}, then a ping with {@code syncId}
+   * (non-zero). {@link #syncedThrough()} returns the id once the client has applied them.
+   */
+  public void advanceTo(long timeMs, int syncId) {
+    manualTarget.set(timeMs);
+    syncRequest.set(syncId);
+  }
+
+  /** The id of the last ping the client answered. */
+  public int syncedThrough() {
+    return lastPong;
   }
 
   /** Called on the client thread once the rebuilt world is shown after a backwards seek. */
@@ -430,9 +483,18 @@ public final class ReplayServer implements AutoCloseable {
           case PLAY -> {
             // Movement, keep-alive answers and so on are dropped. Only the answer to a restart
             // (backwards seek) matters: after it the client speaks the configuration protocol.
-            if (peekId(frame) == CONFIGURATION_ACK_ID) {
+            int id = peekId(frame);
+            if (id == CONFIGURATION_ACK_ID) {
               phase = Phase.CONFIGURATION;
               configurationAcks.incrementAndGet();
+            } else if (id == PONG_ID && frame.length >= 5) {
+              // varint id (one byte for this packet) then the int we sent in the ping.
+              int answered =
+                  ((frame[1] & 0xFF) << 24)
+                      | ((frame[2] & 0xFF) << 16)
+                      | ((frame[3] & 0xFF) << 8)
+                      | (frame[4] & 0xFF);
+              lastPong = answered;
             }
           }
         }
@@ -451,20 +513,24 @@ public final class ReplayServer implements AutoCloseable {
   // ---- encoding helpers ----
 
   /** Packet id of the client's acknowledgement of a switch back to configuration. */
-  private static final int CONFIGURATION_ACK_ID = serverboundPlayId();
+  private static final int CONFIGURATION_ACK_ID =
+      serverboundPlayId(ServerboundConfigurationAcknowledgedPacket.INSTANCE.type());
 
-  private static int serverboundPlayId() {
+  /** Packet id of the client's answer to a ping (frame sync during export). */
+  private static final int PONG_ID = serverboundPlayId(new ServerboundPongPacket(0).type());
+
+  private static int serverboundPlayId(net.minecraft.network.protocol.PacketType<?> wanted) {
     int[] found = {-1};
     GameProtocols.SERVERBOUND_TEMPLATE
         .details()
         .listPackets(
             (type, id) -> {
-              if (type.equals(ServerboundConfigurationAcknowledgedPacket.INSTANCE.type())) {
+              if (type.equals(wanted)) {
                 found[0] = id;
               }
             });
-    if (found[0] < 0) {
-      throw new IllegalStateException("configuration acknowledgement packet not found");
+    if (found[0] < 0 || found[0] > 127) {
+      throw new IllegalStateException("serverbound packet " + wanted + " not found");
     }
     return found[0];
   }

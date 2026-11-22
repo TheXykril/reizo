@@ -14,3 +14,4 @@ in AGENTS.md needs an ADR.
 | [0006](0006-recording-storage-and-recovery.md) | Block stream, working directories, lock-based recovery | Accepted |
 | [0007](0007-multi-version-strategy.md) | Multi-version strategy: modern Fabric family + 1.8.9 Ornithe | Accepted (owner) |
 | [0008](0008-playback-loopback-replay-server.md) | Playback through a loopback replay server | Accepted |
+| [0009](0009-frame-exact-export.md) | Frame-exact video export with a virtual clock and FFmpeg | Accepted |

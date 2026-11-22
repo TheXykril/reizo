@@ -38,6 +38,9 @@ public final class ClientConfig {
    */
   public String toggleModifier = "shift";
 
+  /** FFmpeg executable for video export; empty uses "ffmpeg" from the system PATH. */
+  public String ffmpegPath = "";
+
   /** Recordings folder, relative to the game directory unless absolute. */
   public String recordingsDirectory = "reizo/recordings";
 

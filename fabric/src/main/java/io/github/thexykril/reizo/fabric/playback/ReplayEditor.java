@@ -79,6 +79,11 @@ public final class ReplayEditor {
     return pathPlaying;
   }
 
+  /** Sets camera path playback; it stays off while the path is empty. */
+  public static void setPathPlaying(boolean on) {
+    pathPlaying = on && !path.isEmpty();
+  }
+
   /** Turns camera path playback on or off. Returns the new state. */
   public static boolean togglePath() {
     pathPlaying = !pathPlaying && !path.isEmpty();
@@ -160,7 +165,7 @@ public final class ReplayEditor {
     if (server == null || !pathPlaying || ReplayCamera.mode() != ReplayCamera.Mode.FREE) {
       return null;
     }
-    return path.sample(server.clock().timeMs());
+    return path.sample(server.replayTimeMs());
   }
 
   /** Keeps the camera player (and so chunk loading and culling) where the path camera is. */
