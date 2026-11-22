@@ -51,7 +51,7 @@ abstract class CameraMixin {
               target = "Lorg/joml/Quaternionf;rotationYXZ(FFF)Lorg/joml/Quaternionf;"),
       index = 2)
   private float reizo$roll(float roll) {
-    CameraKeyframe k = ReplayEditor.cameraNow();
-    return k == null ? roll : (float) Math.toRadians(-k.roll());
+    float r = ReplayEditor.rollNow();
+    return Float.isNaN(r) ? roll : (float) Math.toRadians(-r);
   }
 }

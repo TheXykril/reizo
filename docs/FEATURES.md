@@ -86,13 +86,20 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   rendered camera is on the path at the replay time; the project is saved; screenshot
   `reizo-camera-path`). Keys: N add, Delete remove nearest, B play/stop, J smoothing (Catmull-Rom
   or linear, with or without ease in/out). Position, yaw and pitch come from the camera. Roll and
-  FOV are stored and applied (mixins on `Camera` and `GameRenderer.getFov`). There is no key to
-  set them yet: N stores roll 0 and the FOV setting.
+  FOV are stored and applied (mixins on `Camera` and `GameRenderer.getFov`).
+- **Free camera roll and FOV (hold U / I to roll, - / = to zoom, 0 resets):** **partial**,
+  evidence GT (`checkFreeCamera`: holding I rolls 10°, holding - narrows the FOV by 10, N stores
+  both in the keyframe, 0 resets). Applied live to the free camera.
+- **Camera path shown in the world (G toggles):** **partial**, evidence GT (screenshot
+  `reizo-path-display`: curve, keyframe boxes with view arrows, current position; G hides it).
+  Drawn with Minecraft's gizmos; hidden with F1, during export and while the path plays. Not
+  visually checked by a person yet.
+- **Free camera kept across backwards seeks:** **implemented**, evidence GT (`checkTimeline`: the
+  camera is within 0.5 blocks of where it was after a ruler seek back).
 - **Projects:** **implemented**, evidence UT (`ProjectStoreTest`) and GT (saved project read back).
   One project per recording, created on first replay, autosaved on every change to
   `reizo/projects/<id>.reizoproj`. The recording is referenced, never copied.
-- Path visualization in the world, Bézier handles, look-at tracking, camera shake, depth of field:
-  **planned**.
+- Bézier handles, look-at tracking, camera shake, depth of field: **planned**.
 
 ## Timeline editor (M4)
 

@@ -38,6 +38,13 @@ public final class ReplayPlayback {
   private static volatile boolean enteredWorld;
   private static volatile RecordingMetadata metadata;
   private static final Object NO_LEVEL = new Object();
+
+  /** Free camera position and rotation (x, y, z, yaw, pitch) when a backwards seek started. */
+  private static double[] cameraBeforeRestart;
+
+  private static int cameraRestoreTicks;
+  private static Object cameraRestoredTo;
+
   private static Object levelBeforeRestart;
 
   private ReplayPlayback() {}
@@ -62,6 +69,7 @@ public final class ReplayPlayback {
     // The clock runs on past the end; count from the end then.
     long now = Math.min(server.clock().timeMs(), duration);
     long target = Math.max(0, Math.min(now + deltaMs, duration));
+    rememberCamera(Minecraft.getInstance());
     server.seek(target);
     return target;
   }
@@ -73,6 +81,7 @@ public final class ReplayPlayback {
       return 0;
     }
     long target = Math.max(0, Math.min(timeMs, server.script().durationMs()));
+    rememberCamera(Minecraft.getInstance());
     server.seek(target);
     return target;
   }
@@ -97,8 +106,23 @@ public final class ReplayPlayback {
     if (best == null) {
       return false;
     }
+    rememberCamera(Minecraft.getInstance());
     server.seek(best);
     return true;
+  }
+
+  /** Remembers the free camera so a backwards seek can put it back. Client thread. */
+  private static void rememberCamera(Minecraft mc) {
+    if (mc.player != null && mc.level != null) {
+      cameraBeforeRestart =
+          new double[] {
+            mc.player.getX(),
+            mc.player.getY(),
+            mc.player.getZ(),
+            mc.player.getYRot(),
+            mc.player.getXRot()
+          };
+    }
   }
 
   public static boolean isActive() {
@@ -233,16 +257,35 @@ public final class ReplayPlayback {
     if (server.isReconfiguring()) {
       // A backwards seek rebuilds the world: it is gone until the new login packet arrives.
       if (levelBeforeRestart == null) {
-        // First tick of the restart: remember the old world to tell the new one apart.
+        // First tick of the restart: remember the old world to tell the new one apart, and where
+        // the free camera was, so the seek does not move it.
         levelBeforeRestart = mc.level == null ? NO_LEVEL : mc.level;
+        // Refresh it if the old world is still there; otherwise keep what the seek remembered.
+        rememberCamera(mc);
       } else if (inWorld && mc.level != levelBeforeRestart) {
         LOGGER.info("Replay world rebuilt after a backwards seek");
         server.restartDone();
         ReplayCamera.reset();
+        // Recorded respawns can replace the camera player shortly after: keep the camera where it
+        // was for a second, re-applying it to each new player entity.
+        cameraRestoreTicks = cameraBeforeRestart == null ? 0 : 20;
+        cameraRestoredTo = null;
       }
       return;
     }
     levelBeforeRestart = null;
+    if (cameraRestoreTicks > 0) {
+      cameraRestoreTicks--;
+      if (mc.player != null && mc.player != cameraRestoredTo) {
+        double[] c = cameraBeforeRestart;
+        mc.player.snapTo(c[0], c[1], c[2], (float) c[3], (float) c[4]);
+        cameraRestoredTo = mc.player;
+      }
+      if (cameraRestoreTicks == 0) {
+        cameraBeforeRestart = null;
+        cameraRestoredTo = null;
+      }
+    }
     if (inWorld) {
       enteredWorld = true;
       ReplayCamera.tick(mc);

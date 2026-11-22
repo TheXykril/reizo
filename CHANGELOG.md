@@ -8,11 +8,15 @@ compatibility.
 
 ### Fixed
 
+- A backwards seek no longer moves the free camera to the world origin.
 - Seeking a paused replay to before its world had loaded left the client on the "reconfiguring"
   screen. Seeks now start no earlier than the recording's first world packet.
 
 ### Added
 
+- Camera path shown in the replay world (G toggles it): the curve, each keyframe with its view
+  direction, and where the camera is now.
+- Free camera roll (hold U / I) and FOV (hold - / =), reset with 0. New keyframes store both.
 - Timeline editor for replays (Y or the pause menu): a panel with a time ruler, markers, camera
   keyframes and the export region. Drag keyframes, box-select, copy and paste, undo and redo,
   zoom and scroll, click to seek, and set the export start and end with I and O.

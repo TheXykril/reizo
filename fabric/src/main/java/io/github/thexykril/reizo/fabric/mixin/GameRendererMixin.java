@@ -4,7 +4,6 @@
  */
 package io.github.thexykril.reizo.fabric.mixin;
 
-import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.GameRenderer;
@@ -19,9 +18,9 @@ abstract class GameRendererMixin {
   @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
   private void reizo$pathFov(
       Camera camera, float partialTick, boolean useFovSetting, CallbackInfoReturnable<Float> cir) {
-    CameraKeyframe k = ReplayEditor.cameraNow();
-    if (k != null && useFovSetting) {
-      cir.setReturnValue(k.fov());
+    float fov = ReplayEditor.fovNow();
+    if (!Float.isNaN(fov) && useFovSetting) {
+      cir.setReturnValue(fov);
     }
   }
 }

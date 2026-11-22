@@ -37,6 +37,17 @@ public final class RecorderKeys {
   private static KeyMapping pathToggle;
   private static KeyMapping pathSmoothing;
   private static KeyMapping timeline;
+  private static KeyMapping rollLeft;
+  private static KeyMapping rollRight;
+  private static KeyMapping fovIn;
+  private static KeyMapping fovOut;
+  private static KeyMapping cameraReset;
+  private static KeyMapping pathDisplay;
+
+  /** Degrees per tick while a roll or FOV key is held. */
+  static final float ROLL_STEP = 2f;
+
+  static final float FOV_STEP = 1f;
 
   /** How far the seek keys jump. */
   static final long SEEK_STEP_MS = 5_000;
@@ -112,6 +123,26 @@ public final class RecorderKeys {
     timeline =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping("key.reizo.timeline", GLFW.GLFW_KEY_Y, replay));
+    // Free camera roll and FOV (stored in new keyframes) and the path display. U, I, minus,
+    // equals, 0 and G are unused by vanilla.
+    rollLeft =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.roll_left", GLFW.GLFW_KEY_U, replay));
+    rollRight =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.roll_right", GLFW.GLFW_KEY_I, replay));
+    fovIn =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.fov_in", GLFW.GLFW_KEY_MINUS, replay));
+    fovOut =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.fov_out", GLFW.GLFW_KEY_EQUAL, replay));
+    cameraReset =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.camera_reset", GLFW.GLFW_KEY_0, replay));
+    pathDisplay =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.path_display", GLFW.GLFW_KEY_G, replay));
   }
 
   /** Called once per client tick. */
@@ -160,6 +191,7 @@ public final class RecorderKeys {
     }
     seekKeys(mc, active);
     pathKeys(mc, active);
+    cameraKeys(mc, active);
     while (timeline.consumeClick()) {
       if (active && mc.screen == null) {
         mc.setScreen(new TimelineScreen());
@@ -205,6 +237,54 @@ public final class RecorderKeys {
             Component.translatable(
                 "reizo.path.smoothing",
                 io.github.thexykril.reizo.fabric.playback.ReplayEditor.cycleSmoothing()));
+      }
+    }
+  }
+
+  private static void cameraKeys(Minecraft mc, boolean active) {
+    boolean rolled = false;
+    boolean zoomed = false;
+    if (active && mc.screen == null) {
+      if (rollLeft.isDown()) {
+        io.github.thexykril.reizo.fabric.playback.ReplayEditor.rollBy(-ROLL_STEP);
+        rolled = true;
+      }
+      if (rollRight.isDown()) {
+        io.github.thexykril.reizo.fabric.playback.ReplayEditor.rollBy(ROLL_STEP);
+        rolled = true;
+      }
+      float setting = mc.options.fov().get().floatValue();
+      if (fovIn.isDown()) {
+        io.github.thexykril.reizo.fabric.playback.ReplayEditor.zoomBy(-FOV_STEP, setting);
+        zoomed = true;
+      }
+      if (fovOut.isDown()) {
+        io.github.thexykril.reizo.fabric.playback.ReplayEditor.zoomBy(FOV_STEP, setting);
+        zoomed = true;
+      }
+    }
+    // Drain the click queues so a held key does not fire again later.
+    while (rollLeft.consumeClick() | rollRight.consumeClick()) {}
+    while (fovIn.consumeClick() | fovOut.consumeClick()) {}
+    if (rolled || zoomed) {
+      float fov = io.github.thexykril.reizo.fabric.playback.ReplayEditor.freeFov();
+      status(
+          mc,
+          Component.translatable(
+              "reizo.camera.roll_fov",
+              Math.round(io.github.thexykril.reizo.fabric.playback.ReplayEditor.freeRoll()),
+              Math.round(Float.isNaN(fov) ? mc.options.fov().get() : fov)));
+    }
+    while (cameraReset.consumeClick()) {
+      if (active) {
+        io.github.thexykril.reizo.fabric.playback.ReplayEditor.resetFreeCamera();
+        status(mc, Component.translatable("reizo.camera.reset"));
+      }
+    }
+    while (pathDisplay.consumeClick()) {
+      if (active) {
+        boolean on = io.github.thexykril.reizo.fabric.playback.PathVisualizer.toggle();
+        status(mc, Component.translatable(on ? "reizo.path.shown" : "reizo.path.hidden"));
       }
     }
   }
