@@ -47,6 +47,40 @@ class PlaybackTest {
   }
 
   @Test
+  void clockSeeksKeepingRunStateAndSpeed() {
+    AtomicLong now = new AtomicLong(0);
+    PlaybackClock clock = new PlaybackClock(now::get);
+    clock.seek(5_000);
+    now.addAndGet(100 * MS);
+    assertEquals(5_000, clock.timeMs(), "paused clock stays at the seek target");
+    clock.resume();
+    clock.setSpeed(2.0);
+    now.addAndGet(100 * MS);
+    assertEquals(5_200, clock.timeMs());
+    clock.seek(1_000);
+    now.addAndGet(100 * MS);
+    assertEquals(1_200, clock.timeMs(), "running clock continues from the target at speed");
+    clock.seek(-5);
+    assertEquals(0, clock.timeMs());
+  }
+
+  @Test
+  void scriptRewindsForBackwardSeeks() {
+    ReplayScript script =
+        ReplayScript.of(
+            List.of(
+                Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}),
+                Frame.packet(0, ProtocolPhase.PLAY, new byte[] {10}),
+                Frame.packet(500, ProtocolPhase.PLAY, new byte[] {11})));
+    assertEquals(2, script.due(1_000).size());
+    assertTrue(script.finished());
+    script.rewind();
+    assertFalse(script.finished());
+    assertEquals(1, script.due(100).size());
+    assertEquals(1, script.due(600).size());
+  }
+
+  @Test
   void scriptSplitsPhasesAndReleasesPacketsByTime() {
     List<Frame> frames =
         List.of(

@@ -28,6 +28,13 @@ public final class RecorderKeys {
   private static KeyMapping replayPause;
   private static KeyMapping replaySlower;
   private static KeyMapping replayFaster;
+  private static KeyMapping replayBack;
+  private static KeyMapping replayForward;
+  private static KeyMapping replayPrevMarker;
+  private static KeyMapping replayNextMarker;
+
+  /** How far the seek keys jump. */
+  static final long SEEK_STEP_MS = 5_000;
 
   private RecorderKeys() {}
 
@@ -71,6 +78,18 @@ public final class RecorderKeys {
     replayFaster =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping("key.reizo.replay_faster", GLFW.GLFW_KEY_RIGHT_BRACKET, replay));
+    replayBack =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.replay_back", GLFW.GLFW_KEY_LEFT, replay));
+    replayForward =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.replay_forward", GLFW.GLFW_KEY_RIGHT, replay));
+    replayPrevMarker =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.replay_prev_marker", GLFW.GLFW_KEY_COMMA, replay));
+    replayNextMarker =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.replay_next_marker", GLFW.GLFW_KEY_PERIOD, replay));
   }
 
   /** Called once per client tick. */
@@ -115,6 +134,30 @@ public final class RecorderKeys {
     while (replayFaster.consumeClick()) {
       if (active) {
         speedStatus(mc, ReplayPlayback.stepSpeed(1));
+      }
+    }
+    seekKeys(mc, active);
+  }
+
+  private static void seekKeys(Minecraft mc, boolean active) {
+    while (replayBack.consumeClick()) {
+      if (active) {
+        ReplayPlayback.seekBy(-SEEK_STEP_MS);
+      }
+    }
+    while (replayForward.consumeClick()) {
+      if (active) {
+        ReplayPlayback.seekBy(SEEK_STEP_MS);
+      }
+    }
+    while (replayPrevMarker.consumeClick()) {
+      if (active && !ReplayPlayback.seekToMarker(-1)) {
+        status(mc, Component.translatable("reizo.replay.no_marker"));
+      }
+    }
+    while (replayNextMarker.consumeClick()) {
+      if (active && !ReplayPlayback.seekToMarker(1)) {
+        status(mc, Component.translatable("reizo.replay.no_marker"));
       }
     }
   }

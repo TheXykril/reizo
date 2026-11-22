@@ -94,6 +94,11 @@ public final class ReplayScript {
     return timeline.get(timeline.size() - 1).timeMs();
   }
 
+  /** Starts handing out the timeline from the beginning again (for a backwards seek). */
+  public synchronized void rewind() {
+    next = 0;
+  }
+
   /** True when every timeline entry has been handed out. */
   public synchronized boolean finished() {
     return next >= timeline.size();
@@ -101,7 +106,8 @@ public final class ReplayScript {
 
   /**
    * Returns the timeline entries due at {@code timeMs} that have not been handed out yet, in order.
-   * Time never goes backwards here; seeking is a separate feature.
+   * Time never goes backwards here: to go back, {@link #rewind()} and hand out again from the
+   * start.
    */
   public synchronized List<Entry> due(long timeMs) {
     List<Entry> out = new ArrayList<>();

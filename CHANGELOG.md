@@ -18,6 +18,8 @@ compatibility.
 - Start/stop is now Shift+R by default, like Lunar. The modifier can be changed or removed.
 - Reizo settings screen (Replays → Settings): auto-record, indicator, saving the server name,
   start/stop modifier, and a shortcut to key bindings.
+- Seeking in replays: ← and → jump 5 seconds, `,` and `.` jump to markers. A time bar at the
+  bottom shows the position, speed, camera mode and markers.
 - Replay controls: V switches the camera between free, the recorded player's view and following
   the player; K pauses and resumes; `[` and `]` change the speed (1/8x to 8x).
 - Gradle multi-project build: `core` (Minecraft-independent engine) and `fabric` (Minecraft 1.21.11

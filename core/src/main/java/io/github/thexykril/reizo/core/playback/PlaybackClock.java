@@ -63,6 +63,12 @@ public final class PlaybackClock {
     speed = newSpeed;
   }
 
+  /** Jumps to a replay time; running or paused stays as it was. */
+  public synchronized void seek(long timeMs) {
+    baseMs = Math.max(0, timeMs);
+    baseNanos = nanoClock.getAsLong();
+  }
+
   private void rebase() {
     baseMs = currentMs();
     baseNanos = nanoClock.getAsLong();

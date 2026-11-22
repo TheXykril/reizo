@@ -271,6 +271,28 @@ public final class RecordingGameTest implements FabricClientGameTest {
 
     context.getInput().pressKey(GLFW.GLFW_KEY_LEFT_BRACKET);
     context.waitFor(mc -> mc.level.tickRateManager().tickrate() == 20f, 20 * 5);
+
+    // The replay has finished; the back key restarts it through a reconfiguration.
+    Object levelBefore = context.computeOnClient(mc -> mc.level);
+    context.getInput().pressKey(GLFW.GLFW_KEY_LEFT);
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.seeksDone() == 1
+              && !replay.isReconfiguring()
+              && mc.level != null
+              && mc.level != levelBefore
+              && mc.screen == null
+              && mc.level.getChunkSource().getLoadedChunksCount() > 0;
+        },
+        20 * 30);
+    check(
+        context.computeOnClient(mc -> mc.player.isSpectator()),
+        "camera is not a spectator after a backwards seek");
+    context.getInput().pressKey(GLFW.GLFW_KEY_RIGHT);
+    context.waitFor(mc -> ReplayPlayback.current().seeksDone() == 2, 20 * 5);
+    context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -354,11 +376,62 @@ public final class RecordingGameTest implements FabricClientGameTest {
             });
     double offSq = shown.distanceSq(stats.lastPlayer);
     check(offSq < 0.25, "recorded player at " + shown + ", walk ended at " + stats.lastPlayer);
+    checkSeeking(context, stats);
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     // Leaving a server ends on the multiplayer screen; tests must end on the title screen.
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
     LOGGER.info("playBackWalk OK: recorded player shown at {}", shown);
+  }
+
+  /**
+   * Seeks the finished walk replay back to the start (the world is rebuilt through a
+   * reconfiguration), checks the recorded player is back near the start, then seeks forward to the
+   * end and checks it is at the end again.
+   */
+  private void checkSeeking(ClientGameTestContext context, Stats stats) {
+    Object levelBefore = context.computeOnClient(mc -> mc.level);
+    int seeksBefore = ReplayPlayback.current().seeksDone();
+    long durationMs = ReplayPlayback.current().script().durationMs();
+    // This mid-session recording has no chunks, so the client stays on the loading screen and
+    // keys do not reach the game; the seek keys are covered in checkReplayControls.
+    context.runOnClient(mc -> ReplayPlayback.seekBy(-durationMs));
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.seeksDone() > seeksBefore
+              && !replay.isReconfiguring()
+              && mc.level != null
+              && mc.level != levelBefore
+              && replay.view() != null
+              && mc.level.getEntity(replay.view().recordedEntityId())
+                  instanceof net.minecraft.world.entity.player.Player;
+        },
+        20 * 30);
+    context.waitTicks(5);
+    check(ReplayPlayback.isActive(), "replay ended during a backwards seek");
+    Pos early = recordedPlayerPos(context);
+    check(
+        early.distanceSq(stats.lastPlayer) > 1.0,
+        "after seeking back the recorded player is still at the end: " + early);
+
+    context.runOnClient(mc -> ReplayPlayback.current().seek(durationMs));
+    context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
+    context.waitTicks(10);
+    Pos end = recordedPlayerPos(context);
+    check(
+        end.distanceSq(stats.lastPlayer) < 0.25,
+        "after seeking forward the recorded player is at " + end + ", not " + stats.lastPlayer);
+    LOGGER.info("checkSeeking OK: back to {}, forward to {}", early, end);
+  }
+
+  private static Pos recordedPlayerPos(ClientGameTestContext context) {
+    return context.computeOnClient(
+        mc -> {
+          var e = mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId());
+          return new Pos(e.getX(), e.getY(), e.getZ());
+        });
   }
 
   /** Presses the button on the current screen whose label is the given translation key. */

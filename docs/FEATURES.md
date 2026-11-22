@@ -52,7 +52,14 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   freezes the client world's ticking, speed 2x sets its tick rate to 40). Speeds 1/8x to 8x. The
   free camera also moves faster or slower with the speed, because the client's own tick rate
   changes (to be decoupled later).
-- Seek, frame step, timeline navigation, follow any entity, recorded player pose and equipment,
+- **Seek (← / → by 5 s, `,` / `.` to markers) and the replay time bar:** **partial**, evidence
+  GT (`checkReplayControls`: ← after the end rebuilds the world through a reconfiguration, chunks
+  load again, the camera is still a spectator, and → seeks forward. `checkSeeking`: back to the
+  start puts the recorded player back near the start, forward to the end puts it at the end within
+  0.5 blocks). A backwards seek replays from the start, so it is slow for long recordings until
+  snapshots exist. The time bar shows play state, time, speed, camera mode and markers; it is not
+  visually checked yet.
+- Frame step, timeline navigation with the mouse, follow any entity, recorded player pose and equipment,
   markers in timeline, Quick View: **planned**.
 
 ## Replay browser (#10)
