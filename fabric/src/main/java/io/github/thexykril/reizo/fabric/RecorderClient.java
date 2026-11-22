@@ -103,6 +103,11 @@ public final class RecorderClient implements ClientModInitializer {
     return config;
   }
 
+  /** Writes the current settings to the config file. */
+  public void saveConfig() {
+    config.save(FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json"));
+  }
+
   public RecordingStorage storage() {
     return storage;
   }

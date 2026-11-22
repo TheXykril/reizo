@@ -30,7 +30,8 @@ working without an executed test or a documented manual check.
 
 ## Using it (current build)
 
-- **F9** starts and stops recording (rebindable under Controls → Recorder).
+- **Shift+R** starts and stops recording, like Lunar. The key is rebindable under Controls → Recorder
+  and the modifier is in Reizo settings (Replays → Settings).
 - Pause/resume and "Add marker" keys are available but unbound by default.
 - Recordings are saved to `.minecraft/reizo/recordings/*.reizo`.
 - If the game crashes while recording, the recording is recovered on the next launch.

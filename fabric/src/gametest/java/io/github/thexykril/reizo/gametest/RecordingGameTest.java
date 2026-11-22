@@ -292,7 +292,19 @@ public final class RecordingGameTest implements FabricClientGameTest {
       registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
       context.getInput().holdKeyFor(options -> options.keyUp, 40);
       context.waitTicks(5);
-      context.runOnClient(mc -> RecorderClient.get().stopRecording());
+      // R alone must not stop it; Shift+R (the default, like Lunar) does.
+      context.getInput().pressKey(GLFW.GLFW_KEY_R);
+      context.waitTicks(2);
+      check(
+          context.computeOnClient(mc -> RecorderClient.get().session()) != null,
+          "R without Shift stopped the recording");
+      context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+      context.getInput().pressKey(GLFW.GLFW_KEY_R);
+      context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+      context.waitTicks(2);
+      check(
+          context.computeOnClient(mc -> RecorderClient.get().session()) == null,
+          "Shift+R did not stop the recording");
     }
     Path archive = await(context, session);
     Stats stats = verifyArchive(archive, registries);

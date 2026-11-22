@@ -76,11 +76,17 @@ public final class ReplayBrowserScreen extends Screen {
                 .build());
     addRenderableWidget(
         Button.builder(Component.translatable("reizo.browser.open_folder"), b -> openFolder())
-            .bounds(width / 2 - 154, y + 24, 150, 20)
+            .bounds(width / 2 - 154, y + 24, 100, 20)
+            .build());
+    addRenderableWidget(
+        Button.builder(
+                Component.translatable("reizo.browser.settings"),
+                b -> minecraft.setScreen(new SettingsScreen(this)))
+            .bounds(width / 2 - 50, y + 24, 100, 20)
             .build());
     addRenderableWidget(
         Button.builder(Component.translatable("gui.done"), b -> onClose())
-            .bounds(width / 2 + 4, y + 24, 150, 20)
+            .bounds(width / 2 + 54, y + 24, 100, 20)
             .build());
     updateButtons();
   }

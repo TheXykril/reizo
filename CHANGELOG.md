@@ -15,6 +15,9 @@ compatibility.
 - Replay browser: list, play, rename and delete recordings, and open the recordings folder.
   Opened with the new "Replays" button on the title screen and in the pause menu.
 - Pause menu buttons to start, stop, pause and resume recording.
+- Start/stop is now Shift+R by default, like Lunar. The modifier can be changed or removed.
+- Reizo settings screen (Replays → Settings): auto-record, indicator, saving the server name,
+  start/stop modifier, and a shortcut to key bindings.
 - Replay controls: V switches the camera between free, the recorded player's view and following
   the player; K pauses and resumes; `[` and `]` change the speed (1/8x to 8x).
 - Gradle multi-project build: `core` (Minecraft-independent engine) and `fabric` (Minecraft 1.21.11

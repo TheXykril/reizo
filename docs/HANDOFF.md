@@ -20,7 +20,7 @@ camera, project and export are not started.
 - Build: Gradle 9.5.1 wrapper, Loom 1.17.21, Minecraft 1.21.11, Mojang mappings, Spotless, CI.
 - `core`: stream format v1, metadata, local player payload, recording session (writer thread,
   pause, markers), storage (locks, packaging, recovery), capture controller (config cache).
-- `fabric`: decoder mixin capture, local player sampler, F9 toggle + pause/marker keys, HUD
+- `fabric`: decoder mixin capture, local player sampler, Shift+R toggle + pause/marker keys, HUD
   indicator, toasts, auto-record on join, startup recovery, debug commands (dev only).
 - Playback first slice (#7, ADR 0008): `core.playback` (PlaybackClock, ReplayScript) and
   `fabric.playback` (ReplayServer on 127.0.0.1, ReplayPlayback), `/reizo-debug play [file]`,
@@ -75,7 +75,8 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 - Fabric's play DISCONNECT event fires on the Netty thread and Minecraft drops queued client tasks
   while disconnecting; `stopRecording()` is therefore thread-safe and called directly. Keep it that
   way (a regression made the first gametest hang).
-- Default key is F9, not Lunar's Shift+R (needs modifier support, issue in M1).
+- Default key is Shift+R like Lunar: the base key R is a vanilla key mapping, the modifier is the
+  `toggleModifier` setting (`KeyModifier`), because vanilla key mappings have no modifiers.
 - HUD indicator not yet visually checked on real hardware (only rendered under Xvfb).
 - Empty private repo `TheXykril/rewind` exists from before the rename; the owner should delete it
   (the session could not rename or delete repositories).

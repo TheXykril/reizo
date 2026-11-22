@@ -15,7 +15,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 
 | Feature | Lunar | FB | HS | RM | Status | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Manual start/stop (hotkey) | Shift+R | ✓ | ✓ | ✓ | implemented | GT | F9 by default; Shift+R combo needs modifier-key support (#issue M1) |
+| Manual start/stop (hotkey) | Shift+R | ✓ | ✓ | ✓ | implemented | GT | Shift+R by default like Lunar (GT: R alone does nothing, Shift+R stops). Modifier set in Reizo settings, key in Controls |
 | Start/stop from pause menu | ✓ | ✓ | ? | ✓ | implemented | GT | Top-left buttons: start/stop, pause/resume, Replays. Visual check pending |
 | Recording indicator + elapsed time | ✓ | ✓ | ? | ✓ | partial | — | HUD drawn; visual check on real hardware pending |
 | Pause / resume recording | ✓ | ✓ | ? | ✓ | implemented | UT | Clock freeze; packets keep flowing (see FORMAT.md). Key unbound by default |

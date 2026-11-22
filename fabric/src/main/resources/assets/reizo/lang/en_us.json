@@ -1,6 +1,6 @@
 {
   "key.category.reizo.recorder": "Recorder",
-  "key.reizo.toggle": "Start / stop recording",
+  "key.reizo.toggle": "Start / stop recording (with the modifier in Reizo settings)",
   "key.reizo.pause": "Pause / resume recording",
   "key.reizo.marker": "Add marker",
   "key.category.reizo.replay": "Replay",
@@ -41,5 +41,16 @@
   "reizo.browser.list_failed": "Could not read the recordings folder",
   "reizo.browser.play_failed": "Could not play: %s",
   "reizo.browser.rename_failed": "Could not rename the recording",
-  "reizo.browser.delete_failed": "Could not delete the recording"
+  "reizo.browser.delete_failed": "Could not delete the recording",
+  "reizo.modifier.none": "None",
+  "reizo.modifier.shift": "Shift",
+  "reizo.modifier.control": "Ctrl",
+  "reizo.modifier.alt": "Alt",
+  "reizo.settings.title": "Reizo settings",
+  "reizo.settings.auto_record": "Record automatically on join",
+  "reizo.settings.indicator": "Recording indicator",
+  "reizo.settings.server_name": "Save server or world name",
+  "reizo.settings.toggle_modifier": "Start/stop key modifier",
+  "reizo.settings.keys": "Key bindings…",
+  "reizo.browser.settings": "Settings"
 }
