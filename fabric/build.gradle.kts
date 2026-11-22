@@ -12,6 +12,10 @@ base {
 
 repositories {
     mavenCentral()
+    // OneConfig API, compile-only: the integration is optional and loaded only by OneConfig.
+    maven("https://repo.polyfrost.org/releases") {
+        content { includeGroupAndSubgroups("org.polyfrost") }
+    }
 }
 
 loom {
@@ -58,6 +62,10 @@ dependencies {
     mappings(loom.officialMojangMappings())
     modImplementation(libs.fabric.loader)
     modImplementation(libs.fabric.api)
+
+    // Optional OneConfig settings page (only its Minecraft-independent config API is needed).
+    compileOnly("org.polyfrost.oneconfig:config:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:config-impl:${libs.versions.oneconfig.get()}") { isTransitive = false }
 
     implementation(project(":core"))
     include(project(":core"))

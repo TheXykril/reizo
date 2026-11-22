@@ -8,6 +8,8 @@ compatibility.
 
 ### Added
 
+- Optional OneConfig page (for example in OneClient): open replays, start/stop recording and
+  change Reizo's settings from OneConfig. Reizo works the same without OneConfig.
 - Basic playback: a recording is played back into the client world through a loopback replay
   server (ADR 0008). Dev-only entry point `/reizo-debug play [file]`.
 - Playback shows the recorded player as its own entity, moving as recorded, while you watch as a

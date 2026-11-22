@@ -131,8 +131,16 @@ replay ("Export video"). Evidence GT (`exportVideo`: 20 fps export of a replay, 
 | Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |
 | Frame sequence, screenshot export, render queue, presets | ? | planned |
 
-## OneClient integration (planned, M7)
+## OneClient integration (M7)
 
-OneConfig settings page, keybinds in OneConfig's keybind page, OneConfig notifications, editor
-entry point in the OneClient main menu, styling consistent with PolyCompose. Must remain optional.
-Status: **planned**.
+Optional: works only when OneConfig is installed (for example in OneClient), and Reizo runs the same
+without it (ADR 0010). Not affiliated with or endorsed by Polyfrost or OneClient.
+
+- **OneConfig settings page:** **partial**, evidence — (builds against the OneConfig 1.9.1 API;
+  not run in OneConfig yet, manual check needed). Page "Reizo" under Utility: Replays button,
+  start/stop recording button, auto-record, indicator, save server name, start/stop modifier,
+  FFmpeg path. Values are shared with Reizo's own settings screen.
+- **Keybinds in OneConfig's keybind page:** **partial**, evidence — (Reizo uses vanilla key
+  mappings, which OneConfig lists; not checked).
+- OneConfig notifications, editor entry in the OneClient main menu, PolyCompose styling:
+  **planned**.

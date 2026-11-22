@@ -9,7 +9,8 @@
   "license": "GPL-3.0-or-later",
   "environment": "client",
   "entrypoints": {
-    "client": ["io.github.thexykril.reizo.fabric.RecorderClient"]
+    "client": ["io.github.thexykril.reizo.fabric.RecorderClient"],
+    "oneconfig:config": ["io.github.thexykril.reizo.fabric.compat.OneConfigIntegration"]
   },
   "mixins": ["reizo.mixins.json"],
   "depends": {
