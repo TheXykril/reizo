@@ -16,3 +16,4 @@ in AGENTS.md needs an ADR.
 | [0008](0008-playback-loopback-replay-server.md) | Playback through a loopback replay server | Accepted |
 | [0009](0009-frame-exact-export.md) | Frame-exact video export with a virtual clock and FFmpeg | Accepted |
 | [0010](0010-optional-oneconfig-page.md) | Optional OneConfig page through a compile-only entrypoint | Accepted |
+| [0011](0011-shadow-recording-buffer.md) | Shadow recording with snapshot segments in memory | Accepted |

@@ -43,6 +43,7 @@ public final class CaptureController {
   private ProtocolPhase lastPhase;
   private long playPacketsThisConnection;
   private RecordingSession session;
+  private ShadowBuffer shadow;
 
   public CaptureController(
       RecordingStorage storage, RecorderSettings settings, LongSupplier nanoClock) {
@@ -54,12 +55,16 @@ public final class CaptureController {
   /** Called for every clientbound configuration or play packet the client decodes. */
   public void onPacket(ProtocolPhase phase, byte[] packetBytes) {
     RecordingSession target;
+    ShadowBuffer buffer;
     synchronized (this) {
       if (phase == ProtocolPhase.CONFIGURATION && lastPhase != ProtocolPhase.CONFIGURATION) {
         // A new configuration phase: a new connection, or a proxy moving us to another server.
         // The previous world's cached state no longer applies.
         clearCache();
         playPacketsThisConnection = 0;
+        if (shadow != null) {
+          shadow.clear();
+        }
       }
       lastPhase = phase;
       if (phase == ProtocolPhase.CONFIGURATION) {
@@ -71,9 +76,13 @@ public final class CaptureController {
         playPacketsThisConnection++;
       }
       target = session;
+      buffer = phase == ProtocolPhase.PLAY ? shadow : null;
     }
     if (target != null) {
       target.submitPacket(phase, packetBytes);
+    }
+    if (buffer != null) {
+      buffer.onPacket(phase, packetBytes);
     }
   }
 
@@ -101,6 +110,64 @@ public final class CaptureController {
     clearCache();
     lastPhase = null;
     playPacketsThisConnection = 0;
+    if (shadow != null) {
+      shadow.clear();
+    }
+  }
+
+  /**
+   * Turns shadow recording on (with a buffer) or off (null). Play packets of the connection go to
+   * the buffer from then on; the buffer starts collecting at its first segment.
+   */
+  public synchronized void setShadow(ShadowBuffer buffer) {
+    shadow = buffer;
+  }
+
+  public synchronized ShadowBuffer shadow() {
+    return shadow;
+  }
+
+  /** A consistent copy of the shadow buffer and the connection data, ready to be written. */
+  public final class ShadowSave {
+    private final ShadowBuffer.Contents contents;
+    private final List<Frame> prelude;
+
+    private ShadowSave(ShadowBuffer.Contents contents, List<Frame> prelude) {
+      this.contents = contents;
+      this.prelude = prelude;
+    }
+
+    public ShadowBuffer.Contents contents() {
+      return contents;
+    }
+
+    /**
+     * Writes it as a recording (see {@link ShadowBuffer#save}). Blocks while the frames are
+     * written; run it off the game thread.
+     */
+    public CompletableFuture<Path> write(RecordingMetadata meta) throws IOException {
+      return ShadowBuffer.save(contents, prelude, storage, meta, settings);
+    }
+  }
+
+  /**
+   * Copies what a shadow save needs. Cheap (no frame is copied), so it can run on the game thread
+   * right when the player asks, before a disconnect could clear the buffer.
+   *
+   * @return null when nothing is buffered or the connection's configuration was not kept
+   */
+  public synchronized ShadowSave prepareShadowSave() {
+    if (shadow == null || cacheOverflowed || connectionCache.isEmpty()) {
+      return null;
+    }
+    ShadowBuffer.Contents contents = shadow.contents();
+    return contents == null ? null : new ShadowSave(contents, List.copyOf(connectionCache));
+  }
+
+  /** Prepares and writes a shadow save; null when there is nothing to save. Blocks. */
+  public CompletableFuture<Path> saveShadow(RecordingMetadata meta) throws IOException {
+    ShadowSave save = prepareShadowSave();
+    return save == null ? null : save.write(meta);
   }
 
   /** True while connected and past the login phase (something can be recorded). */

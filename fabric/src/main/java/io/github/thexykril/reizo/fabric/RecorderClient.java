@@ -10,13 +10,16 @@ import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.recording.CaptureController;
 import io.github.thexykril.reizo.core.recording.RecorderSettings;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
+import io.github.thexykril.reizo.core.recording.ShadowBuffer;
 import io.github.thexykril.reizo.core.storage.RecordingStorage;
 import io.github.thexykril.reizo.fabric.capture.LocalPlayerSampler;
 import io.github.thexykril.reizo.fabric.capture.PacketTap;
+import io.github.thexykril.reizo.fabric.capture.WorldSnapshot;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.ui.DebugCommands;
 import io.github.thexykril.reizo.fabric.ui.RecorderKeys;
 import io.github.thexykril.reizo.fabric.ui.RecordingIndicator;
+import io.github.thexykril.reizo.fabric.ui.ReplayHud;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -49,6 +52,10 @@ public final class RecorderClient implements ClientModInitializer {
   private RecordingStorage storage;
   private CaptureController capture;
   private final LocalPlayerSampler sampler = new LocalPlayerSampler();
+  private final LocalPlayerSampler shadowSampler = new LocalPlayerSampler();
+
+  /** Shadow lengths offered in the settings, in seconds. */
+  public static final List<Integer> SHADOW_LENGTHS = List.of(30, 60, 120, 300, 600);
 
   public static RecorderClient get() {
     return instance;
@@ -66,6 +73,7 @@ public final class RecorderClient implements ClientModInitializer {
             recordings.resolveSibling("projects")));
     capture = new CaptureController(storage, RecorderSettings.DEFAULTS, System::nanoTime);
     PacketTap.install(capture);
+    applyShadowSettings();
 
     RecorderKeys.register();
     io.github.thexykril.reizo.fabric.ui.MenuButtons.register();
@@ -113,6 +121,75 @@ public final class RecorderClient implements ClientModInitializer {
     config.save(FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json"));
   }
 
+  /** Turns the shadow buffer on, off or to a new length after a settings change. */
+  public void applyShadowSettings() {
+    if (!config.shadowEnabled) {
+      capture.setShadow(null);
+      return;
+    }
+    int seconds = Math.max(30, Math.min(600, config.shadowSeconds));
+    long budget = Math.max(64, Math.min(4096, config.shadowMemoryMb)) * 1024L * 1024L;
+    ShadowBuffer current = capture.shadow();
+    if (current != null && current.windowSeconds() == seconds) {
+      return;
+    }
+    capture.setShadow(
+        new ShadowBuffer(
+            seconds, ShadowBuffer.segmentSecondsFor(seconds), budget, System::nanoTime));
+  }
+
+  /** The shadow buffer while shadow recording is on, else null. */
+  public ShadowBuffer shadow() {
+    return capture.shadow();
+  }
+
+  /**
+   * Saves the shadow buffer (the last minutes of play) as a recording, in the background. Client
+   * thread only.
+   *
+   * @return the archive's future; it completes with null when there was nothing to save
+   */
+  public CompletableFuture<Path> saveShadow() {
+    Minecraft mc = Minecraft.getInstance();
+    CaptureController.ShadowSave save =
+        ReplayPlayback.isActive() ? null : capture.prepareShadowSave();
+    if (save == null) {
+      toast("reizo.toast.shadow_empty", null);
+      return CompletableFuture.completedFuture(null);
+    }
+    RecordingMetadata meta =
+        RecordingMetadata.create(recordingName(mc), System.currentTimeMillis());
+    fillMetadata(mc, meta);
+    toast(
+        "reizo.toast.shadow_saving",
+        Component.literal(ReplayHud.time(save.contents().durationMillis())));
+    CompletableFuture<Path> out = new CompletableFuture<>();
+    Thread t =
+        new Thread(
+            () -> {
+              try {
+                CompletableFuture<Path> result = save.write(meta);
+                reportSaved(result);
+                result.whenComplete(
+                    (path, error) -> {
+                      if (error != null) {
+                        out.completeExceptionally(error);
+                      } else {
+                        out.complete(path);
+                      }
+                    });
+              } catch (IOException | RuntimeException e) {
+                LOGGER.error("Could not save the shadow buffer", e);
+                onClientThread(() -> toast("reizo.toast.save_failed", null));
+                out.completeExceptionally(e);
+              }
+            },
+            "Recorder-Shadow-Save");
+    t.setDaemon(true);
+    t.start();
+    return out;
+  }
+
   public RecordingStorage storage() {
     return storage;
   }
@@ -139,7 +216,7 @@ public final class RecorderClient implements ClientModInitializer {
         RecordingMetadata.create(recordingName(mc), System.currentTimeMillis());
     fillMetadata(mc, meta);
     try {
-      capture.start(meta, () -> io.github.thexykril.reizo.fabric.capture.WorldSnapshot.capture(mc));
+      capture.start(meta, () -> WorldSnapshot.capture(mc));
       sampler.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
       toast(
@@ -158,6 +235,10 @@ public final class RecorderClient implements ClientModInitializer {
     }
     LOGGER.info("Stopping recording");
     onClientThread(() -> toast("reizo.toast.saving", null));
+    reportSaved(result);
+  }
+
+  private void reportSaved(CompletableFuture<Path> result) {
     result.whenComplete(
         (path, error) -> {
           if (error != null) {
@@ -185,8 +266,14 @@ public final class RecorderClient implements ClientModInitializer {
 
   public void addMarker(String label) {
     RecordingSession s = session();
+    ShadowBuffer buffer = capture.shadow();
+    if (buffer != null && !buffer.isEmpty()) {
+      buffer.onFrame(FrameType.MARKER, label.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
     if (s != null) {
       s.addMarker(label);
+    }
+    if (s != null || (buffer != null && !buffer.isEmpty())) {
       toast("reizo.toast.marker", Component.literal(label));
     }
   }
@@ -196,6 +283,7 @@ public final class RecorderClient implements ClientModInitializer {
   private void onClientTick(Minecraft mc) {
     ReplayPlayback.tick(mc);
     RecorderKeys.handle(this);
+    tickShadow(mc);
     RecordingSession s = session();
     if (s == null || mc.player == null || s.state() != RecordingSession.State.RECORDING) {
       return;
@@ -203,6 +291,30 @@ public final class RecorderClient implements ClientModInitializer {
     LocalPlayerState state = sampler.sample(mc.player);
     if (state != null) {
       s.submit(FrameType.LOCAL_PLAYER, state.encode());
+    }
+  }
+
+  private void tickShadow(Minecraft mc) {
+    ShadowBuffer buffer = capture.shadow();
+    if (buffer == null
+        || mc.level == null
+        || mc.player == null
+        || ReplayPlayback.isActive()
+        || !capture.canRecord()) {
+      return;
+    }
+    if (buffer.needsSegment()) {
+      long start = System.nanoTime();
+      buffer.startSegment(WorldSnapshot.capture(mc));
+      shadowSampler.reset();
+      LOGGER.debug(
+          "Shadow segment started in {} ms, buffer {} MB",
+          (System.nanoTime() - start) / 1_000_000,
+          buffer.bytes() >> 20);
+    }
+    LocalPlayerState state = shadowSampler.sample(mc.player);
+    if (state != null) {
+      buffer.onFrame(FrameType.LOCAL_PLAYER, state.encode());
     }
   }
 

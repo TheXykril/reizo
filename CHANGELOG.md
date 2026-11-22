@@ -14,6 +14,9 @@ compatibility.
 
 ### Added
 
+- Shadow recording (off by default; Settings or OneConfig): keeps the last 30 s to 10 min of
+  play in memory without recording, and "Save last …" in the pause menu or the save key writes
+  it as a normal recording.
 - Export settings screen (pause menu "Export video" or the timeline's Export): size, frame rate,
   quality, format (H.264, H.265, VP9, AV1, and NVIDIA, VAAPI or Intel QSV hardware encoders when
   FFmpeg has them), file name, and the In/Out range.

@@ -23,7 +23,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Auto-record on join | ✓ | ✓ | ✓ | ✓ | implemented | GT | `autoRecordOnJoin` in config/reizo.json |
 | Continuous across world/server switch | ✓ | ? | ? | ✗ | planned | — | Currently stops on disconnect |
 | Crash backup / recovery | ✓ | ? | ? | partial | implemented | UT | Max ~1 s loss; GT for real crash pending |
-| Shadow (rolling buffer) recording | ✓ 30 s–10 min | ? | ✓ 2 min | ✗ | planned | — | M5 |
+| Shadow (rolling buffer) recording | ✓ 30 s–10 min | ? | ✓ 2 min | ✓ 30 s–10 min | implemented | UT, GT | Off by default; ADR 0011. Pause menu "Save last" or a key (unbound). Snapshot hitch not yet measured on real hardware |
 | World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; basic playback (GT) |
 | Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; not yet replayed |
 | Inventory / equipment | ✓ | ✓ | ? | ✓ | partial | — | Present in recorded packets; untested on playback |

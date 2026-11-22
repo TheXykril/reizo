@@ -77,6 +77,29 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
         category = "Recording")
     public static int toggleModifier = 1;
 
+    @Button(
+        title = "Save last minutes",
+        description = "Save what the shadow buffer holds as a recording.",
+        text = "Save",
+        category = "Shadow")
+    public static void saveShadow() {
+      Minecraft.getInstance().execute(() -> RecorderClient.get().saveShadow());
+    }
+
+    @Switch(
+        title = "Shadow recording",
+        description =
+            "Keep the last minutes of play in memory so you can save them after something happened.",
+        category = "Shadow")
+    public static boolean shadowEnabled;
+
+    @Dropdown(
+        title = "Shadow length",
+        description = "How much play a save keeps at least.",
+        options = {"30 s", "1 min", "2 min", "5 min", "10 min"},
+        category = "Shadow")
+    public static int shadowLength = 2;
+
     @Text(
         title = "FFmpeg path",
         description = "Leave empty to use ffmpeg from the system PATH.",
@@ -95,7 +118,13 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       super.onInitialized(tree);
       for (String id :
           new String[] {
-            "autoRecordOnJoin", "showIndicator", "storeServerName", "toggleModifier", "ffmpegPath"
+            "autoRecordOnJoin",
+            "showIndicator",
+            "storeServerName",
+            "toggleModifier",
+            "ffmpegPath",
+            "shadowEnabled",
+            "shadowLength"
           }) {
         addCallback(id, Page::push);
       }
@@ -110,6 +139,9 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       storeServerName = c.storeServerName;
       toggleModifier = modifierIndex(c.toggleModifier);
       ffmpegPath = c.ffmpegPath == null ? "" : c.ffmpegPath;
+      shadowEnabled = c.shadowEnabled;
+      int length = RecorderClient.SHADOW_LENGTHS.indexOf(c.shadowSeconds);
+      shadowLength = length < 0 ? 2 : length;
     }
 
     /** Copies the page's values into Reizo's settings and saves them. */
@@ -121,6 +153,11 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       c.storeServerName = storeServerName;
       c.toggleModifier = MODIFIERS[Math.max(0, Math.min(MODIFIERS.length - 1, toggleModifier))];
       c.ffmpegPath = ffmpegPath == null ? "" : ffmpegPath.strip();
+      c.shadowEnabled = shadowEnabled;
+      c.shadowSeconds =
+          RecorderClient.SHADOW_LENGTHS.get(
+              Math.max(0, Math.min(RecorderClient.SHADOW_LENGTHS.size() - 1, shadowLength)));
+      client.applyShadowSettings();
       client.saveConfig();
     }
 

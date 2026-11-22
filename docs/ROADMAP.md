@@ -42,7 +42,7 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 
 - Post-processing pipeline (only active in editor/export), effect tracks with keyframed intensity
 - Text/image overlays, transitions, letterboxing, HUD elements in POV
-- Shadow recording (rolling buffer, save last N minutes)
+- ✓ Shadow recording (rolling buffer, save last N minutes; ADR 0011)
 
 ## M6 — Audio
 

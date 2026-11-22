@@ -72,6 +72,36 @@ public final class SettingsScreen extends Screen {
                 (b, v) -> config.toggleModifier = v.configValue()));
     y += 24;
     addRenderableWidget(
+        CycleButton.onOffBuilder(config.shadowEnabled)
+            .create(
+                x,
+                y,
+                150,
+                20,
+                Component.translatable("reizo.settings.shadow"),
+                (b, v) -> {
+                  config.shadowEnabled = v;
+                  RecorderClient.get().applyShadowSettings();
+                }));
+    addRenderableWidget(
+        CycleButton.builder(
+                (Integer v) -> Component.literal(ReplayHud.time(v * 1000L)),
+                RecorderClient.SHADOW_LENGTHS.contains(config.shadowSeconds)
+                    ? config.shadowSeconds
+                    : 120)
+            .withValues(RecorderClient.SHADOW_LENGTHS)
+            .create(
+                x + 160,
+                y,
+                150,
+                20,
+                Component.translatable("reizo.settings.shadow_length"),
+                (b, v) -> {
+                  config.shadowSeconds = v;
+                  RecorderClient.get().applyShadowSettings();
+                }));
+    y += 24;
+    addRenderableWidget(
         Button.builder(
                 Component.translatable("reizo.settings.keys"),
                 b -> minecraft.setScreen(new KeyBindsScreen(this, minecraft.options)))

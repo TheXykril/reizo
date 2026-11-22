@@ -74,6 +74,22 @@ public final class MenuButtons {
                 .build());
         y += 24;
       }
+      var shadow = recorder.shadow();
+      if (shadow != null) {
+        Button save =
+            Button.builder(
+                    Component.translatable(
+                        "reizo.menu.save_shadow", ReplayHud.time(shadow.bufferedSeconds() * 1000)),
+                    b -> {
+                      recorder.saveShadow();
+                      client.setScreen(null);
+                    })
+                .bounds(4, y, 120, 20)
+                .build();
+        save.active = !shadow.isEmpty();
+        buttons.add(save);
+        y += 24;
+      }
     }
     if (ReplayPlayback.isActive()) {
       buttons.add(
