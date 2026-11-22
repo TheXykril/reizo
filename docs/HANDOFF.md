@@ -15,7 +15,7 @@ client, start, record, stop and save) work and are covered by automated in-game 
 
 - Research: OneClient, OneConfig, Lunar Rewind, Flashback, Hindsight (docs/RESEARCH.md).
 - Owner decisions: license GPL-3.0-or-later; name **Reizo**; Flashback-inspired clean-room design;
-  nothing from Replay Mod; repository private.
+  nothing from Replay Mod; repository public since 2026-11-22.
 - Build: Gradle 9.5.1 wrapper, Loom 1.17.21, Minecraft 1.21.11, Mojang mappings, Spotless, CI.
 - `core`: stream format v1, metadata, local player payload, recording session (writer thread,
   pause, markers), storage (locks, packaging, recovery), capture controller (config cache).
@@ -26,13 +26,13 @@ client, start, record, stop and save) work and are covered by automated in-game 
 
 ## 3. Current branch and commit
 
-- `main`: initial commit (license + README).
-- `feat/recording-foundation`: all work above, open as PR #20 (see section 11).
+- `main`: all work above, squash-merged from PR #20 on 2026-11-22 (commit dad38a1).
+- `docs/multi-version-plan`: ADR 0007 (accepted), PR #26.
   Check `git log --oneline` for the exact head commit.
 
 ## 4. Active implementation work
 
-None in progress. The PR awaits owner review.
+CI in-game test job fails on GitHub runners (world load timeout, see section 7). Being fixed.
 
 ## 5. Files and modules affected
 
@@ -48,6 +48,12 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 
 ## 7. Known bugs and blockers
 
+- **CI in-game tests time out on GitHub runners** ("Timeout loading world", spawn area stuck at
+  16%), on ubuntu-26.04 and on 24.04. Thread dumps show the render thread busy in software
+  rendering (texture upload, `glfwSwapBuffers`). The integrated server runs in lockstep with
+  client ticks, so it never finishes loading. Reproduced in the cloud box by pinning the run to one
+  core. Passes with 2+ cores in the cloud and on Hyperion. Fix in progress: cheaper rendering
+  settings in the test.
 - **Mid-session recordings are incomplete:** chunks/entities loaded before start are missing
   (flagged `completeFromJoin=false`, toast warns). Fix = world snapshots (M2 issue).
 - Fabric's play DISCONNECT event fires on the Netty thread and Minecraft drops queued client tasks
@@ -87,7 +93,8 @@ i915 driver, no NVIDIA), branch `feat/recording-foundation` at c72bb9e:
   the missing `libflite` narrator library (harmless). F9 not tested: nobody at the keyboard.
 - `:fabric:runClientGameTest`: first world loaded and "Recording started ... complete from join:
   true" logged, then the run stalled at about 1 FPS in `glfwSwapBuffers` because the laptop
-  display was off (DPMS). Inconclusive; rerun with the screen on.
+  display was off (DPMS). Rerun with the screen on (2026-11-22, by the Hyperion session): **pass,
+  2/2 in 24 s**.
 
 ## 9. Uncommitted or unpushed changes
 
@@ -95,7 +102,7 @@ None at the end of this session (everything pushed to `feat/recording-foundation
 
 ## 10. Next recommended actions
 
-1. Owner: review and merge PR #20; delete the empty `TheXykril/rewind` repo.
+1. Owner: delete the empty `TheXykril/rewind` repo. (PR #20 is merged.)
 2. Owner on Hyperion (Arch/Hyprland): run and paste results of
    `java -version; gh auth status; ffmpeg -hide_banner -encoders | grep -E "264|265|av1|vaapi|nvenc|qsv"; glxinfo -B | head -20; vainfo 2>&1 | head; nvidia-smi 2>&1 | head -5`
    then `./gradlew :fabric:runClient` and walk through docs/TESTING.md manual checklist.
@@ -104,7 +111,7 @@ None at the end of this session (everything pushed to `feat/recording-foundation
 
 ## 11. Relevant GitHub issues and pull requests
 
-- Repository: https://github.com/TheXykril/reizo (private)
+- Repository: https://github.com/TheXykril/reizo (public)
 - PR #20: initial recording foundation (branch `feat/recording-foundation`); tracks issue #1.
 - Milestones M1–M8 with issues #1–#19.
 
