@@ -1,23 +1,27 @@
 name: CI
 
+# Runs only for pull requests, pushes to main and manual runs. Pushes to other branches do not
+# trigger it, there is no schedule, and documentation-only changes are skipped to save minutes.
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     name: Build and unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -34,16 +38,18 @@ jobs:
           name: test-reports
           path: "**/build/reports/tests/"
           if-no-files-found: ignore
+          retention-days: 7
       - name: Upload mod jar
         uses: actions/upload-artifact@v4
         with:
           name: mod-jar
           path: fabric/build/libs/*.jar
+          retention-days: 7
 
   gametest:
     name: In-game tests (headless client)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +63,17 @@ jobs:
       - name: Run client gametests
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClientGameTest --stacktrace
+          # Software rendering would otherwise take every core and starve the integrated server.
+          LP_NUM_THREADS: "2"
+        run: |
+          # Thread dumps of the game every 60 s, so a hang can be diagnosed from the artifact.
+          mkdir -p fabric/build/run/clientGameTest/logs
+          ( while sleep 60; do
+              for pid in $(pgrep -f devlaunchinjector); do
+                { date; jcmd "$pid" Thread.print; } >> fabric/build/run/clientGameTest/logs/threads.txt 2>&1
+              done
+            done ) &
+          xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew :fabric:runClientGameTest --stacktrace
       - name: Upload gametest logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,3 +81,4 @@ jobs:
           name: gametest-logs
           path: fabric/build/run/clientGameTest/logs/
           if-no-files-found: ignore
+          retention-days: 7
