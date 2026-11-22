@@ -303,7 +303,7 @@ public final class RecorderClient implements ClientModInitializer {
     }
   }
 
-  private static void toast(String titleKey, Component body) {
+  public static void toast(String titleKey, Component body) {
     Minecraft mc = Minecraft.getInstance();
     SystemToast.addOrUpdate(
         mc.getToastManager(),

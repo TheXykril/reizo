@@ -75,6 +75,19 @@ public final class MenuButtons {
         y += 24;
       }
     }
+    if (ReplayPlayback.isActive()) {
+      buttons.add(
+          Button.builder(
+                  Component.translatable("reizo.menu.export"),
+                  b -> {
+                    client.setScreen(null);
+                    io.github.thexykril.reizo.fabric.export.ExportControls.exportCurrent(
+                        client, null);
+                  })
+              .bounds(4, y, 120, 20)
+              .build());
+      y += 24;
+    }
     buttons.add(
         Button.builder(
                 Component.translatable("reizo.menu.replays"),

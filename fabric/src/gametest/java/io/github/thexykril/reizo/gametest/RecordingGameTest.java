@@ -14,6 +14,8 @@ import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingArchive;
 import io.github.thexykril.reizo.fabric.RecorderClient;
+import io.github.thexykril.reizo.fabric.export.ExportControls;
+import io.github.thexykril.reizo.fabric.export.ExportSession;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
@@ -97,6 +99,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         20 * 60);
     context.waitTicks(10);
     context.takeScreenshot("reizo-replay-playing");
+    exportVideo(context);
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
@@ -515,6 +518,70 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(2);
     check(!ReplayEditor.isPathPlaying(), "B did not stop the camera path");
     LOGGER.info("checkCameraPath OK: camera on the path at {}", expected);
+  }
+
+  /**
+   * Exports the running replay with FFmpeg at 20 fps, frame by frame, and checks the video has
+   * exactly one frame per planned frame. Skipped (with a log line) when FFmpeg is not installed.
+   */
+  private void exportVideo(ClientGameTestContext context) {
+    if (io.github.thexykril.reizo.core.export.FfmpegCommand.locate(null, System.getenv("PATH"))
+        .isEmpty()) {
+      LOGGER.warn("exportVideo SKIPPED: ffmpeg not on PATH");
+      return;
+    }
+    java.util.concurrent.atomic.AtomicReference<ExportSession> result =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    long duration = ReplayPlayback.current().script().durationMs();
+    context.runOnClient(
+        mc -> {
+          var render = ReplayEditor.project().render;
+          render.fps = 20;
+          render.width = 0; // keep the window size; no scaling on slow CI machines
+          render.height = 0;
+          render.crf = 30;
+          render.codec = "libx264";
+          render.output = "gametest-export.mp4";
+          check(ExportControls.exportCurrent(mc, result::set), "export did not start");
+        });
+    context.waitFor(mc -> result.get() != null, 20 * 240);
+    ExportSession s = result.get();
+    check(s.state() == ExportSession.State.DONE, "export ended " + s.state() + ": " + s.error());
+    int expected =
+        new io.github.thexykril.reizo.core.export.ExportPlan(0, duration, 20).frameCount();
+    check(s.framesCaptured() == expected, "captured " + s.framesCaptured() + " of " + expected);
+    String frames =
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_frames",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_read_frames",
+            "-of",
+            "csv=p=0",
+            s.output().toString());
+    check(
+        frames.strip().equals(Integer.toString(expected)),
+        "video has " + frames.strip() + " frames, expected " + expected);
+    LOGGER.info("exportVideo OK: {} frames in {}", expected, s.output());
+  }
+
+  private static String run(String... command) {
+    try {
+      Process p = new ProcessBuilder(command).redirectErrorStream(true).start();
+      String out =
+          new String(p.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      p.waitFor(60, TimeUnit.SECONDS);
+      return out;
+    } catch (java.io.IOException e) {
+      throw new AssertionError("could not run " + command[0], e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(e);
+    }
   }
 
   /** Presses the button on the current screen whose label is the given translation key. */

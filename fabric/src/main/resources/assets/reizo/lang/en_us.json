@@ -67,5 +67,11 @@
   "reizo.path.no_keyframe": "No keyframe near this time",
   "reizo.path.on": "Camera path playing",
   "reizo.path.off": "Camera path off",
-  "reizo.path.smoothing": "Path: %s"
+  "reizo.path.smoothing": "Path: %s",
+  "reizo.menu.export": "Export video",
+  "reizo.export.started": "Exporting video… press Esc to cancel",
+  "reizo.export.done": "Video exported",
+  "reizo.export.failed": "Export failed",
+  "reizo.export.cancelled": "Export cancelled",
+  "reizo.export.no_ffmpeg": "FFmpeg not found: install it or set its path in reizo.json"
 }

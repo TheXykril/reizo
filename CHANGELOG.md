@@ -18,6 +18,9 @@ compatibility.
 - Start/stop is now Shift+R by default, like Lunar. The modifier can be changed or removed.
 - Reizo settings screen (Replays → Settings): auto-record, indicator, saving the server name,
   start/stop modifier, and a shortcut to key bindings.
+- Video export: "Export video" in the pause menu during a replay renders it frame by frame
+  (exact timing at any computer speed) and encodes it with your FFmpeg to `reizo/exports/`. The
+  camera path plays during the export. Progress shows in the window title; Esc cancels.
 - Camera paths in replays: N adds a keyframe at the camera, Delete removes the nearest one, B plays
   the path and J switches smoothing. Keyframes show on the time bar. Each recording gets a project
   that saves the path automatically.
