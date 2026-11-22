@@ -18,6 +18,9 @@ compatibility.
 - Start/stop is now Shift+R by default, like Lunar. The modifier can be changed or removed.
 - Reizo settings screen (Replays → Settings): auto-record, indicator, saving the server name,
   start/stop modifier, and a shortcut to key bindings.
+- Camera paths in replays: N adds a keyframe at the camera, Delete removes the nearest one, B plays
+  the path and J switches smoothing. Keyframes show on the time bar. Each recording gets a project
+  that saves the path automatically.
 - Recordings started in the middle of a session now include the world as it was at the start
   (chunks, entities, players, time, weather), so they play back with the world visible.
 - Seeking in replays: ← and → jump 5 seconds, `,` and `.` jump to markers. A time bar at the

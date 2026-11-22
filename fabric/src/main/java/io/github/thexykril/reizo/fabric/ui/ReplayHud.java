@@ -25,6 +25,7 @@ public final class ReplayHud {
   private static final int TRACK = 0xFF3A3A3A;
   private static final int PROGRESS = 0xFFE5484D;
   private static final int MARKER = 0xFFF5A524;
+  private static final int KEYFRAME = 0xFF4CC9F0;
   private static final int TEXT = 0xFFFFFFFF;
   private static final int DIM = 0xFFB0B0B0;
 
@@ -61,7 +62,9 @@ public final class ReplayHud {
     String right =
         speed(server.clock().speed())
             + "x  ·  "
-            + ReplayCamera.mode().name().toLowerCase(Locale.ROOT);
+            + (io.github.thexykril.reizo.fabric.playback.ReplayEditor.isPathPlaying()
+                ? "path"
+                : ReplayCamera.mode().name().toLowerCase(Locale.ROOT));
     g.drawString(font, left, x + 6, y + 4, TEXT, false);
     g.drawString(font, right, x + width - 6 - font.width(right), y + 4, DIM, false);
 
@@ -70,6 +73,10 @@ public final class ReplayHud {
     int barY = y + height - 7;
     g.fill(barX, barY, barX + barW, barY + 3, TRACK);
     g.fill(barX, barY, barX + (int) (barW * time / duration), barY + 3, PROGRESS);
+    for (var k : io.github.thexykril.reizo.fabric.playback.ReplayEditor.path().keyframes()) {
+      int kx = barX + (int) (barW * Math.min(k.timeMs(), duration) / duration);
+      g.fill(kx - 1, barY - 1, kx + 2, barY + 4, KEYFRAME);
+    }
     RecordingMetadata meta = ReplayPlayback.metadata();
     if (meta != null) {
       for (RecordingMetadata.Marker m : meta.markers) {
@@ -77,6 +84,10 @@ public final class ReplayHud {
         g.fill(mx, barY - 2, mx + 1, barY + 5, MARKER);
       }
     }
+  }
+
+  static String time(long ms) {
+    return RecordingIndicator.formatElapsed(ms);
   }
 
   static String speed(double speed) {

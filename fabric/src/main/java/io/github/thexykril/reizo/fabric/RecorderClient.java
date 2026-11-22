@@ -61,6 +61,9 @@ public final class RecorderClient implements ClientModInitializer {
     config = ClientConfig.load(loader.getConfigDir().resolve(MOD_ID + ".json"));
     Path recordings = loader.getGameDir().resolve(config.recordingsDirectory);
     storage = new RecordingStorage(recordings);
+    io.github.thexykril.reizo.fabric.playback.ReplayEditor.init(
+        new io.github.thexykril.reizo.core.project.ProjectStore(
+            recordings.resolveSibling("projects")));
     capture = new CaptureController(storage, RecorderSettings.DEFAULTS, System::nanoTime);
     PacketTap.install(capture);
 

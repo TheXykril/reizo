@@ -142,6 +142,7 @@ public final class ReplayPlayback {
             ReplayPlayback::onServerClosed);
     current = server;
     metadata = meta;
+    ReplayEditor.open(archivePath, meta);
     ReplayCamera.reset();
     playListener = null;
     enteredWorld = false;
@@ -234,6 +235,7 @@ public final class ReplayPlayback {
     if (inWorld) {
       enteredWorld = true;
       ReplayCamera.tick(mc);
+      ReplayEditor.tick(mc);
     } else if (enteredWorld) {
       server.close();
     }
@@ -270,6 +272,7 @@ public final class ReplayPlayback {
   private static void onServerClosed() {
     current = null;
     metadata = null;
+    ReplayEditor.close();
     playListener = null;
     ReplayCamera.reset();
     PacketTap.setSuppressed(false);

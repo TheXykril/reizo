@@ -32,6 +32,10 @@ public final class RecorderKeys {
   private static KeyMapping replayForward;
   private static KeyMapping replayPrevMarker;
   private static KeyMapping replayNextMarker;
+  private static KeyMapping keyframeAdd;
+  private static KeyMapping keyframeRemove;
+  private static KeyMapping pathToggle;
+  private static KeyMapping pathSmoothing;
 
   /** How far the seek keys jump. */
   static final long SEEK_STEP_MS = 5_000;
@@ -90,6 +94,19 @@ public final class RecorderKeys {
     replayNextMarker =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping("key.reizo.replay_next_marker", GLFW.GLFW_KEY_PERIOD, replay));
+    // Camera path keys; N, B and J are unused by vanilla (P is Social Interactions).
+    keyframeAdd =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.keyframe_add", GLFW.GLFW_KEY_N, replay));
+    keyframeRemove =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.keyframe_remove", GLFW.GLFW_KEY_DELETE, replay));
+    pathToggle =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.path_toggle", GLFW.GLFW_KEY_B, replay));
+    pathSmoothing =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.path_smoothing", GLFW.GLFW_KEY_J, replay));
   }
 
   /** Called once per client tick. */
@@ -137,6 +154,49 @@ public final class RecorderKeys {
       }
     }
     seekKeys(mc, active);
+    pathKeys(mc, active);
+  }
+
+  private static void pathKeys(Minecraft mc, boolean active) {
+    while (keyframeAdd.consumeClick()) {
+      if (active) {
+        var k = io.github.thexykril.reizo.fabric.playback.ReplayEditor.addKeyframe(mc);
+        if (k != null) {
+          status(
+              mc,
+              Component.translatable(
+                  "reizo.path.keyframe_added",
+                  ReplayHud.time(k.timeMs()),
+                  io.github.thexykril.reizo.fabric.playback.ReplayEditor.path().size()));
+        }
+      }
+    }
+    while (keyframeRemove.consumeClick()) {
+      if (active) {
+        var k = io.github.thexykril.reizo.fabric.playback.ReplayEditor.removeNearestKeyframe();
+        status(
+            mc,
+            k == null
+                ? Component.translatable("reizo.path.no_keyframe")
+                : Component.translatable(
+                    "reizo.path.keyframe_removed", ReplayHud.time(k.timeMs())));
+      }
+    }
+    while (pathToggle.consumeClick()) {
+      if (active) {
+        boolean on = io.github.thexykril.reizo.fabric.playback.ReplayEditor.togglePath();
+        status(mc, Component.translatable(on ? "reizo.path.on" : "reizo.path.off"));
+      }
+    }
+    while (pathSmoothing.consumeClick()) {
+      if (active) {
+        status(
+            mc,
+            Component.translatable(
+                "reizo.path.smoothing",
+                io.github.thexykril.reizo.fabric.playback.ReplayEditor.cycleSmoothing()));
+      }
+    }
   }
 
   private static void seekKeys(Minecraft mc, boolean active) {
