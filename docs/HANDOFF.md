@@ -3,14 +3,14 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-22 by Claude (playback first slice).
+Last updated: 2026-11-22 by Claude (OneConfig page).
 
 ## 1. Current project phase
 
-M1 "Recording foundation" first slice done; M2 started. Vertical slice: steps 1–4 (launch dev
-client, start, record, stop and save) and a first version of steps 5–6 (open and play a recording
-into the client world, dev command only) work and are covered by automated in-game tests. Free
-camera, project and export are not started.
+M1 recording, M2 playback (browser, camera modes, pause/speed, seeking, start snapshots) and the
+start of M3 (camera keyframes, projects) are on `main`. M4/M5 export first slice (PR #35) and the
+optional OneConfig page (M7 first slice, ADR 0010) are in open PRs. Not started: timeline editor
+screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
@@ -57,19 +57,22 @@ camera, project and export are not started.
 
 ## 3. Current branch and commit
 
-- `main`: recording foundation (#20), CI fix (#27), ADR 0007 (#26), all merged 2026-11-22.
-- `feat/playback-replay-server`: playback first slice, PR #28 (awaiting the owner's OK to merge).
-- `feat/playback-recorded-player`: recorded player + spectator camera, PR #29 stacked on #28.
-- `feat/replay-camera-controls`: camera modes, pause and speed, stacked on #29.
-  Check `git log --oneline` for the exact head commit.
+- `main`: everything up to camera keyframes and projects (#28–#34 merged 2026-11-22).
+- `feat/video-export`: PR #35, base `main`.
+- `feat/oneconfig`: OneConfig page, PR stacked on #35.
+  Merge workflow for stacked PRs: squash-merge, then merge `origin/main` into the next branch and
+  resolve with `git checkout --ours -- .` after checking `git diff --quiet origin/main <merged head>`.
 
 ## 4. Active implementation work
 
-Playback first slice on branch `feat/playback-replay-server` (PR open). Recorded player is
-done on `feat/playback-recorded-player` (stacked PR), camera modes, pause and speed on
-`feat/replay-camera-controls` (stacked PR). Next: recorded player pose/sneak (needs entity data
-accessors) and equipment, free camera speed decoupled from replay speed, #8 seeking, #10 replay
-browser (the real entry point instead of the debug command).
+- OneConfig page (`fabric/compat/OneConfigIntegration`): builds against the OneConfig 1.9.1 API but
+  has never run inside OneConfig. The cloud proxy blocks OneConfig's runtime dependencies
+  (repo.hypixel.net, jitpack), so it needs a manual check in OneClient on Hyperion: page shows under
+  Utility, buttons work, values match Reizo's settings screen, Reizo's keys appear in OneConfig's
+  keybind page, and whether OneClient's main menu hides the title screen "Replays" button.
+- Next: timeline editor screen (#13), camera path visualization and roll/FOV keys, export settings
+  UI and rendering at output size, shadow recording (#16), audio (#17), effects (#15), recorded
+  player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected
 
@@ -77,7 +80,7 @@ Everything (initial import): `core/`, `fabric/`, `docs/`, `.github/`, root build
 
 ## 6. Important decisions
 
-ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
+ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
 - Capture at `PacketDecoder` (ADR 0004): bytes are exact; phase comes from the decoder.
 - Pause freezes the clock but keeps capturing packets (FORMAT.md "Time").
 - `core` must stay Minecraft-free.
@@ -85,8 +88,8 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 
 ## 7. Known bugs and blockers
 
-- **Mid-session recordings are incomplete:** chunks/entities loaded before start are missing
-  (flagged `completeFromJoin=false`, toast warns). Fix = world snapshots (M2 issue).
+- Mid-session recordings: the start snapshot covers chunks, entities, tab list, time, weather and
+  border, but not scoreboards, boss bars or map data yet.
 - Fabric's play DISCONNECT event fires on the Netty thread and Minecraft drops queued client tasks
   while disconnecting; `stopRecording()` is therefore thread-safe and called directly. Keep it that
   way (a regression made the first gametest hang).
@@ -100,6 +103,10 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, OneConfig page (branch `feat/oneconfig`):
+- `./gradlew build`: pass (59 unit tests). OneConfig could not be loaded at runtime here (its
+  dependencies' repositories are blocked by the cloud proxy), so the page itself is untested.
 
 2026-11-22, cloud box, video export (branch `feat/video-export`):
 - `./gradlew build`: pass (59 unit tests). Gametests: pass, adding `exportVideo` (93/93 frames,
@@ -168,7 +175,7 @@ i915 driver, no NVIDIA), branch `feat/recording-foundation` at c72bb9e:
 
 ## 9. Uncommitted or unpushed changes
 
-None at the end of this session (everything pushed to `feat/recording-foundation`).
+None at the end of this session (everything pushed).
 
 ## 10. Next recommended actions
 
@@ -188,7 +195,7 @@ None at the end of this session (everything pushed to `feat/recording-foundation
 
 ## 12. Warnings for the next agent
 
-- Do not make the repository public or publish releases.
+- The repository is public (owner-approved). Do not publish releases without approval.
 - Loom 1.18+ needs Java 25; staying on 1.17.21 keeps Java 21 working. Upgrade deliberately (ADR).
 - When writing mixins, read the generated Minecraft sources first
   (`./gradlew :fabric:genSourcesWithVineflower`); names are Mojang mappings.
