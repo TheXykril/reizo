@@ -88,7 +88,10 @@ screen, effects, audio, shadow recording, multi-version.
   frames), owned by `CaptureController` (`setShadow`, `prepareShadowSave`). `RecorderClient`
   starts segments in its tick and saves through `saveShadow()` on a background thread. The
   snapshot hitch per segment is unmeasured on real hardware.
-- Next: rendering at output size (frames are still the window size, scaled by FFmpeg), audio (#17), effects (#15), recorded
+- Exports render at the output size: `WindowMixin` makes `Window.getWidth/getHeight` return
+  `ExportSession.renderOverride()` and the export calls `mc.resizeDisplay()` at start and end.
+  `presentTexture` blits 1:1, so the window shows only the bottom-left of a larger frame.
+- Next: audio (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected

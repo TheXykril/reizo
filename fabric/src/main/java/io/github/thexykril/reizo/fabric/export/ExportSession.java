@@ -6,8 +6,10 @@ package io.github.thexykril.reizo.fabric.export;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.thexykril.reizo.core.export.ExportPlan;
 import io.github.thexykril.reizo.core.export.FfmpegCommand;
+import io.github.thexykril.reizo.core.export.RenderSize;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
@@ -28,6 +30,9 @@ import org.slf4j.LoggerFactory;
  * one frame duration per captured frame (see {@code MinecraftMixin}), so ticks and interpolation
  * are deterministic too. Frames are read back from the main render target and piped to FFmpeg.
  *
+ * <p>With an output size set, the game renders at that size for the export (see {@code
+ * WindowMixin}): the window then shows the bottom-left part of each frame, at full detail.
+ *
  * <p>Client (render) thread only.
  */
 public final class ExportSession {
@@ -45,6 +50,7 @@ public final class ExportSession {
   }
 
   private static ExportSession current;
+  private static volatile RenderSize renderOverride;
 
   private final ExportPlan plan;
   private final Path output;
@@ -79,6 +85,11 @@ public final class ExportSession {
 
   public static ExportSession current() {
     return current;
+  }
+
+  /** The size the game renders at instead of the window size, or null. */
+  public static RenderSize renderOverride() {
+    return renderOverride;
   }
 
   public static boolean isExporting() {
@@ -189,6 +200,21 @@ public final class ExportSession {
           return;
         }
         RenderTarget target = mc.getMainRenderTarget();
+        if (renderOverride == null) {
+          RenderSize size =
+              RenderSize.of(
+                  settings.outWidth(),
+                  settings.outHeight(),
+                  target.width,
+                  target.height,
+                  RenderSystem.getDevice().getMaxTextureSize());
+          if (!size.matches(target.width, target.height)) {
+            renderOverride = size;
+            mc.resizeDisplay();
+            LOGGER.info("Rendering the export at {}x{}", size.width(), size.height());
+            return; // the next frame renders at the new size
+          }
+        }
         width = target.width;
         height = target.height;
         try {
@@ -290,6 +316,10 @@ public final class ExportSession {
     }
     Minecraft mc = Minecraft.getInstance();
     mc.options.hideGui = hideGuiBefore;
+    if (renderOverride != null) {
+      renderOverride = null;
+      mc.resizeDisplay();
+    }
     mc.updateTitle();
     ReplayEditor.setPathPlaying(pathBefore);
     ReplayServer server = ReplayPlayback.current();

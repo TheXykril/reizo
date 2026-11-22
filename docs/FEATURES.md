@@ -145,7 +145,7 @@ options per encoder, VAAPI upload chain, encoder list parsing).
 | MP4 / H.264 (libx264) | ✓ | implemented (GT) |
 | MKV, WebM; HEVC, VP9, AV1 | ✓ | partial: H.264 and VP9/WebM tested in-game (GT); H.265 and SVT-AV1 options checked with a real FFmpeg by hand |
 | NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: offered when FFmpeg has them; command options unit tested; never run on a GPU (needs a check on Hyperion: VAAPI/QSV) |
-| Resolution, frame rate, quality | ✓ | partial: settings screen (GT opens it); frames are rendered at window size and scaled by FFmpeg, not rendered at the output size |
+| Resolution, frame rate, quality | ✓ | implemented: settings screen (GT opens it); the game renders at the output size during an export (GT: 640×360 from a 320×240 window), falling back to window size plus FFmpeg scaling past the GPU's texture limit. While exporting, the window shows the bottom-left part of each frame |
 | Render region (in/out) | ✓ (Jul 2026) | implemented (GT): I and O in the timeline; `exportRegionVp9` exports only that range |
 | Progress, cancel | ? | implemented: progress in the window title, Esc cancels |
 | Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |

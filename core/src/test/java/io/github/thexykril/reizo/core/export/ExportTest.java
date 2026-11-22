@@ -123,6 +123,25 @@ class ExportTest {
   }
 
   @Test
+  void rendersAtTheOutputSizeWhenTheGpuAllows() {
+    assertEquals(new RenderSize(853, 480), RenderSize.of(0, 0, 853, 480, 16384));
+    assertEquals(new RenderSize(3840, 2160), RenderSize.of(3840, 2160, 853, 480, 16384));
+    assertEquals(new RenderSize(1920, 1080), RenderSize.of(1921, 1081, 853, 480, 16384));
+    assertEquals(new RenderSize(853, 480), RenderSize.of(3840, 2160, 853, 480, 2048));
+    assertTrue(new RenderSize(2, 4).matches(2, 4));
+    // Rendering at the output size means FFmpeg does not scale.
+    List<String> cmd =
+        FfmpegCommand.build(
+            "ffmpeg",
+            1920,
+            1080,
+            60,
+            new FfmpegCommand.Settings("libx264", 20, "fast", 1920, 1080, "yuv420p"),
+            Path.of("a.mp4"));
+    assertFalse(cmd.contains("-vf"), String.join(" ", cmd));
+  }
+
+  @Test
   void locatesFfmpegOnPathOrConfigured() throws IOException {
     if (File.separatorChar == '\\') {
       return; // POSIX permissions below
