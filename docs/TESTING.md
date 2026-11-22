@@ -39,9 +39,9 @@ MB/min, export fps), OneClient pack compatibility (run gametests with the OneCli
 ## Manual validation checklist (record results in HANDOFF.md with date and machine)
 
 1. Dev client starts; "Recorder ready" in log.
-2. Join a world; press F9: toast appears; HUD shows blinking red dot and running time.
+2. Join a world; press Shift+R: toast appears; HUD shows blinking red dot and running time.
 3. Walk, break blocks, fight a mob for 30 s; add a marker (bind the key first).
-4. Press F9: "Saving" then "Recording saved" toasts; file in `reizo/recordings/`.
+4. Press Shift+R: "Saving" then "Recording saved" toasts; file in `reizo/recordings/`.
 5. Kill the game process while recording; restart: "Recovered" toast; file present.
 6. Check FPS with and without recording (F3), note the difference.
 

@@ -35,11 +35,11 @@ public final class RecorderKeys {
     KeyMapping.Category category =
         KeyMapping.Category.register(
             Identifier.fromNamespaceAndPath(RecorderClient.MOD_ID, "recorder"));
-    // F9 is unused by vanilla. Lunar's Shift+R needs modifier support, which vanilla key
-    // mappings lack; tracked in the roadmap.
+    // Shift+R like Lunar: R is unused by vanilla, and the modifier is a Reizo setting because
+    // vanilla key mappings have none (see KeyModifier).
     toggle =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.toggle", GLFW.GLFW_KEY_F9, category));
+            new KeyMapping("key.reizo.toggle", GLFW.GLFW_KEY_R, category));
     pause =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping(
@@ -75,8 +75,12 @@ public final class RecorderKeys {
 
   /** Called once per client tick. */
   public static void handle(RecorderClient client) {
+    Minecraft mc = Minecraft.getInstance();
+    KeyModifier modifier = KeyModifier.parse(client.config().toggleModifier);
     while (toggle.consumeClick()) {
-      client.toggleRecording();
+      if (modifier.isDown(mc.getWindow())) {
+        client.toggleRecording();
+      }
     }
     while (pause.consumeClick()) {
       client.togglePause();
@@ -84,7 +88,7 @@ public final class RecorderKeys {
     while (marker.consumeClick()) {
       client.addMarker("Marker");
     }
-    handleReplay(Minecraft.getInstance());
+    handleReplay(mc);
   }
 
   private static void handleReplay(Minecraft mc) {

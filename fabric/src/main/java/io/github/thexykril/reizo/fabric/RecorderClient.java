@@ -65,6 +65,7 @@ public final class RecorderClient implements ClientModInitializer {
     PacketTap.install(capture);
 
     RecorderKeys.register();
+    io.github.thexykril.reizo.fabric.ui.MenuButtons.register();
     RecordingIndicator.register(this);
     DebugCommands.register(this);
 
@@ -100,6 +101,11 @@ public final class RecorderClient implements ClientModInitializer {
 
   public ClientConfig config() {
     return config;
+  }
+
+  /** Writes the current settings to the config file. */
+  public void saveConfig() {
+    config.save(FabricLoader.getInstance().getConfigDir().resolve(MOD_ID + ".json"));
   }
 
   public RecordingStorage storage() {

@@ -32,6 +32,12 @@ public final class ClientConfig {
   /** Show the recording indicator on the HUD. */
   public boolean showIndicator = true;
 
+  /**
+   * Modifier that must be held with the start/stop key: "none", "shift", "control" or "alt". The
+   * key itself is set in Controls (default R, so Shift+R like Lunar).
+   */
+  public String toggleModifier = "shift";
+
   /** Recordings folder, relative to the game directory unless absolute. */
   public String recordingsDirectory = "reizo/recordings";
 

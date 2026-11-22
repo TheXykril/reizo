@@ -252,6 +252,85 @@ public final class RecordingStorage {
     }
   }
 
+  /** A finalized recording as the replay browser lists it. */
+  public record Entry(Path path, RecordingMetadata metadata, long sizeBytes) {}
+
+  /** Readable finalized recordings with their metadata, newest file first. */
+  public List<Entry> listRecordings() throws IOException {
+    List<Entry> out = new java.util.ArrayList<>();
+    for (Path p : listArchives()) {
+      try (RecordingArchive archive = RecordingArchive.open(p)) {
+        out.add(new Entry(p, archive.metadata(), Files.size(p)));
+      } catch (IOException e) {
+        // Not a readable recording (partial copy, other file): leave it out of the list.
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Changes the display name stored in a recording. The file keeps its name, so references to it
+   * stay valid; the archive is rewritten to a temporary file and moved over the original.
+   */
+  public void rename(Path archivePath, String newName) throws IOException {
+    String name = newName == null ? "" : newName.strip();
+    if (name.isEmpty()) {
+      throw new IllegalArgumentException("name must not be empty");
+    }
+    checkInRoot(archivePath);
+    Path temp = archivePath.resolveSibling(archivePath.getFileName() + ".tmp");
+    try (java.util.zip.ZipFile in = new java.util.zip.ZipFile(archivePath.toFile());
+        OutputStream file = Files.newOutputStream(temp);
+        ZipOutputStream out = new ZipOutputStream(file, StandardCharsets.UTF_8)) {
+      ZipEntry metaEntry = in.getEntry(RecordingArchive.META_ENTRY);
+      if (metaEntry == null) {
+        throw new io.github.thexykril.reizo.core.format.FormatException(
+            archivePath.getFileName() + " is not a recording");
+      }
+      RecordingMetadata meta;
+      try (java.io.InputStream metaIn = in.getInputStream(metaEntry)) {
+        meta =
+            RecordingMetadata.fromJson(new String(metaIn.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      meta.name = name;
+      // Same entry order as finalizeRecording: metadata first, so it is cheap to read.
+      out.putNextEntry(new ZipEntry(RecordingArchive.META_ENTRY));
+      out.write(meta.toJson().getBytes(StandardCharsets.UTF_8));
+      out.closeEntry();
+      var entries = in.entries();
+      while (entries.hasMoreElements()) {
+        ZipEntry e = entries.nextElement();
+        if (e.getName().equals(RecordingArchive.META_ENTRY)) {
+          continue;
+        }
+        out.putNextEntry(new ZipEntry(e.getName()));
+        try (java.io.InputStream data = in.getInputStream(e)) {
+          data.transferTo(out);
+        }
+        out.closeEntry();
+      }
+    } catch (IOException | RuntimeException e) {
+      Files.deleteIfExists(temp);
+      throw e;
+    }
+    AtomicFiles.move(temp, archivePath);
+  }
+
+  /** Deletes a finalized recording. Only files directly in this storage's folder are accepted. */
+  public void delete(Path archivePath) throws IOException {
+    checkInRoot(archivePath);
+    Files.delete(archivePath);
+  }
+
+  private void checkInRoot(Path archivePath) {
+    Path parent = archivePath.toAbsolutePath().normalize().getParent();
+    if (parent == null
+        || !parent.equals(root.toAbsolutePath().normalize())
+        || !archivePath.getFileName().toString().endsWith("." + RecordingArchive.EXTENSION)) {
+      throw new IllegalArgumentException(archivePath + " is not a recording in " + root);
+    }
+  }
+
   private static long lastModified(Path p) {
     try {
       return Files.getLastModifiedTime(p).toMillis();

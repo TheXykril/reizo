@@ -20,7 +20,7 @@ camera, project and export are not started.
 - Build: Gradle 9.5.1 wrapper, Loom 1.17.21, Minecraft 1.21.11, Mojang mappings, Spotless, CI.
 - `core`: stream format v1, metadata, local player payload, recording session (writer thread,
   pause, markers), storage (locks, packaging, recovery), capture controller (config cache).
-- `fabric`: decoder mixin capture, local player sampler, F9 toggle + pause/marker keys, HUD
+- `fabric`: decoder mixin capture, local player sampler, Shift+R toggle + pause/marker keys, HUD
   indicator, toasts, auto-record on join, startup recovery, debug commands (dev only).
 - Playback first slice (#7, ADR 0008): `core.playback` (PlaybackClock, ReplayScript) and
   `fabric.playback` (ReplayServer on 127.0.0.1, ReplayPlayback), `/reizo-debug play [file]`,
@@ -31,6 +31,9 @@ camera, project and export are not started.
 - Replay camera and controls (#7/#9, branch `feat/replay-camera-controls`, stacked on #29):
   `ReplayCamera` (free / POV / follow on V), pause (K) and speed (`[` `]`) via the replay server's
   `ClientboundTickingStatePacket` (recorded tick rate × speed, frozen when paused).
+- Replay browser (#10) and pause-menu recording buttons (#2), branch `feat/replay-browser`:
+  `ReplayBrowserScreen`, `RenameScreen`, `MenuButtons` (Fabric screen events, no mixins), and
+  `RecordingStorage.listRecordings/rename/delete` (unit tested).
 - Multi-version plan accepted (ADR 0007, issues #19, #21–#25).
 - CI gametests made reliable on slow runners (320x240 window, cheap render options; #27).
 - Tests: 37 unit tests; 5 client gametest scenarios (record from join, play back, record
@@ -72,7 +75,8 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
 - Fabric's play DISCONNECT event fires on the Netty thread and Minecraft drops queued client tasks
   while disconnecting; `stopRecording()` is therefore thread-safe and called directly. Keep it that
   way (a regression made the first gametest hang).
-- Default key is F9, not Lunar's Shift+R (needs modifier support, issue in M1).
+- Default key is Shift+R like Lunar: the base key R is a vanilla key mapping, the modifier is the
+  `toggleModifier` setting (`KeyModifier`), because vanilla key mappings have no modifiers.
 - HUD indicator not yet visually checked on real hardware (only rendered under Xvfb).
 - Empty private repo `TheXykril/rewind` exists from before the rename; the owner should delete it
   (the session could not rename or delete repositories).
@@ -81,6 +85,11 @@ ADRs 0001–0006 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-22, cloud box, replay browser (branch `feat/replay-browser`):
+- `./gradlew build`: pass (40 unit tests). Gametests: pass, adding `browseAndPlay` (title screen
+  button → browser lists recordings → Play starts the replay) and the pause menu "Start recording"
+  button starting the walking recording. Screenshots in `fabric/build/run/clientGameTest/screenshots`.
 
 2026-11-22, cloud box, camera and controls (branch `feat/replay-camera-controls`):
 - `./gradlew build`: pass (37 unit tests). Gametests: pass, all scenarios plus
