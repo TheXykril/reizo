@@ -356,37 +356,38 @@ public final class RecorderClient implements ClientModInitializer {
   }
 
   private void recoverAbandoned() {
-    Thread t =
-        new Thread(
-            () -> {
-              try {
-                List<Path> abandoned = storage.findAbandoned();
-                int recovered = 0;
-                for (Path dir : abandoned) {
-                  RecordingStorage.RecoveryResult r = storage.recover(dir);
-                  if (r.recovered()) {
-                    recovered++;
-                    LOGGER.info("Recovered recording {} ({} frames)", r.archive(), r.frames());
-                  } else {
-                    LOGGER.warn("Could not recover {}: {}", dir, r.problem());
-                  }
-                }
-                if (recovered > 0) {
-                  int count = recovered;
-                  Minecraft.getInstance()
-                      .execute(
-                          () ->
-                              toast(
-                                  "reizo.toast.recovered",
-                                  Component.literal(String.valueOf(count))));
-                }
-              } catch (IOException e) {
-                LOGGER.error("Recording recovery failed", e);
-              }
-            },
-            "Recorder-Recovery");
+    Thread t = new Thread(this::recoverAbandonedNow, "Recorder-Recovery");
     t.setDaemon(true);
     t.start();
+  }
+
+  /**
+   * Salvages recordings left by a crash or a killed game (working directories without a live owner)
+   * and shows a toast when there were any. Blocks; runs on a background thread at startup. Returns
+   * how many were recovered.
+   */
+  public int recoverAbandonedNow() {
+    int recovered = 0;
+    try {
+      List<Path> abandoned = storage.findAbandoned();
+      for (Path dir : abandoned) {
+        RecordingStorage.RecoveryResult r = storage.recover(dir);
+        if (r.recovered()) {
+          recovered++;
+          LOGGER.info("Recovered recording {} ({} frames)", r.archive(), r.frames());
+        } else {
+          LOGGER.warn("Could not recover {}: {}", dir, r.problem());
+        }
+      }
+    } catch (IOException e) {
+      LOGGER.error("Recording recovery failed", e);
+    }
+    if (recovered > 0) {
+      int count = recovered;
+      Minecraft.getInstance()
+          .execute(() -> toast("reizo.toast.recovered", Component.literal(String.valueOf(count))));
+    }
+    return recovered;
   }
 
   // ---- helpers ----

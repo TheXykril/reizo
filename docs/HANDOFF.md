@@ -114,7 +114,10 @@ screen, effects, audio, shadow recording, multi-version.
   (accessor mixins `EntityDataAccessors`, `LivingEntityDataAccessors`).
 - Multiplayer gametest (#4): `recordOnDedicatedServer` uses `worldBuilder().createServer()` and
   `connect()`; records, checks a server-spawned named pig in the archive and in playback.
-- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), crash gametest (#5), performance baseline (#6).
+- Crash gametest (#5): `recoverAfterCrash` copies a live working directory without its lock,
+  appends garbage, and runs `RecorderClient.recoverAbandonedNow()` (the startup recovery, now
+  callable synchronously).
+- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), performance baseline (#6).
 
 ## 5. Files and modules affected
 

@@ -78,6 +78,96 @@ public final class RecordingGameTest implements FabricClientGameTest {
     recordMidSessionWhileWalking(context);
     saveShadowAfterWalking(context);
     browseAndPlay(context);
+    recoverAfterCrash(context);
+  }
+
+  /**
+   * Crash recovery (#5). A killed game leaves its working directory with whatever had reached the
+   * disk and no live lock owner. The test makes that state by copying a live recording's working
+   * directory mid-recording, without its lock, and appending half a block of garbage like a write
+   * cut short. Startup recovery must salvage it into a playable recording marked RECOVERED.
+   */
+  private void recoverAfterCrash(ClientGameTestContext context) {
+    RecordingSession session;
+    RegistryAccess registries;
+    Path crashed;
+    try (TestSingleplayerContext world = context.worldBuilder().create()) {
+      world.getClientWorld().waitForChunksDownload();
+      context.waitTicks(10);
+      context.runOnClient(mc -> RecorderClient.get().toggleRecording());
+      session = context.computeOnClient(mc -> RecorderClient.get().session());
+      check(session != null, "recording did not start");
+      registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
+      context.runOnClient(mc -> RecorderClient.get().addMarker("before the crash"));
+      context.getInput().holdKeyFor(options -> options.keyUp, 20);
+      // Past the flush (1 s) and metadata (5 s) intervals, so both are on disk.
+      context.waitTicks(130);
+      Path root = context.computeOnClient(mc -> RecorderClient.get().storage().root());
+      Path live = root.resolve("working").resolve(session.id());
+      check(Files.isDirectory(live), "no working directory at " + live);
+      crashed = root.resolve("working").resolve(session.id() + "-crashed");
+      try {
+        Files.createDirectories(crashed);
+        Files.copy(live.resolve("meta.json"), crashed.resolve("meta.json"));
+        byte[] stream = Files.readAllBytes(live.resolve("stream.bin"));
+        check(stream.length > 0, "nothing flushed to disk after 6 s");
+        byte[] torn = new byte[stream.length + 300];
+        System.arraycopy(stream, 0, torn, 0, stream.length);
+        for (int i = stream.length; i < torn.length; i++) {
+          torn[i] = (byte) (i * 31);
+        }
+        Files.write(crashed.resolve("stream.bin"), torn);
+      } catch (java.io.IOException e) {
+        throw new AssertionError(e);
+      }
+      context.runOnClient(mc -> RecorderClient.get().toggleRecording());
+    }
+    await(context, session);
+    int recovered = context.computeOnClient(mc -> RecorderClient.get().recoverAbandonedNow());
+    check(recovered == 1, "recovered " + recovered + " recordings, expected 1");
+    check(!Files.exists(crashed), "working directory left after recovery");
+    Path archive;
+    try (var files = Files.list(crashed.getParent().getParent())) {
+      archive =
+          files
+              .filter(f -> f.toString().endsWith(".reizo"))
+              .filter(f -> metadata(f).state == RecordingMetadata.State.RECOVERED)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError("no recovered recording"));
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+    Stats stats = verifyArchive(archive, registries);
+    RecordingMetadata meta = metadata(archive);
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
+        "recovered recording has no chunks");
+    check(stats.localPlayerFrames > 0, "recovered recording has no player frames");
+    check(meta.markers.size() == 1, "marker lost in recovery");
+    check(meta.durationMs > 1000, "recovered duration " + meta.durationMs);
+    // The recovered file plays like any other.
+    context.runOnClient(
+        mc -> {
+          try {
+            ReplayPlayback.start(mc, archive);
+          } catch (java.io.IOException e) {
+            throw new AssertionError("could not start the recovered replay", e);
+          }
+        });
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.script().finished()
+              && mc.level != null
+              && mc.screen == null
+              && mc.level.getChunkSource().getLoadedChunksCount() > 0;
+        },
+        20 * 60);
+    context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+    LOGGER.info("recoverAfterCrash OK: {} -> {}", archive.getFileName(), stats);
   }
 
   /**
