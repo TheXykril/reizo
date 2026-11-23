@@ -129,3 +129,22 @@ Step 2 of the order above. Recorded here because it fixes how every later versio
 - **CI** builds every version and runs the gametests for both 1.21.11 and 26.3. With only two
   modern versions that is still within the "newest of each family" budget; revisit when 1.21.1 and
   the other OneClient versions are added.
+
+## Implementation notes: 1.21.10 and 26.2 (2026-11-23)
+
+- **Versions** `1.21.10` and `26.2` added beside 1.21.11 and 26.3. Both compile from the same
+  sources and pass all 20 gametests in a cloud session (headless; 26.2 on lavapipe).
+- **Version blocks** can now chain: `//? if >=26.3 { … } else if >=26.1 { … } else { … }`. 26.2 is
+  between the two families: it has 26.x's render-state names and reversed depth, but 1.21.11's GLFW
+  key codes, `swinging`/`swingTime`, a nullable previous game mode and the `com.mojang.blaze3d` GPU
+  API (no renderpearl, GLSL 330 shaders). Blocks that were `>=26.1` and hold one of those are now
+  `>=26.3`. Rename rules have a version predicate (`is26`, `is263`, `before12111`).
+- **1.21.10 differences:** `ResourceLocation` (a rename that skips `SPDX-License-Identifier`), no
+  gizmos (the camera path is drawn as plain lines before the debug renderer), samplers bound
+  without sampler objects, `CycleButton.builder(label)` (through `Compat.cycle`), `Camera.getYRot`,
+  `Screen.init(mc, w, h)` and the older horse-screen packet name.
+- **Export across a server switch** waited forever on 26.2: client ticks follow the export clock,
+  and the loading screen only closes after a tick, so the clock now runs in real time while
+  nothing is captured.
+- **CI:** pull requests run the gametests for 1.21.11 and 26.3 (newest of each family); pushes to
+  main run all four.

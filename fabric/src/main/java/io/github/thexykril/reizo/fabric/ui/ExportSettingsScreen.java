@@ -94,7 +94,7 @@ public final class ExportSettingsScreen extends Screen {
     int x = width / 2 - 155;
     int y = 34;
     addRenderableWidget(
-        CycleButton.builder(Resolution::label, closest(r.width, r.height))
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(Resolution::label, closest(r.width, r.height))
             .withValues(RESOLUTIONS)
             .create(
                 x,
@@ -108,7 +108,7 @@ public final class ExportSettingsScreen extends Screen {
                   ReplayEditor.changed();
                 }));
     addRenderableWidget(
-        CycleButton.builder(
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
                 (Integer v) -> Component.literal(v + " fps"),
                 FRAME_RATES.contains(r.fps) ? r.fps : 60)
             .withValues(FRAME_RATES)
@@ -124,7 +124,7 @@ public final class ExportSettingsScreen extends Screen {
                 }));
     y += 24;
     addRenderableWidget(
-        CycleButton.builder(ExportSettingsScreen::qualityLabel, closestQuality(r.crf))
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::qualityLabel, closestQuality(r.crf))
             .withValues(QUALITIES)
             .create(
                 x,
@@ -143,7 +143,7 @@ public final class ExportSettingsScreen extends Screen {
         r.codec = current.encoder();
       }
       addRenderableWidget(
-          CycleButton.builder((ExportFormat f) -> Component.literal(f.label()), current)
+          io.github.thexykril.reizo.fabric.compat.Compat.cycle((ExportFormat f) -> Component.literal(f.label()), current)
               .withValues(formats)
               .create(
                   x + 160,
@@ -159,7 +159,7 @@ public final class ExportSettingsScreen extends Screen {
     y += 24;
     // Sound and music levels; "Off" for sound leaves the sound track out entirely.
     addRenderableWidget(
-        CycleButton.builder(ExportSettingsScreen::volumeLabel, r.audio ? volume(r.soundVolume) : 0)
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::volumeLabel, r.audio ? volume(r.soundVolume) : 0)
             .withValues(VOLUMES)
             .create(
                 x,
@@ -175,7 +175,7 @@ public final class ExportSettingsScreen extends Screen {
                   ReplayEditor.changed();
                 }));
     addRenderableWidget(
-        CycleButton.builder(ExportSettingsScreen::volumeLabel, volume(r.musicVolume))
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::volumeLabel, volume(r.musicVolume))
             .withValues(VOLUMES)
             .create(
                 x + 104,
@@ -188,7 +188,7 @@ public final class ExportSettingsScreen extends Screen {
                   ReplayEditor.changed();
                 }));
     addRenderableWidget(
-        CycleButton.builder(
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
                 (Integer v) ->
                     v <= 1
                         ? Component.translatable("options.off")

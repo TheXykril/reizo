@@ -170,7 +170,7 @@ final class PlayTransformer {
                     net.minecraft.world.level.Level.OVERWORLD,
                     0,
                     GameType.SPECTATOR,
-                    //? if >=26.1 {
+                    //? if >=26.3 {
                     /*java.util.Optional.empty(),
                     *///?} else {
                     null,
@@ -317,7 +317,7 @@ final class PlayTransformer {
         encode(
             new ClientboundEntityPositionSyncPacket(
                 recordedEntityId,
-                //? if >=26.1 {
+                //? if >=26.3 {
                 /*net.minecraft.world.entity.PositionPath.of(pos),
                 s.yRot(),
                 s.xRot(),
@@ -373,7 +373,7 @@ final class PlayTransformer {
         info.dimension(),
         info.seed(),
         GameType.SPECTATOR,
-        //? if >=26.1 {
+        //? if >=26.3 {
         /*java.util.Optional.of(info.gameType()),
         *///?} else {
         info.gameType(),

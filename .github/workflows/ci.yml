@@ -60,7 +60,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        minecraft: ["1.21.11", "26.3"]
+        # Pull requests test the newest version of each family; main tests every version (ADR 0007).
+        minecraft: ${{ fromJSON(github.event_name == 'pull_request' && '["1.21.11", "26.3"]' || '["1.21.10", "1.21.11", "26.2", "26.3"]') }}
     env:
       RUN_DIR: fabric/versions/${{ matrix.minecraft }}/build/run/clientGameTest
     steps:

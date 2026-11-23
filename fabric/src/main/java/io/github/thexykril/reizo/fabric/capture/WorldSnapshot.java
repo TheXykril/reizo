@@ -105,7 +105,7 @@ public final class WorldSnapshot {
                 level.dimension(),
                 0L,
                 mc.gameMode.getPlayerMode(),
-                //? if >=26.1 {
+                //? if >=26.3 {
                 /*java.util.Optional.ofNullable(mc.gameMode.getPreviousPlayerMode()),
                 *///?} else {
                 mc.gameMode.getPreviousPlayerMode(),
@@ -257,7 +257,7 @@ public final class WorldSnapshot {
   }
 
   private static ClientboundSetTimePacket timePacket(ClientLevel level) {
-    //? if >=26.1 {
+    //? if >=26.3 {
     /*// 26.x replaced the day time with world clocks. Every registered clock is sent as it stands.
     java.util.Map<
             net.minecraft.core.Holder<net.minecraft.world.clock.WorldClock>,
@@ -275,6 +275,23 @@ public final class WorldSnapshot {
                   new net.minecraft.world.clock.ClockNetworkState(
                       instance.totalTicks(), instance.partialTick(), instance.rate()));
             });
+    return new ClientboundSetTimePacket(level.getGameTime(), clocks);
+    *///?} else if >=26.1 {
+    /*// 26.1 and 26.2 keep a clock's partial tick and rate private; whole ticks are enough.
+    java.util.Map<
+            net.minecraft.core.Holder<net.minecraft.world.clock.WorldClock>,
+            net.minecraft.world.clock.ClockNetworkState>
+        clocks = new java.util.HashMap<>();
+    level
+        .registryAccess()
+        .lookupOrThrow(net.minecraft.core.registries.Registries.WORLD_CLOCK)
+        .listElements()
+        .forEach(
+            clock ->
+                clocks.put(
+                    clock,
+                    new net.minecraft.world.clock.ClockNetworkState(
+                        level.clockManager().getTotalTicks(clock), 0f, 1f)));
     return new ClientboundSetTimePacket(level.getGameTime(), clocks);
     *///?} else {
     return new ClientboundSetTimePacket(level.getGameTime(), level.getDayTime(), true);

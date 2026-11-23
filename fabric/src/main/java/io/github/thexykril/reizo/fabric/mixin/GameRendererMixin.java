@@ -26,8 +26,10 @@ abstract class GameRendererMixin {
       net.minecraft.client.DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
     ReplayEditor.applySettings();
   }
+  *///?}
 
-  @Inject(
+  //? if >=26.3 {
+  /*@Inject(
       method = "render()V",
       at =
           @At(
@@ -38,7 +40,21 @@ abstract class GameRendererMixin {
     io.github.thexykril.reizo.fabric.playback.EffectRenderer.afterWorld(
         net.minecraft.client.Minecraft.getInstance());
   }
-  *///?} else {
+  *///?} else if >=26.1 {
+  /*@Inject(
+      method = "render(Lnet/minecraft/client/DeltaTracker;Z)V",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/renderer/LevelRenderer;doEntityOutline()V",
+              shift = At.Shift.AFTER))
+  private void reizo$effects(
+      net.minecraft.client.DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.playback.EffectRenderer.afterWorld(
+        net.minecraft.client.Minecraft.getInstance());
+  }
+  *///?}
+  //? if <26.1 {
   @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
   private void reizo$pathFov(
       Camera camera, float partialTick, boolean useFovSetting, CallbackInfoReturnable<Float> cir) {
