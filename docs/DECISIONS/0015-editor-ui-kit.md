@@ -61,6 +61,11 @@ Option 3.
   (or a card docked on the left for panels that keep the replay visible), switch rows, value rows
   that cycle on click, `KitField` text fields (a vanilla `EditBox` drawn in the kit's look) and
   `KitConfirmScreen`. Vanilla `CycleButton`, sliders and selection lists are no longer used.
+- When OneConfig is installed, the kit follows the theme selected there
+  (`compat/OneConfigThemeSync`, reflection on OneConfig's `OneConfigTheme.getActive()`): its
+  colours, light or dark, and its style. Glass themes make surfaces translucent; pixel themes use
+  square corners and Minecraft's font. Without OneConfig, or if its API changes, Reizo's own dark
+  theme stays (`core.theme.Palette.DEFAULT`).
 - Reizo's screens lower the GUI scale while open when the window is narrower than their layout
   needs (`GuiScaleFit`), and put the player's scale back when they close.
 

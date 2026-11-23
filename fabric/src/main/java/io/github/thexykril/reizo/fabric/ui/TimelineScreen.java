@@ -828,6 +828,7 @@ public final class TimelineScreen extends Screen {
 
   @Override
   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    Theme.refresh();
     ReplayServer server = ReplayPlayback.current();
     if (server == null) {
       return;

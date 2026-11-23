@@ -42,6 +42,7 @@ public final class ReplayHud {
     if (server == null || Compat.hudHidden(mc) || mc.screen instanceof TimelineScreen) {
       return;
     }
+    Theme.refresh();
     long duration = Math.max(1, server.script().durationMs());
     long time = Math.min(server.replayTimeMs(), duration);
     Font font = mc.font;

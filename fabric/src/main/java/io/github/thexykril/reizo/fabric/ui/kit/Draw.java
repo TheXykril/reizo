@@ -29,12 +29,17 @@ public final class Draw {
 
   /** {@code s} in the UI font. */
   public static MutableComponent ui(String s) {
-    return Component.literal(s).withStyle(UI);
+    return Component.literal(s).withStyle(style());
+  }
+
+  /** The text style in use: Inter, or Minecraft's font with OneConfig's pixel themes. */
+  public static Style style() {
+    return Theme.pixel() ? Style.EMPTY : UI;
   }
 
   /** {@code c} in the UI font. */
   public static MutableComponent ui(Component c) {
-    return c.copy().withStyle(UI);
+    return c.copy().withStyle(style());
   }
 
   /** Width of {@code s} in the UI font. */
@@ -84,7 +89,8 @@ public final class Draw {
       return;
     }
     int s = guiScale();
-    int r = Math.max(0, Math.min(radius * s, Math.min((x1 - x0) * s / 2, (y1 - y0) * s / 2)));
+    int r =
+        Theme.pixel() ? 0 : Math.max(0, Math.min(radius * s, Math.min((x1 - x0) * s / 2, (y1 - y0) * s / 2)));
     if (r == 0) {
       g.fill(x0, y0, x1, y1, color);
       return;

@@ -116,13 +116,14 @@ public abstract class KitScreen extends Screen {
 
   @Override
   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    Theme.refresh();
     if (dim) {
-      g.fill(0, 0, width, height, 0xB00B0F13);
+      g.fill(0, 0, width, height, Theme.alpha(Theme.GROUND, 0xB0));
     }
     if (cx1 > cx0) {
       Draw.round(g, cx0 - 1, cy0 + 1, cx1 + 3, cy1 + 4, 8, 0x60000000);
       Draw.round(g, cx0 - 1, cy0 - 1, cx1 + 1, cy1 + 1, 7, Theme.LINE);
-      Draw.round(g, cx0, cy0, cx1, cy1, 6, 0xFF161D23);
+      Draw.round(g, cx0, cy0, cx1, cy1, 6, Theme.SURFACE);
       Draw.round(g, cx0, cy0, cx1, cy0 + TITLE_H, 6, Theme.GROUND | 0xFF000000, true, true);
       Draw.hline(g, cx0, cx1, cy0 + TITLE_H, Theme.LINE);
       Draw.round(g, cx0 + 7, cy0 + 6, cx0 + 13, cy0 + 12, 2, Theme.ACCENT);

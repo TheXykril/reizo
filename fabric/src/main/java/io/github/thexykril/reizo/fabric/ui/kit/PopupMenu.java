@@ -71,7 +71,7 @@ public final class PopupMenu {
   public void draw(GuiGraphics g, Font font, int mouseX, int mouseY) {
     int h = height();
     Draw.round(g, x - 1, y - 1, x + w + 1, y + h + 1, 5, Theme.LINE);
-    Draw.round(g, x, y, x + w, y + h, 4, 0xFA1A2229);
+    Draw.round(g, x, y, x + w, y + h, 4, Theme.alpha(Draw.mix(Theme.SURFACE, Theme.RAISED, 0.3), 0xFA));
     int ry = y + PAD;
     for (Item i : items) {
       if (i == null) {

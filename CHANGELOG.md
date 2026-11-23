@@ -37,6 +37,8 @@ compatibility.
   The replay browser, settings, export, effects, settings-over-time and rename screens, the delete
   question and the replay bar use the same look (switches, value rows, rounded text fields). Reizo's
   screens lower the GUI scale while open when the window is too small for their layout.
+  With OneConfig installed (OneClient), Reizo's UI follows the selected OneConfig theme: its
+  colours, light or dark, and its flat, glass or pixel style.
 - Hide entities in a replay: press H while looking at a mob, item or player to hide it from that
   moment on (press again to show it). Hidden entities are keyframed switches in Timeline →
   Settings, undoable, saved with the project and hidden in exports too.
