@@ -17,6 +17,10 @@ class EffectsTest {
     assertTrue(Grade.NEUTRAL.isNeutral());
     Grade g = new Grade(9, -1, 5, 2, 3, 0.5f);
     assertEquals(new Grade(3, 0, 2, 1, 1, 1), g);
+    assertTrue(Grade.NEUTRAL.withFocus(30).isNeutral(), "focus alone changes nothing");
+    assertFalse(Grade.NEUTRAL.withBloom(0.5f).isNeutral());
+    assertEquals(0.5f, Grade.NEUTRAL.withFocus(0).focus());
+    assertEquals(1, Grade.NEUTRAL.withDof(3).dof());
     assertFalse(g.isNeutral());
     assertEquals(0, new Grade(0, 1, 1, 0, 0, -2).letterbox());
   }
@@ -52,12 +56,20 @@ class EffectsTest {
   void projectStoresEffectKeyframes() {
     Project p = Project.create("p", "P", "r.reizo", 0);
     EffectTrack track = new EffectTrack();
-    track.put(500, new Grade(1, 1.2f, 0.5f, -0.3f, 0.4f, 2.39f));
+    track.put(500, new Grade(1, 1.2f, 0.5f, -0.3f, 0.4f, 2.39f, 0.6f, 0.8f, 20));
     p.setEffects(track);
     Project back = Project.fromJson(p.toJson());
     assertEquals(track.keyframes(), back.effects().keyframes());
     // Old projects without effects load with none.
     Project old = Project.fromJson("{\"recordingFile\":\"r.reizo\"}");
     assertTrue(old.effects().isEmpty());
+    // Effects saved before bloom and depth of field load without them.
+    Project before =
+        Project.fromJson(
+            "{\"recordingFile\":\"r.reizo\",\"effects\":[{\"t\":0,\"saturation\":0}]}");
+    Grade g = before.effects().at(0);
+    assertEquals(0, g.bloom());
+    assertEquals(0, g.dof());
+    assertEquals(Grade.DEFAULT_FOCUS, g.focus());
   }
 }

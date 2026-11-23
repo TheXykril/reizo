@@ -136,7 +136,13 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   (`PropertyTracksTest`); ADR 0014. Timeline → Settings lists settings with a search box; a change
   sets a keyframe at the playhead; numbers blend, switches flip; teal squares on the marker track.
   OneConfig mod settings: **partial**, see OneClient integration.
-- **Planned:** depth of field, bloom, camera shake, chromatic aberration, blur,
+- **Depth of field and bloom:** **implemented**, evidence GT (`checkEffects`: depth of field
+  focused at 0.5 blocks halves the frame's fine detail; bloom brightens 8% of the frame around the
+  bright spots). Effects panel: "Bloom", "Depth of field" (strength) and "Focus (blocks)", keyframed
+  like the other effects. Single pass in the effects shader (24-tap disc blur from the world's
+  depth; luminance-thresholded glow with a per-pixel turned pattern). Not checked by a person on
+  real hardware or with shader packs.
+- **Planned:** camera shake, chromatic aberration, blur,
   fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV.
 
 ## Audio (M6)

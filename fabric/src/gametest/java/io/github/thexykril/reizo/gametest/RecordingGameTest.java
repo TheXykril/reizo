@@ -629,7 +629,85 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(
         context.computeOnClient(mc -> EffectRenderer.lastApplied() == null),
         "effects pass still running after removing the keyframe");
-    LOGGER.info("checkEffects OK");
+    // Depth of field focused right in front of the camera blurs the world; bloom brightens the
+    // bright sky. Both compared with the same frame without effects.
+    java.awt.image.BufferedImage plain = image(context.takeScreenshot("reizo-effects-none"));
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.effects().put(0, Grade.NEUTRAL.withDof(1).withFocus(0.5f));
+          ReplayEditor.effectsChanged();
+        });
+    context.waitTicks(3);
+    java.awt.image.BufferedImage blurred = image(context.takeScreenshot("reizo-effects-dof"));
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.effects().put(0, Grade.NEUTRAL.withBloom(1));
+          ReplayEditor.effectsChanged();
+        });
+    context.waitTicks(3);
+    java.awt.image.BufferedImage bloomed = image(context.takeScreenshot("reizo-effects-bloom"));
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.effects().remove(0);
+          ReplayEditor.effectsChanged();
+        });
+    double sharp = detail(plain);
+    double soft = detail(blurred);
+    check(soft < sharp * 0.7, "depth of field did not blur: detail " + sharp + " -> " + soft);
+    double glow = glowing(plain, bloomed);
+    check(glow > 0.02, "bloom lit too few pixels: " + glow);
+    LOGGER.info(
+        "checkEffects OK: detail {} -> {} with depth of field, {}% of pixels lit by bloom",
+        String.format("%.2f", sharp),
+        String.format("%.2f", soft),
+        String.format("%.1f", glow * 100));
+  }
+
+  private static java.awt.image.BufferedImage image(Path file) {
+    try {
+      return javax.imageio.ImageIO.read(file.toFile());
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+  }
+
+  /** Mean difference between horizontal neighbours in the upper middle of the frame (0..255). */
+  private static double detail(java.awt.image.BufferedImage img) {
+    double sum = 0;
+    int n = 0;
+    for (int y = img.getHeight() / 10; y < img.getHeight() * 7 / 10; y++) {
+      for (int x = img.getWidth() / 4; x < img.getWidth() - 1; x++) {
+        int a = img.getRGB(x, y);
+        int b = img.getRGB(x + 1, y);
+        for (int shift = 0; shift <= 16; shift += 8) {
+          sum += Math.abs(((a >> shift) & 0xFF) - ((b >> shift) & 0xFF));
+        }
+        n += 3;
+      }
+    }
+    return sum / n;
+  }
+
+  /** Share of pixels in the same area that got clearly brighter (by more than 8 of 255). */
+  private static double glowing(
+      java.awt.image.BufferedImage before, java.awt.image.BufferedImage after) {
+    int lit = 0;
+    int n = 0;
+    for (int y = before.getHeight() / 10; y < before.getHeight() * 7 / 10; y++) {
+      for (int x = before.getWidth() / 4; x < before.getWidth(); x++) {
+        int p = before.getRGB(x, y);
+        int q = after.getRGB(x, y);
+        int gain = 0;
+        for (int shift = 0; shift <= 16; shift += 8) {
+          gain += ((q >> shift) & 0xFF) - ((p >> shift) & 0xFF);
+        }
+        if (gain > 24) {
+          lit++;
+        }
+        n++;
+      }
+    }
+    return lit / (double) n;
   }
 
   private double gammaBefore;

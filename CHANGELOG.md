@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Depth of field (strength and focus distance) and bloom in the Effects panel, keyframed like
+  the other effects.
 - The recorded player in replays now holds its items, wears its armor and shows its pose
   (crouching, swimming, sleeping) and item use.
 - Settings over time (timeline → Settings), like Rewind's mod properties: keyframe Minecraft's

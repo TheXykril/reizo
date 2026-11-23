@@ -19,9 +19,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 /**
- * Effects for the running replay: exposure, contrast, saturation, temperature, vignette and
- * letterbox. A change sets an effect keyframe at the current replay time (or edits the keyframe
- * there); between keyframes values blend. The panel sits on the left so the replay stays visible.
+ * Effects for the running replay: exposure, contrast, saturation, temperature, vignette, bloom,
+ * depth of field (strength and focus distance in blocks) and letterbox. A change sets an effect
+ * keyframe at the current replay time (or edits the keyframe there); between keyframes values
+ * blend. The panel sits on the left so the replay stays visible.
  */
 public final class EffectsScreen extends Screen {
   /** Keyframes this close to the playhead are edited instead of adding another. */
@@ -54,7 +55,7 @@ public final class EffectsScreen extends Screen {
         float max,
         Function<Grade, Float> get,
         BiFunction<Grade, Float, Grade> set) {
-      super(x, y, PANEL_WIDTH - 8, 20, Component.empty(), 0);
+      super(x, y, PANEL_WIDTH - 8, rowHeight, Component.empty(), 0);
       this.key = key;
       this.min = min;
       this.max = max;
@@ -87,6 +88,8 @@ public final class EffectsScreen extends Screen {
 
   private final java.util.List<ValueSlider> sliders = new java.util.ArrayList<>();
   private long lastEditMs;
+  private int rowHeight = 20;
+  private int infoY;
 
   @Override
   protected void init() {
@@ -95,28 +98,37 @@ public final class EffectsScreen extends Screen {
       return;
     }
     sliders.clear();
+    // Eight sliders, the letterbox button and the bottom row; rows shrink on short windows.
+    int step = Math.max(16, Math.min(22, (height - 22 - 30) / 9));
+    rowHeight = step - 2;
     int x = 4;
     int y = 22;
     sliders.add(
         slider(x, y, "reizo.effects.exposure", -3, 3, Grade::exposure, Grade::withExposure));
-    y += 22;
+    y += step;
     sliders.add(slider(x, y, "reizo.effects.contrast", 0, 2, Grade::contrast, Grade::withContrast));
-    y += 22;
+    y += step;
     sliders.add(
         slider(x, y, "reizo.effects.saturation", 0, 2, Grade::saturation, Grade::withSaturation));
-    y += 22;
+    y += step;
     sliders.add(
         slider(
             x, y, "reizo.effects.temperature", -1, 1, Grade::temperature, Grade::withTemperature));
-    y += 22;
+    y += step;
     sliders.add(slider(x, y, "reizo.effects.vignette", 0, 1, Grade::vignette, Grade::withVignette));
-    y += 22;
+    y += step;
+    sliders.add(slider(x, y, "reizo.effects.bloom", 0, 1, Grade::bloom, Grade::withBloom));
+    y += step;
+    sliders.add(slider(x, y, "reizo.effects.dof", 0, 1, Grade::dof, Grade::withDof));
+    y += step;
+    sliders.add(slider(x, y, "reizo.effects.focus", 0.5f, 64, Grade::focus, Grade::withFocus));
+    y += step;
     letterboxButton =
         addRenderableWidget(
             Button.builder(Component.empty(), b -> cycleLetterbox())
-                .bounds(x, y, PANEL_WIDTH - 8, 20)
+                .bounds(x, y, PANEL_WIDTH - 8, rowHeight)
                 .build());
-    y += 26;
+    y += step + 4;
     removeButton =
         addRenderableWidget(
             Button.builder(Component.translatable("reizo.effects.remove"), b -> removeHere())
@@ -126,6 +138,7 @@ public final class EffectsScreen extends Screen {
         Button.builder(Component.translatable("gui.done"), b -> onClose())
             .bounds(x + (PANEL_WIDTH - 10) / 2 + 2, y, (PANEL_WIDTH - 10) / 2, 20)
             .build());
+    infoY = y + 26;
     refresh();
   }
 
@@ -240,7 +253,9 @@ public final class EffectsScreen extends Screen {
             near >= 0 ? "reizo.effects.at_keyframe" : "reizo.effects.between",
             ReplayHud.time(playhead()),
             count);
-    g.drawWordWrap(font, info, 4, 22 + 5 * 22 + 26 + 26, PANEL_WIDTH - 8, 0xFFA0A0A0);
+    if (infoY + font.lineHeight <= height) {
+      g.drawWordWrap(font, info, 4, infoY, PANEL_WIDTH - 8, 0xFFA0A0A0);
+    }
   }
 
   @Override

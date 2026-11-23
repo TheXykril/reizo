@@ -117,7 +117,9 @@ screen, effects, audio, shadow recording, multi-version.
 - Crash gametest (#5): `recoverAfterCrash` copies a live working directory without its lock,
   appends garbage, and runs `RecorderClient.recoverAbandonedNow()` (the startup recovery, now
   callable synchronously).
-- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), performance baseline (#6).
+- Depth of field and bloom: `Grade.bloom/dof/focus` (project `Effect` fields), same shader
+  (`grade.fsh`, UBO now four vec4s, `DepthSampler` = main depth).
+- Next: music/looping sounds and microphone (#17), effects (#15), performance baseline (#6).
 
 ## 5. Files and modules affected
 
