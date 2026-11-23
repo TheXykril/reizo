@@ -112,7 +112,9 @@ screen, effects, audio, shadow recording, multi-version.
   `ClientboundSetEquipmentPacket` for the local player when held/worn items change (after the
   tick's sample); `PlayTransformer.poseData` sends pose and living flags from samples
   (accessor mixins `EntityDataAccessors`, `LivingEntityDataAccessors`).
-- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), multiplayer and crash gametests (#4, #5), performance baseline (#6).
+- Multiplayer gametest (#4): `recordOnDedicatedServer` uses `worldBuilder().createServer()` and
+  `connect()`; records, checks a server-spawned named pig in the archive and in playback.
+- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), crash gametest (#5), performance baseline (#6).
 
 ## 5. Files and modules affected
 

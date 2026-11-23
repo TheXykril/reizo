@@ -28,7 +28,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; replayed on the recorded player |
 | Inventory / equipment | ✓ | ✓ | ✓ | ✓ | partial | GT | Inventory in recorded packets; own held items and armor recorded as equipment packets and shown on playback |
 | Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | — | Server-sent ones are in packets; client-only effects not captured |
-| Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | — | Same pipeline as singleplayer; no multiplayer test yet |
+| Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | GT | `recordOnDedicatedServer`: auto-record on joining a dedicated server over the network (compressed), server-spawned entity recorded and shown in playback. Not tested: proxies, server switches, real public servers |
 | Start mid-session with full world | ✓ | ✓ | ? | ✗ | partial | GT | Config + login prelude only; loaded chunks missing until world snapshots (M2) |
 | Replay metadata (version, server, player, markers) | ? | ✓ | ✓ | ✓ | implemented | UT, GT | |
 | Configurable storage location | ? | ✓ | ? | ✓ | implemented | — | `recordingsDirectory` setting |

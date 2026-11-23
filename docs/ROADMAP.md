@@ -13,7 +13,7 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 - [x] Hotkey, HUD indicator, toasts, auto-record on join
 - [x] Pause-menu recording controls (Lunar: ESC → hover indicator → Record)
 - [x] Modifier-key bindings (Shift+R default like Lunar)
-- [ ] Multiplayer gametest against a dedicated server (`createServer` in the gametest API)
+- [x] Multiplayer gametest against a dedicated server (`createServer` in the gametest API)
 - [ ] Crash gametest: kill the client mid-recording, verify recovery
 - [ ] Performance baseline: FPS, allocation rate, MB/min recorded
 
