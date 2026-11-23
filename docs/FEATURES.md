@@ -148,12 +148,16 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 ## Audio (M6)
 
 - **Game sound in exports:** **implemented**, evidence GT (`exportVideo`: a sound played during
-  the export is in the MP4's AAC track, audible, and starts within one frame of its video time),
-  UT (`AudioTest`: placement, pitch, distance, pan, WAV, mux command). Sounds that start during
-  the export are rendered offline from the game's sound files, panned and attenuated from the
-  camera, and added with FFmpeg (AAC for MP4/MKV, Opus for WebM). "Sound" on/off in the export
-  settings (ADR 0013). Left out: music, looping and moving sounds (minecarts, elytra), and sounds
-  that started before the export range.
+  the export is in the MP4's AAC track, audible, and starts within one frame of its video time; a
+  looping sound that moves past the camera is followed for the second it plays and repeats in the
+  track), UT (`AudioTest`: placement, pitch, distance, pan, looping, stopping, moving sounds and
+  pitch changes, WAV, mux command). Sounds are rendered offline from the game's sound files,
+  panned and attenuated from the camera, and added with FFmpeg (AAC for MP4/MKV, Opus for WebM).
+  Sounds are followed while they play: moving sounds (minecarts, elytra) and the camera are
+  sampled every frame, looping sounds repeat until the game stops them, and music is included.
+  Loops that started while the export got ready (an entity's sound) play from the first frame.
+  "Sound" on/off in the export settings (ADR 0013). Left out: one-shot sounds and music that
+  started before the export range. Music and minecarts by ear on real hardware: **untested**.
 - Microphone, Simple Voice Chat (only where permitted), per-track volume, mute/solo, fades:
   **planned**.
 

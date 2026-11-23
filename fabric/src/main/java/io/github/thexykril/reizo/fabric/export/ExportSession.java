@@ -166,11 +166,32 @@ public final class ExportSession {
   /** Called for every sound the client starts; recorded while frames are being captured. */
   public static void onSound(net.minecraft.client.resources.sounds.SoundInstance sound) {
     ExportSession s = current;
-    if (s != null && s.audio && s.state == State.RUNNING) {
-      // The frame being prepared now is the one these sounds belong to.
-      s.sounds.onPlay(
-          Minecraft.getInstance(), sound, s.plan.timeOfSample(s.frame) - s.plan.startMs());
+    if (s == null || !s.audio) {
+      return;
     }
+    if (s.state == State.RUNNING) {
+      // The frame being prepared now is the one these sounds belong to.
+      s.sounds.onPlay(Minecraft.getInstance(), sound, s.videoTimeOfSample(s.frame));
+    } else if (s.state == State.PREPARING) {
+      s.sounds.onPlayBeforeStart(sound);
+    }
+  }
+
+  /** Called for every sound the game stops. */
+  public static void onSoundStopped(net.minecraft.client.resources.sounds.SoundInstance sound) {
+    ExportSession s = current;
+    if (s != null && s.audio && (s.state == State.RUNNING || s.state == State.PREPARING)) {
+      s.sounds.onStop(sound, s.videoTimeOfSample(s.frame));
+    }
+  }
+
+  private double videoTimeOfSample(int sample) {
+    return plan.timeOfSample(sample) - plan.startMs();
+  }
+
+  /** The export's sounds so far (for tests). */
+  public java.util.List<io.github.thexykril.reizo.core.audio.SoundCue> soundCues() {
+    return java.util.List.copyOf(sounds.cues());
   }
 
   /**
@@ -191,9 +212,10 @@ public final class ExportSession {
   /** Mixes the captured sounds and adds them to the video, off the game thread. */
   private void startMux(Minecraft mc) {
     Path video = videoFile();
+    sounds.finishAll();
     var cues = java.util.List.copyOf(sounds.cues());
-    var clips = sounds.decodeClips(mc);
     double durationMs = plan.frameCount() * 1000.0 / plan.fps();
+    var clips = sounds.decodeClips(mc, durationMs);
     mux =
         java.util.concurrent.CompletableFuture.runAsync(
             () -> {
@@ -316,6 +338,9 @@ public final class ExportSession {
         server.setManual(true, plan.startMs());
         server.advanceTo(Math.round(plan.timeOfSample(0)), 1);
         state = State.RUNNING;
+        if (audio) {
+          sounds.startFirstFrame(mc);
+        }
       }
       case RUNNING -> {
         if (mc.screen != null) {
@@ -334,6 +359,9 @@ public final class ExportSession {
         }
         int index = frame;
         Screenshot.takeScreenshot(target, image -> deliver(index, image));
+        if (audio) {
+          sounds.onFrame(mc, videoTimeOfSample(index));
+        }
         frame++;
         if (frame % (10 * plan.samples()) == 0) {
           mc.getWindow()

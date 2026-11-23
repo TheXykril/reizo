@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Exports now include music, looping sounds and moving sounds (minecarts, elytra, bees): sounds
+  follow their source and the camera while they play, and loops repeat until they stop.
 - With OneConfig (for example in OneClient): Reizo's messages show as OneConfig notifications, and
   exports show their progress in one. Can be turned off on Reizo's OneConfig page.
 - Depth of field (strength and focus distance) and bloom in the Effects panel, keyframed like
