@@ -198,5 +198,11 @@ without it (ADR 0010). Not affiliated with or endorsed by Polyfrost or OneClient
   Lunar mod properties. Needs a manual check in OneClient (ADR 0014).
 - **Keybinds in OneConfig's keybind page:** **partial**, evidence — (Reizo uses vanilla key
   mappings, which OneConfig lists; not checked).
-- OneConfig notifications, editor entry in the OneClient main menu, PolyCompose styling:
+- **OneConfig notifications:** **partial**, evidence — (builds against the OneConfig 1.9.1
+  notifications API; not run in OneConfig yet). With OneConfig installed, Reizo's messages
+  (recording started or saved, shadow saved, recovery, export done or failed) show as OneConfig
+  notifications typed info, success, warning or error, and an export shows one notification with
+  a progress bar. Switch "OneConfig notifications" on Reizo's OneConfig page; any failure falls
+  back to Minecraft toasts for the session. GT: without OneConfig, toasts stay vanilla.
+- Editor entry in the OneClient main menu, PolyCompose styling:
   **planned**.

@@ -101,6 +101,14 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
         category = "Shadow")
     public static int shadowLength = 2;
 
+    @Switch(
+        title = "OneConfig notifications",
+        description =
+            "Show Reizo's messages and export progress as OneConfig notifications instead of"
+                + " Minecraft toasts.",
+        category = "Recording")
+    public static boolean oneConfigNotifications = true;
+
     @Text(
         title = "FFmpeg path",
         description = "Leave empty to use ffmpeg from the system PATH.",
@@ -125,7 +133,8 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
             "toggleModifier",
             "ffmpegPath",
             "shadowEnabled",
-            "shadowLength"
+            "shadowLength",
+            "oneConfigNotifications"
           }) {
         addCallback(id, Page::push);
       }
@@ -141,6 +150,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       toggleModifier = modifierIndex(c.toggleModifier);
       ffmpegPath = c.ffmpegPath == null ? "" : c.ffmpegPath;
       shadowEnabled = c.shadowEnabled;
+      oneConfigNotifications = c.oneConfigNotifications;
       int length = RecorderClient.SHADOW_LENGTHS.indexOf(c.shadowSeconds);
       shadowLength = length < 0 ? 2 : length;
     }
@@ -155,6 +165,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       c.toggleModifier = MODIFIERS[Math.max(0, Math.min(MODIFIERS.length - 1, toggleModifier))];
       c.ffmpegPath = ffmpegPath == null ? "" : ffmpegPath.strip();
       c.shadowEnabled = shadowEnabled;
+      c.oneConfigNotifications = oneConfigNotifications;
       c.shadowSeconds =
           RecorderClient.SHADOW_LENGTHS.get(
               Math.max(0, Math.min(RecorderClient.SHADOW_LENGTHS.size() - 1, shadowLength)));

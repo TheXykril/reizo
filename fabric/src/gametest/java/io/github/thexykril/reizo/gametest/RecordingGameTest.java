@@ -412,6 +412,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
         "no chunks recorded");
     check(meta.markers.size() == 1, "marker missing");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
+    // Without OneConfig, messages stay Minecraft toasts; the kinds used inside OneClient.
+    check(!RecorderClient.useOneConfigNotifications(), "OneConfig notifications without OneConfig");
+    check(
+        RecorderClient.toastKind("reizo.toast.save_failed").name().equals("ERROR")
+            && RecorderClient.toastKind("reizo.toast.saved").name().equals("SUCCESS")
+            && RecorderClient.toastKind("reizo.export.cancelled").name().equals("WARNING")
+            && RecorderClient.toastKind("reizo.toast.started").name().equals("INFO"),
+        "wrong notification kinds");
     LOGGER.info("recordFromJoin OK: {} -> {}", archive.getFileName(), stats);
     return archive;
   }

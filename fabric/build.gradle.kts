@@ -71,6 +71,8 @@ dependencies {
     compileOnly("org.polyfrost.oneconfig:hud:${libs.versions.oneconfig.get()}") { isTransitive = false }
     compileOnly("org.polyfrost.oneconfig:ui:${libs.versions.oneconfig.get()}") { isTransitive = false }
     compileOnly("org.polyfrost.oneconfig:utils:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    // OneConfig notifications (Reizo's toasts and export progress inside OneClient).
+    compileOnly("org.polyfrost.oneconfig:notifications:${libs.versions.oneconfig.get()}") { isTransitive = false }
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.2.20") { isTransitive = false }
 
     implementation(project(":core"))

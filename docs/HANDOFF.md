@@ -119,6 +119,9 @@ screen, effects, audio, shadow recording, multi-version.
   callable synchronously).
 - Depth of field and bloom: `Grade.bloom/dof/focus` (project `Effect` fields), same shader
   (`grade.fsh`, UBO now four vec4s, `DepthSampler` = main depth).
+- OneConfig notifications: `compat/OneConfigNotifications` (compileOnly `notifications` 1.9.1),
+  used by `RecorderClient.toast` when `useOneConfigNotifications()`; export progress notification
+  in `ExportControls`. Untested at runtime: check in OneClient.
 - Next: music/looping sounds and microphone (#17), effects (#15), performance baseline (#6).
 
 ## 5. Files and modules affected
