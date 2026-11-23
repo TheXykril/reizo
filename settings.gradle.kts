@@ -19,7 +19,7 @@ include("core")
 stonecutter {
     create(":fabric") {
         // The OneClient versions are added one at a time (docs/ROADMAP.md, M8).
-        versions("1.21.10", "1.21.11", "26.2", "26.3")
+        versions("1.21.10", "1.21.11", "26.1.2", "26.2", "26.3")
         vcsVersion = "1.21.11"
     }
 }

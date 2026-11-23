@@ -113,6 +113,7 @@ tasks.processResources {
 // Anything that is not a plain rename lives in //? blocks or in fabric/compat.
 val sc = extensions.getByType<dev.kikugie.stonecutter.build.StonecutterBuildExtension>()
 val is26 = sc.eval(sc.current.version, ">=26.1")
+val is262 = sc.eval(sc.current.version, ">=26.2")
 val is263 = sc.eval(sc.current.version, ">=26.3")
 
 fun rename(
@@ -188,12 +189,14 @@ rename(
     "$1.gui.screen()",
     "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.gui\\.screen\\(\\)",
     "$1.screen",
+    is262,
 )
 rename(
     "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.setScreen\\(",
     "$1.gui.setScreen(",
     "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.gui\\.setScreen\\(",
     "$1.setScreen(",
+    is262,
 )
 // Fabric API renames.
 rename("\\bScreens\\.getButtons\\(", "Screens.getWidgets(", "\\bScreens\\.getWidgets\\(", "Screens.getButtons(")
@@ -209,12 +212,14 @@ rename(
     "$1.gui.toastManager()",
     "\\b(mc|minecraft|client)\\.gui\\.toastManager\\(\\)",
     "$1.getToastManager()",
+    is262,
 )
 rename(
     "\\.gui\\.setOverlayMessage\\(",
     ".gui.hud.setOverlayMessage(",
     "\\.gui\\.hud\\.setOverlayMessage\\(",
     ".gui.setOverlayMessage(",
+    is262,
 )
 rename(
     "\\bUtil\\.getPlatform\\(\\)\\.openPath\\(",
@@ -228,12 +233,14 @@ rename(
     "$1.gameRenderer.mainRenderTarget()",
     "\\b(mc|minecraft|client)\\.gameRenderer\\.mainRenderTarget\\(\\)",
     "$1.getMainRenderTarget()",
+    is262,
 )
 rename(
     "\\.gameRenderer\\.getMainCamera\\(\\)",
     ".gameRenderer.mainCamera()",
     "\\.gameRenderer\\.mainCamera\\(\\)",
     ".gameRenderer.getMainCamera()",
+    is262,
 )
 rename(
     "\\.resolve\\((\\w+)\\.getSoundManager\\(\\)\\)",
@@ -247,6 +254,7 @@ rename(
     "net.minecraft.world.entity.EntityTypes.$1",
     "\\bnet\\.minecraft\\.world\\.entity\\.EntityTypes\\.([A-Z_]+)\\b",
     "EntityType.$1",
+    is262,
 )
 // Fabric's client gametest API: worlds are reached through their server connection.
 rename(
@@ -254,22 +262,36 @@ rename(
     "world.getConnection()",
     "\\bworld\\.getConnection\\(\\)",
     "world.getClientWorld()",
+    is262,
 )
 rename(
     "\\bconnection\\.getClientWorld\\(\\)\\.",
     "connection.",
     "\\bconnection\\.(?=waitFor)",
     "connection.getClientWorld().",
+    is262,
 )
 rename(
     "\\bTestServerConnection connection = ",
     "TestDedicatedServerConnection connection = ",
     "\\bTestDedicatedServerConnection connection = ",
     "TestServerConnection connection = ",
+    is262,
 )
 rename(
     "\\.v1\\.context\\.TestServerConnection;",
     ".v1.context.TestDedicatedServerConnection;",
     "\\.v1\\.context\\.TestDedicatedServerConnection;",
     ".v1.context.TestServerConnection;",
+    is262,
+)
+// 26.1's gametest API named the client side a level.
+val is261 = is26 && !is262
+rename("\\bworld\\.getClientWorld\\(\\)", "world.getClientLevel()", "\\bworld\\.getClientLevel\\(\\)", "world.getClientWorld()", is261)
+rename(
+    "\\bconnection\\.getClientWorld\\(\\)\\.",
+    "connection.getClientLevel().",
+    "\\bconnection\\.getClientLevel\\(\\)\\.",
+    "connection.getClientWorld().",
+    is261,
 )

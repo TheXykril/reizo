@@ -361,7 +361,7 @@ final class PlayTransformer {
             p.showDeathScreen(),
             p.doLimitedCrafting(),
             spectator(p.commonPlayerSpawnInfo()),
-            //? if >=26.1 {
+            //? if >=26.2 {
             /*p.onlineMode(),
             *///?}
             p.enforcesSecureChat()));

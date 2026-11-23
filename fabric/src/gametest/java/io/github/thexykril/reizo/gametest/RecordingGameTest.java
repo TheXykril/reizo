@@ -1621,7 +1621,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     double onsetMs = Double.parseDouble(end.group(1)) * 1000;
     check(
         Math.abs(onsetMs - s.firstSoundMs()) <= 50,
-        "sound at " + onsetMs + " ms, expected " + s.firstSoundMs() + " ms");
+        "sound at " + onsetMs + " ms, expected " + s.firstSoundMs() + " ms; cues " + s.soundCues());
     // The click (0.28 s, half of it silent) starts again about every 0.28 s while the loop plays.
     double from = loop.timeMs() / 1000 - 0.03;
     double to = loop.endMs() / 1000;
