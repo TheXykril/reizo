@@ -123,7 +123,7 @@ audio. Out of scope: a full color-grading suite and multitrack audio mixing like
 
 Basics first (Lunar's Rewind has the first three):
 
-- Time of day and weather keyframes in replays: override the recorded time and weather (clear,
+- ✓ Time of day and weather keyframes in replays: override the recorded time and weather (clear,
   rain, thunder) for a shot or a timelapse, blended between keyframes, shown in exports.
 - Hide entities: click a mob, item or player in the replay (or pick from a list) to hide it from
   that point, keyframeable, also in exports.

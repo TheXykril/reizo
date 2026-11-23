@@ -73,7 +73,7 @@ public final class KeyframedSettingsScreen extends Screen {
 
     @Override
     protected void updateMessage() {
-      setMessage(Component.literal(String.format(Locale.ROOT, "%.2f", current())));
+      setMessage(Component.literal(setting.format(current())));
     }
 
     @Override

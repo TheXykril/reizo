@@ -31,4 +31,17 @@ public interface KeyframedSetting {
 
   /** Sets the live value (clamped to the range by the caller). */
   void set(double value);
+
+  /**
+   * Puts the setting back once no track drives it, given the value it had before. Settings that
+   * override something recorded (time of day, weather) go back to following the recording instead.
+   */
+  default void restore(double original) {
+    set(original);
+  }
+
+  /** The value as the timeline shows it. */
+  default String format(double value) {
+    return String.format(java.util.Locale.ROOT, "%.2f", value);
+  }
 }
