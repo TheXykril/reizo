@@ -154,7 +154,7 @@ public final class ExportSettingsScreen extends Screen {
                   }));
     }
     y += 34;
-    fileName = new EditBox(font, x, y, 310, 20, Component.translatable("reizo.export.file"));
+    fileName = new EditBox(font, x, y, 200, 20, Component.translatable("reizo.export.file"));
     fileName.setMaxLength(120);
     fileName.setHint(Component.translatable("reizo.export.file_hint"));
     fileName.setValue(r.output == null ? "" : r.output);
@@ -164,6 +164,18 @@ public final class ExportSettingsScreen extends Screen {
           ReplayEditor.changed();
         });
     addRenderableWidget(fileName);
+    addRenderableWidget(
+        CycleButton.onOffBuilder(r.audio)
+            .create(
+                x + 210,
+                y,
+                100,
+                20,
+                Component.translatable("reizo.export.audio"),
+                (b, v) -> {
+                  r.audio = v;
+                  ReplayEditor.changed();
+                }));
     y += 34;
     if (ReplayEditor.inMs() >= 0 || ReplayEditor.outMs() >= 0) {
       addRenderableWidget(

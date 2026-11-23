@@ -92,6 +92,28 @@ public final class FfmpegCommand {
   }
 
   /**
+   * The command that adds a sound track to an encoded video without re-encoding the picture: AAC
+   * for MP4 and MKV, Opus for WebM.
+   */
+  public static List<String> muxAudio(String ffmpeg, Path video, Path wav, Path output) {
+    String name = output.getFileName().toString();
+    boolean webm = name.endsWith(".webm");
+    List<String> cmd = new ArrayList<>();
+    cmd.add(ffmpeg);
+    cmd.addAll(List.of("-hide_banner", "-loglevel", "error", "-y"));
+    cmd.addAll(List.of("-i", video.toString(), "-i", wav.toString()));
+    cmd.addAll(List.of("-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy"));
+    cmd.addAll(
+        webm ? List.of("-c:a", "libopus", "-b:a", "160k") : List.of("-c:a", "aac", "-b:a", "192k"));
+    cmd.add("-shortest");
+    if (name.endsWith(".mp4")) {
+      cmd.addAll(List.of("-movflags", "+faststart"));
+    }
+    cmd.add(output.toString());
+    return cmd;
+  }
+
+  /**
    * Finds FFmpeg: the configured path if it is an executable file, else {@code ffmpeg} on the PATH.
    * Empty when neither exists.
    */

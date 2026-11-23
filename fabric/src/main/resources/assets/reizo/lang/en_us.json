@@ -127,6 +127,7 @@
   "reizo.export.quality.3": "Small file",
   "reizo.export.format": "Format",
   "reizo.export.file": "File name (in reizo/exports)",
+  "reizo.export.audio": "Sound",
   "reizo.export.file_hint": "Automatic: replay name and date",
   "reizo.export.range_all": "Range: whole replay (%s – %s). Set In/Out in the timeline (Y).",
   "reizo.export.range": "Range: %s – %s, from the timeline",

@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Exported videos have the game's sound, rendered in sync from the sounds that play during the
+  export ("Sound" in the export settings).
 - With OneConfig (for example in OneClient): the recording indicator is also a HUD element
   that can be placed in OneConfig's HUD editor, and the OneConfig page has the shadow recording
   settings.

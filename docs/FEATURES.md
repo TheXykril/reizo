@@ -127,11 +127,17 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - **Planned:** motion blur, depth of field, bloom, camera shake, chromatic aberration, blur,
   fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV.
 
-## Audio (planned, M6)
+## Audio (M6)
 
-Game audio (re-synthesized from recorded sound events), microphone, Simple Voice Chat (only where
-permitted; see privacy section to be written), per-track volume, mute/solo, fades, sync, preview,
-mixdown. Status: **planned**.
+- **Game sound in exports:** **implemented**, evidence GT (`exportVideo`: a sound played during
+  the export is in the MP4's AAC track, audible, and starts within one frame of its video time),
+  UT (`AudioTest`: placement, pitch, distance, pan, WAV, mux command). Sounds that start during
+  the export are rendered offline from the game's sound files, panned and attenuated from the
+  camera, and added with FFmpeg (AAC for MP4/MKV, Opus for WebM). "Sound" on/off in the export
+  settings (ADR 0013). Left out: music, looping and moving sounds (minecarts, elytra), and sounds
+  that started before the export range.
+- Microphone, Simple Voice Chat (only where permitted), per-track volume, mute/solo, fades:
+  **planned**.
 
 ## Export (M4/M5)
 
