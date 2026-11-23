@@ -158,6 +158,11 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   `reizo-replay-night-storm` shows a rainy night while paused; removing them goes back to the
   recording). Timeline → Settings → Reizo: "Time of day (replay)" (shown as a clock time), "Rain"
   and "Thunder", blended between keyframes and shown in exports. The recording is unchanged.
+- **Hide entities:** **implemented**, evidence GT (`checkHideEntity` on 1.21.11 and 26.3: a hidden
+  entity is not drawn, is listed in the settings panel, and undo shows it again). H in a replay
+  hides the entity the camera looks at (up to 96 blocks) from the current time on, or shows it
+  again; each hidden entity is a keyframed switch "Hide <name>" in Timeline → Settings, saved with
+  the project and applied in exports. The look-at picking itself is not covered by a test yet.
 - **Depth of field and bloom:** **implemented**, evidence GT (`checkEffects`: depth of field
   focused at 0.5 blocks halves the frame's fine detail; bloom brightens 8% of the frame around the
   bright spots). Effects panel: "Bloom", "Depth of field" (strength) and "Focus (blocks)", keyframed

@@ -21,6 +21,9 @@ compatibility.
 
 ### Added
 
+- Hide entities in a replay: press H while looking at a mob, item or player to hide it from that
+  moment on (press again to show it). Hidden entities are keyframed switches in Timeline →
+  Settings, undoable, saved with the project and hidden in exports too.
 - Time of day, rain and thunder can be keyframed in a replay (Timeline → Settings), for night shots,
   storms or timelapses. They show in exports; the recording itself is unchanged.
 - Minecraft 1.21.10 and 26.2 support (separate jars), so every OneClient version from 1.21.10 up
