@@ -41,7 +41,11 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 ## M5 — Effects, overlays, shadow recording
 
 - ✓ (first slice, ADR 0012) Post-processing pipeline (only active in editor/export), effect tracks with keyframed intensity
-- Text/image overlays, transitions, letterboxing, HUD elements in POV
+- Text/image overlays, transitions, letterboxing
+- Recorded player's HUD in POV, like Lunar Rewind: hotbar with the selected slot, health, hunger,
+  armor and XP, and the inventory or container screens they opened. Needs the selected slot, stats
+  and open-screen events in `LOCAL_PLAYER` frames. Separate toggles for the hotbar/HUD and for
+  inventory screens, keyframeable in the editor and applied in export.
 - ✓ Shadow recording (rolling buffer, save last N minutes; ADR 0011)
 
 ## M6 — Audio
