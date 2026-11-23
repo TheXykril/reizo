@@ -38,9 +38,19 @@ Option 3.
 - Text uses a bundled font, Inter Medium (SIL OFL 1.1, owner asked to drop the Minecraft look on
   2026-11-23), through a `reizo:ui` TTF font with Minecraft's font as the fallback for symbols.
   The licence ships in the jar (`licenses/Inter-OFL.txt`) and the README lists it.
-- `fabric.ui.kit.FlatButton` (extends `Button`) and `FlatSlider` (extends `AbstractSliderButton`)
-  draw themselves. Their one per-version difference, the render hook's name, is a Stonecutter
-  rename plus one version block for 1.21.10.
+- `fabric.ui.kit.FlatButton` (extends `Button`) and `DragField` (extends `AbstractWidget`) draw
+  themselves. Their one per-version difference, the render hook's name, is a Stonecutter rename
+  plus one version block for 1.21.10.
+- Interaction follows the ImGui-style editors the owner pointed to (chosen 2026-11-23): numbers are
+  drag fields (drag to change, Shift for fine steps, scroll to step, double-click to reset) with a
+  fill bar and a keyframe diamond; Inspector content sits in collapsible sections and scrolls; a
+  menu bar (File, Edit, View, Camera) and right-click context menus (`PopupMenu`) on scene rows,
+  the ruler and camera keyframes; the Scene and Inspector panels have title bars, can be dragged
+  to float anywhere over the world, and dock back to the left or right edge (double-click the
+  title toggles). This is Reizo's own code on vanilla `GuiGraphics`, not imgui-java.
+- Widgets draw opaque, non-overlapping pieces (colours mixed in code) instead of stacking
+  translucent fills, because the GUI renderer does not keep the order of overlapping translucent
+  fills inside one widget reliably.
 - The editor (`TimelineScreen`, the class name tests and key bindings use) lays out a top bar
   (transport, time, view mode, undo, Export), a tool rail, a Scene outliner, an Inspector with tabs
   and a multi-track timeline (markers, camera, look, world, entities, settings), with the world

@@ -21,8 +21,10 @@ import io.github.thexykril.reizo.fabric.settings.KeyframedSetting;
 import io.github.thexykril.reizo.fabric.settings.KeyframedSettings;
 import io.github.thexykril.reizo.fabric.ui.kit.Draw;
 import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
-import io.github.thexykril.reizo.fabric.ui.kit.FlatSlider;
+import io.github.thexykril.reizo.fabric.ui.kit.DragField;
 import io.github.thexykril.reizo.fabric.ui.kit.Icons;
+import io.github.thexykril.reizo.fabric.ui.kit.PopupMenu;
+import io.github.thexykril.reizo.fabric.playback.PathVisualizer;
 import io.github.thexykril.reizo.fabric.ui.kit.Theme;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -75,15 +77,14 @@ public final class TimelineScreen extends Screen {
 
   private static Tab tab = Tab.KEYFRAME;
 
-  /** Look tab page: 0 colour, 1 lens. */
-  private static int lookPage;
 
   private enum Drag {
     NONE,
     SEEK,
     KEYFRAMES,
     BOX,
-    OVERVIEW
+    OVERVIEW,
+    PANEL
   }
 
   private enum Tab {
@@ -133,13 +134,49 @@ public final class TimelineScreen extends Screen {
 
   private FlatButton playButton;
   private FlatButton speedButton;
+  private PopupMenu popup;
   private FlatButton letterboxButton;
-  private final List<FlatSlider> sliders = new ArrayList<>();
+  private FlatButton smoothingButton;
+  private final List<DragField> fields = new ArrayList<>();
+  private static final Set<String> collapsed = new java.util.HashSet<>();
+  private long lastKeyEditMs;
+  private int hiddenTextY = -1;
+  private static int inspectorScroll;
+  private int inspectorContent;
   private String builtInspector = "";
 
   // Layout, in GUI pixels; set in init().
   private boolean showLeft;
   private boolean showRight;
+
+  /** Where a side panel sits: docked to a side of the viewport, or floating over it. */
+  private enum Dock {
+    LEFT,
+    RIGHT,
+    FLOAT
+  }
+
+  private static final int TITLE_H = 14;
+  private static Dock sceneDock = Dock.LEFT;
+  private static Dock inspectorDock = Dock.RIGHT;
+  private static int sceneFloatX = 160;
+  private static int sceneFloatY = 40;
+  private static int inspectorFloatX = 320;
+  private static int inspectorFloatY = 40;
+  // Panel rectangles (title bar included), set in layoutPanels().
+  private int sX0;
+  private int sY0;
+  private int sX1;
+  private int sY1;
+  private int iX0;
+  private int iY0;
+  private int iX1;
+  private int iY1;
+  // Panel being moved by its title bar: 1 scene, 2 inspector.
+  private int movingPanel;
+  private double moveOffX;
+  private double moveOffY;
+  private double lastMouseY;
   private boolean showTitle;
   private int timeTextX = -1;
   private int timelineY;
@@ -177,11 +214,14 @@ public final class TimelineScreen extends Screen {
     left = LABEL_W + 4;
     right = width - 6;
     view.setWidth(right - left);
+    layoutPanels();
 
     initTopBar();
     initRail();
     initTimelineHeader();
-    sliders.clear();
+    fields.clear();
+    letterboxButton = null;
+    smoothingButton = null;
     if (showRight) {
       initInspector();
     }
@@ -189,11 +229,85 @@ public final class TimelineScreen extends Screen {
     updateLabels();
   }
 
+  /** Places the Scene and Inspector panels from their docks. */
+  private void layoutPanels() {
+    int top = TOP_H;
+    int bottom = timelineY;
+    int leftX = RAIL_W;
+    int rightX = width;
+    boolean sceneLeft = showLeft && sceneDock == Dock.LEFT;
+    boolean sceneRight = showLeft && sceneDock == Dock.RIGHT;
+    boolean inspLeft = showRight && inspectorDock == Dock.LEFT;
+    boolean inspRight = showRight && inspectorDock == Dock.RIGHT;
+    int leftW = Math.max(sceneLeft ? OUTLINER_W : 0, inspLeft ? INSPECTOR_W : 0);
+    int rightW = Math.max(sceneRight ? OUTLINER_W : 0, inspRight ? INSPECTOR_W : 0);
+    int floatH = Math.min(300, bottom - top - 12);
+    // Scene.
+    if (sceneDock == Dock.FLOAT) {
+      sX0 = clampX(sceneFloatX, OUTLINER_W);
+      sY0 = clampY(sceneFloatY, floatH);
+      sX1 = sX0 + OUTLINER_W;
+      sY1 = sY0 + Math.min(floatH, 200);
+    } else {
+      sX0 = sceneDock == Dock.LEFT ? leftX : rightX - rightW;
+      sX1 = sX0 + (sceneDock == Dock.LEFT ? leftW : rightW);
+      sY0 = top;
+      sY1 = bottom;
+    }
+    // Inspector.
+    if (inspectorDock == Dock.FLOAT) {
+      iX0 = clampX(inspectorFloatX, INSPECTOR_W);
+      iY0 = clampY(inspectorFloatY, floatH);
+      iX1 = iX0 + INSPECTOR_W;
+      iY1 = iY0 + floatH;
+    } else {
+      iX0 = inspectorDock == Dock.LEFT ? leftX : rightX - rightW;
+      iX1 = iX0 + (inspectorDock == Dock.LEFT ? leftW : rightW);
+      iY0 = top;
+      iY1 = bottom;
+    }
+    // Both docked on one side: stack them, scene on top.
+    if (showLeft && showRight && sceneDock == inspectorDock && sceneDock != Dock.FLOAT) {
+      int mid = top + Math.max(60, (bottom - top) / 3);
+      sY1 = mid;
+      iY0 = mid;
+    }
+  }
+
+  private int clampX(int x, int w) {
+    return Math.max(RAIL_W + 2, Math.min(width - w - 2, x));
+  }
+
+  private int clampY(int y, int h) {
+    return Math.max(TOP_H + 2, Math.min(timelineY - h - 2, y));
+  }
+
+  private int inspTabsY() {
+    return iY0 + TITLE_H + 2;
+  }
+
+  private int inspContentY() {
+    return iY0 + TITLE_H + 20;
+  }
+
   private void initTopBar() {
     int x = 22;
-    showTitle = width >= 520;
+    boolean menus = width >= 600;
+    showTitle = width >= 520 && !menus;
     if (showTitle) {
       x += Draw.width(font, "Reizo") + 10;
+    }
+    if (menus) {
+      for (String m : new String[] {"file", "edit", "view", "camera"}) {
+        Component label = Component.translatable("reizo.menu_bar." + m);
+        int mw = FlatButton.fitWidth(font, label, 5);
+        int mx = x;
+        addRenderableWidget(
+            new FlatButton(
+                mx, 3, mw, 14, label, FlatButton.Style.GHOST, b -> openMenu(m, mx, TOP_H)));
+        x += mw;
+      }
+      x += 10;
     }
     String[][] transport = {
       {"reizo.editor.prev_marker", "⏮"},
@@ -309,37 +423,56 @@ public final class TimelineScreen extends Screen {
   }
 
   private void initInspector() {
-    int x0 = width - INSPECTOR_W + 4;
-    int w = INSPECTOR_W - 8;
+    int x0 = iX0 + 4;
+    int w = iX1 - iX0 - 8;
     int tw = w / Tab.values().length;
     int tx = x0;
     for (Tab t : Tab.values()) {
       addRenderableWidget(
               new FlatButton(
                   tx,
-                  TOP_H + 3,
+                  inspTabsY(),
                   tw,
                   14,
                   Component.translatable(t.key),
                   FlatButton.Style.TAB,
                   b -> {
                     tab = t;
+                    inspectorScroll = 0;
                     builtInspector = "";
                   }))
           .selectedWhen(() -> tab == t);
       tx += tw;
     }
-    int y = TOP_H + 24;
+    int y = inspContentY() - inspectorScroll;
+    int half = (w - 2) / 2;
     switch (tab) {
       case KEYFRAME -> {
-        if (selection.size() == 1) {
-          int half = (w - 2) / 2;
-          y = TOP_H + 24 + 9 * 10 + 4;
+        List<CameraKeyframe> chosen = selectedKeyframes();
+        if (chosen.size() == 1) {
+          y += 14;
+          if (section(x0, y, w, "transform")) {
+            y += 16;
+            y = keyField(x0, y, w, "X", -3e7, 3e7, 0.05, k -> k.x(), (k, v) -> withPos(k, v, k.y(), k.z()));
+            y = keyField(x0, y, w, "Y", -2048, 2048, 0.05, k -> k.y(), (k, v) -> withPos(k, k.x(), v, k.z()));
+            y = keyField(x0, y, w, "Z", -3e7, 3e7, 0.05, k -> k.z(), (k, v) -> withPos(k, k.x(), k.y(), v));
+          } else {
+            y += 16;
+          }
+          if (section(x0, y, w, "rotation")) {
+            y += 16;
+            y = keyField(x0, y, w, "reizo.inspector.yaw", -1e7, 1e7, 0.5, k -> k.yaw(), (k, v) -> withRot(k, v.floatValue(), k.pitch(), k.roll()));
+            y = keyField(x0, y, w, "reizo.inspector.pitch", -90, 90, 0.5, k -> k.pitch(), (k, v) -> withRot(k, k.yaw(), v.floatValue(), k.roll()));
+            y = keyField(x0, y, w, "reizo.inspector.roll", -180, 180, 0.5, k -> k.roll(), (k, v) -> withRot(k, k.yaw(), k.pitch(), v.floatValue()));
+            y = keyField(x0, y, w, "reizo.inspector.fov", 10, 170, 0.25, k -> k.fov(), (k, v) -> new CameraKeyframe(k.timeMs(), k.x(), k.y(), k.z(), k.yaw(), k.pitch(), k.roll(), v.floatValue()));
+          } else {
+            y += 16;
+          }
+          y += 2;
           tonal(x0, y, half, "reizo.inspector.goto", b -> goToSelected());
           tonal(x0 + half + 2, y, half, "reizo.inspector.delete", b -> deleteSelection());
           y += 18;
         } else if (selection.isEmpty()) {
-          y = TOP_H + 24;
           addRenderableWidget(
               new FlatButton(
                   x0,
@@ -349,124 +482,220 @@ public final class TimelineScreen extends Screen {
                   Component.translatable("reizo.inspector.add_here"),
                   FlatButton.Style.ACCENT,
                   b -> addKeyframe()));
-          y += 20;
+          y += 18;
         } else {
-          y = TOP_H + 24 + 14;
+          y += 14;
         }
-        addRenderableWidget(
-            new FlatButton(
-                x0,
-                y,
-                w,
-                16,
-                Component.translatable("reizo.inspector.smoothing"),
-                FlatButton.Style.TONAL,
-                b -> ReplayEditor.cycleSmoothing()));
-      }
-      case LOOK -> {
-        int half = w / 2;
-        for (int p = 0; p < 2; p++) {
-          int page = p;
-          addRenderableWidget(
-                  new FlatButton(
-                      x0 + p * half,
-                      y,
-                      half,
-                      14,
-                      Component.translatable(p == 0 ? "reizo.look.color" : "reizo.look.lens"),
-                      FlatButton.Style.TONAL,
-                      b -> {
-                        lookPage = page;
-                        builtInspector = "";
-                      }))
-              .selectedWhen(() -> lookPage == page);
-        }
-        y += 20;
-        if (lookPage == 0) {
-          y = gradeSlider(x0, y, w, "exposure", -3, 3, Grade::exposure, Grade::withExposure);
-          y = gradeSlider(x0, y, w, "contrast", 0, 2, Grade::contrast, Grade::withContrast);
-          y = gradeSlider(x0, y, w, "saturation", 0, 2, Grade::saturation, Grade::withSaturation);
-          y =
-              gradeSlider(
-                  x0, y, w, "temperature", -1, 1, Grade::temperature, Grade::withTemperature);
-        } else {
-          y = gradeSlider(x0, y, w, "vignette", 0, 1, Grade::vignette, Grade::withVignette);
-          y = gradeSlider(x0, y, w, "bloom", 0, 1, Grade::bloom, Grade::withBloom);
-          y = gradeSlider(x0, y, w, "dof", 0, 1, Grade::dof, Grade::withDof);
-          y = gradeSlider(x0, y, w, "focus", 0.5f, 64, Grade::focus, Grade::withFocus);
-        }
-        letterboxButton =
+        smoothingButton =
             addRenderableWidget(
                 new FlatButton(
                     x0,
                     y,
                     w,
                     16,
-                    Component.translatable("reizo.look.letterbox"),
+                    Component.translatable("reizo.inspector.smoothing", smoothingName()),
                     FlatButton.Style.TONAL,
-                    b -> EffectEdits.cycleLetterbox()));
-        y += 18;
-        int half2 = (w - 2) / 2;
-        tonal(x0, y, half2, "reizo.look.remove", b -> EffectEdits.removeHere());
+                    b -> ReplayEditor.cycleSmoothing()));
+      }
+      case LOOK -> {
+        if (section(x0, y, w, "color")) {
+          y += 16;
+          y = gradeField(x0, y, w, "exposure", -3, 3, 0, Grade::exposure, Grade::withExposure);
+          y = gradeField(x0, y, w, "contrast", 0, 2, 1, Grade::contrast, Grade::withContrast);
+          y = gradeField(x0, y, w, "saturation", 0, 2, 1, Grade::saturation, Grade::withSaturation);
+          y = gradeField(x0, y, w, "temperature", -1, 1, 0, Grade::temperature, Grade::withTemperature);
+        } else {
+          y += 16;
+        }
+        if (section(x0, y, w, "lens")) {
+          y += 16;
+          y = gradeField(x0, y, w, "vignette", 0, 1, 0, Grade::vignette, Grade::withVignette);
+          y = gradeField(x0, y, w, "bloom", 0, 1, 0, Grade::bloom, Grade::withBloom);
+          y = gradeField(x0, y, w, "dof", 0, 1, 0, Grade::dof, Grade::withDof);
+          y = gradeField(x0, y, w, "focus", 0.5f, 64, 8, Grade::focus, Grade::withFocus);
+          letterboxButton =
+              addRenderableWidget(
+                  new FlatButton(
+                      x0,
+                      y,
+                      w,
+                      16,
+                      Component.translatable("reizo.look.letterbox"),
+                      FlatButton.Style.TONAL,
+                      b -> EffectEdits.cycleLetterbox()));
+          y += 18;
+        } else {
+          y += 16;
+        }
+        y += 2;
+        tonal(x0, y, half, "reizo.look.remove", b -> EffectEdits.removeHere());
         tonal(
-            x0 + half2 + 2,
+            x0 + half + 2,
             y,
-            half2,
+            half,
             "reizo.inspector.open_settings",
             b -> Minecraft.getInstance().setScreen(new KeyframedSettingsScreen(this)));
       }
       case WORLD -> {
-        int[] colors = {Theme.WARN, Theme.TRACK_WORLD, Theme.TRACK_LOOK};
-        int i = 0;
-        for (String id : List.of("reizo:time_of_day", "reizo:rain", "reizo:thunder")) {
-          KeyframedSetting s = KeyframedSettings.find(id);
-          if (s == null) {
-            continue;
+        if (section(x0, y, w, "time_weather")) {
+          y += 16;
+          int[] colors = {Theme.WARN, Theme.TRACK_WORLD, Theme.TRACK_LOOK};
+          double[] steps = {20, 0.005, 0.005};
+          int i = 0;
+          for (String id : List.of("reizo:time_of_day", "reizo:rain", "reizo:thunder")) {
+            KeyframedSetting s = KeyframedSettings.find(id);
+            int n = i++;
+            if (s == null) {
+              continue;
+            }
+            fields.add(
+                addRenderableWidget(
+                    new DragField(
+                            x0,
+                            y,
+                            w,
+                            Component.translatable(s.label()),
+                            s.min(),
+                            s.max(),
+                            steps[n],
+                            s.min(),
+                            () -> SettingEdits.shownValue(s),
+                            v -> SettingEdits.edit(s, v, true),
+                            s::format)
+                        .accent(colors[n])
+                        .markedWhen(() -> SettingEdits.atKeyframe(s))));
+            y += 18;
           }
-          FlatSlider slider =
-              new FlatSlider(
-                  x0,
-                  y,
-                  w,
-                  Component.translatable(s.label()),
-                  s.min(),
-                  s.max(),
-                  () -> SettingEdits.shownValue(s),
-                  v -> SettingEdits.edit(s, v, true),
-                  s::format);
-          slider.accent(colors[i++ % colors.length]).markedWhen(() -> SettingEdits.atKeyframe(s));
-          sliders.add(addRenderableWidget(slider));
-          y += 24;
+        } else {
+          y += 16;
         }
-        y += 4;
-        tonal(x0, y, w, "reizo.inspector.hide_looked", b -> hideLookedAt());
+        if (section(x0, y, w, "entities")) {
+          y += 16;
+          tonal(x0, y, w, "reizo.inspector.hide_looked", b -> hideLookedAt());
+          y += 18;
+          hiddenTextY = y + 2;
+        } else {
+          hiddenTextY = -1;
+        }
+      }
+    }
+    inspectorContent = y + inspectorScroll - inspContentY();
+    int top = inspContentY() - 2;
+    int bottom = iY1 - 2;
+    for (var child : children()) {
+      if (child instanceof net.minecraft.client.gui.components.AbstractWidget wd
+          && wd.getX() >= iX0
+          && wd.getX() < iX1
+          && wd.getY() > inspTabsY() + 4
+          && wd.getY() < iY1 + 2000) {
+        wd.visible = wd.getY() >= top && wd.getY() + wd.getHeight() <= bottom;
       }
     }
   }
 
-  private int gradeSlider(
+  /** Adds a collapsible section header. Returns whether the section is open. */
+  private boolean section(int x, int y, int w, String name) {
+    boolean open = !collapsed.contains(name);
+    addRenderableWidget(
+            new FlatButton(
+                x,
+                y,
+                w,
+                14,
+                Component.translatable("reizo.section." + name),
+                FlatButton.Style.HEADER,
+                b -> {
+                  if (!collapsed.remove(name)) {
+                    collapsed.add(name);
+                  }
+                  builtInspector = "";
+                }))
+        .selectedWhen(() -> !collapsed.contains(name));
+    return open;
+  }
+
+  private int gradeField(
       int x,
       int y,
       int w,
       String name,
       float min,
       float max,
+      float reset,
       java.util.function.Function<Grade, Float> get,
       java.util.function.BiFunction<Grade, Float, Grade> set) {
-    FlatSlider slider =
-        new FlatSlider(
-            x,
-            y,
-            w,
-            Component.translatable("reizo.look." + name),
-            min,
-            max,
-            () -> get.apply(ReplayEditor.gradeNow()),
-            v -> EffectEdits.edit(g -> set.apply(g, (float) v)),
-            v -> String.format(Locale.ROOT, "%.2f", v).replace("-0.00", "0.00"));
-    slider.accent(Theme.TRACK_LOOK).markedWhen(EffectEdits::atKeyframe);
-    sliders.add(addRenderableWidget(slider));
-    return y + 22;
+    fields.add(
+        addRenderableWidget(
+            new DragField(
+                    x,
+                    y,
+                    w,
+                    Component.translatable("reizo.look." + name),
+                    min,
+                    max,
+                    (max - min) / 200.0,
+                    reset,
+                    () -> get.apply(ReplayEditor.gradeNow()),
+                    v -> EffectEdits.edit(g -> set.apply(g, (float) v)),
+                    v -> String.format(Locale.ROOT, "%.2f", v).replace("-0.00", "0.00"))
+                .accent(Theme.TRACK_LOOK)
+                .markedWhen(EffectEdits::atKeyframe)));
+    return y + 18;
+  }
+
+  /** A field editing the one selected camera keyframe. */
+  private int keyField(
+      int x,
+      int y,
+      int w,
+      String key,
+      double min,
+      double max,
+      double perPixel,
+      java.util.function.ToDoubleFunction<CameraKeyframe> get,
+      java.util.function.BiFunction<CameraKeyframe, Double, CameraKeyframe> set) {
+    Component label = key.length() == 1 ? Component.literal(key) : Component.translatable(key);
+    fields.add(
+        addRenderableWidget(
+            new DragField(
+                    x,
+                    y,
+                    w,
+                    label,
+                    min,
+                    max,
+                    perPixel,
+                    get.applyAsDouble(selectedKeyframes().get(0)),
+                    () -> {
+                      List<CameraKeyframe> c = selectedKeyframes();
+                      return c.size() == 1 ? get.applyAsDouble(c.get(0)) : 0;
+                    },
+                    v -> editKey(k -> set.apply(k, v)),
+                    v -> num(v))
+                .accent(Theme.TRACK_CAMERA)
+                .onCommit(ReplayEditor::changed)));
+    return y + 18;
+  }
+
+  private void editKey(java.util.function.UnaryOperator<CameraKeyframe> change) {
+    List<CameraKeyframe> chosen = selectedKeyframes();
+    if (chosen.size() != 1) {
+      return;
+    }
+    long now = System.currentTimeMillis();
+    if (now - lastKeyEditMs > 700) {
+      ReplayEditor.recordUndo();
+    }
+    lastKeyEditMs = now;
+    ReplayEditor.path().put(change.apply(chosen.get(0)));
+  }
+
+  private static CameraKeyframe withPos(CameraKeyframe k, double x, double y, double z) {
+    return new CameraKeyframe(k.timeMs(), x, y, z, k.yaw(), k.pitch(), k.roll(), k.fov());
+  }
+
+  private static CameraKeyframe withRot(CameraKeyframe k, float yaw, float pitch, float roll) {
+    return new CameraKeyframe(k.timeMs(), k.x(), k.y(), k.z(), yaw, pitch, roll, k.fov());
   }
 
   private FlatButton icon(
@@ -488,9 +717,9 @@ public final class TimelineScreen extends Screen {
       return "none";
     }
     return switch (tab) {
-      case KEYFRAME -> "keyframe:" + Math.min(selection.size(), 2);
-      case LOOK -> "look:" + lookPage;
-      case WORLD -> "world";
+      case KEYFRAME -> "keyframe:" + Math.min(selection.size(), 2) + collapsed;
+      case LOOK -> "look" + collapsed;
+      case WORLD -> "world" + collapsed;
     };
   }
 
@@ -584,11 +813,6 @@ public final class TimelineScreen extends Screen {
       selection.retainAll(existing);
     }
     updateLabels();
-    if (!isDragging()) {
-      for (FlatSlider s : sliders) {
-        s.refresh();
-      }
-    }
   }
 
   // --- Rendering ---------------------------------------------------------------------------
@@ -621,7 +845,13 @@ public final class TimelineScreen extends Screen {
     }
     renderTimeline(g, mouseX);
     renderTopBar(g, server);
+    if (drag == Drag.PANEL) {
+      renderDropPreview(g, mouseX, mouseY);
+    }
     super.render(g, mouseX, mouseY, partialTick);
+    if (popup != null) {
+      popup.draw(g, font, mouseX, mouseY);
+    }
   }
 
   /** Panel grounds and the hairlines between them. */
@@ -630,16 +860,45 @@ public final class TimelineScreen extends Screen {
     Draw.hline(g, 0, width, TOP_H - 1, Theme.LINE);
     g.fill(0, TOP_H, RAIL_W, timelineY, Theme.GROUND);
     Draw.vline(g, RAIL_W - 1, TOP_H, timelineY, Theme.LINE);
-    if (showLeft) {
-      g.fill(RAIL_W, TOP_H, RAIL_W + OUTLINER_W, timelineY, Theme.SURFACE);
-      Draw.vline(g, RAIL_W + OUTLINER_W - 1, TOP_H, timelineY, Theme.LINE);
-    }
-    if (showRight) {
-      g.fill(width - INSPECTOR_W, TOP_H, width, timelineY, Theme.SURFACE);
-      Draw.vline(g, width - INSPECTOR_W, TOP_H, timelineY, Theme.LINE);
-    }
     g.fill(0, timelineY, width, height, Theme.GROUND);
     Draw.hline(g, 0, width, timelineY, Theme.LINE);
+    if (showLeft && sceneDock != Dock.FLOAT) {
+      panelFrame(g, sX0, sY0, sX1, sY1, false, "reizo.scene.title");
+    }
+    if (showRight && inspectorDock != Dock.FLOAT) {
+      panelFrame(g, iX0, iY0, iX1, iY1, false, "reizo.inspector.title");
+    }
+    if (showLeft && sceneDock == Dock.FLOAT) {
+      panelFrame(g, sX0, sY0, sX1, sY1, true, "reizo.scene.title");
+    }
+    if (showRight && inspectorDock == Dock.FLOAT) {
+      panelFrame(g, iX0, iY0, iX1, iY1, true, "reizo.inspector.title");
+    }
+  }
+
+  /** A panel's ground and title bar; floating panels get a border, rounded corners and a shadow. */
+  private void panelFrame(
+      GuiGraphics g, int x0, int y0, int x1, int y1, boolean floating, String titleKey) {
+    if (floating) {
+      Draw.round(g, x0 - 1, y0 + 1, x1 + 3, y1 + 4, 6, 0x50000000);
+      Draw.round(g, x0 - 1, y0 - 1, x1 + 1, y1 + 1, 6, Theme.LINE);
+      Draw.round(g, x0, y0, x1, y1, 5, Draw.mix(Theme.SURFACE, 0xFF000000, 0));
+      Draw.round(g, x0, y0, x1, y0 + TITLE_H, 5, Theme.GROUND, true, true);
+      g.fill(x0, y0 + TITLE_H - 4, x1, y0 + TITLE_H, Theme.GROUND);
+    } else {
+      g.fill(x0, y0, x1, y1, Theme.SURFACE);
+      g.fill(x0, y0, x1, y0 + TITLE_H, Draw.mix(Theme.SURFACE, 0xFF000000, 0.25));
+      Draw.vline(g, x0, y0, y1, Theme.LINE);
+      Draw.vline(g, x1 - 1, y0, y1, Theme.LINE);
+      Draw.hline(g, x0, x1, y1 - 1, Theme.LINE);
+    }
+    Draw.hline(g, x0, x1, y0 + TITLE_H, Theme.LINE);
+    Draw.label(g, font, Component.translatable(titleKey).getString(), x0 + 6, y0 + 3, Theme.DIM);
+    // Grip: two rows of dots, the handle to move the panel.
+    for (int i = 0; i < 3; i++) {
+      g.fill(x1 - 14 + i * 3, y0 + 5, x1 - 13 + i * 3, y0 + 6, Theme.FAINT);
+      g.fill(x1 - 14 + i * 3, y0 + 8, x1 - 13 + i * 3, y0 + 9, Theme.FAINT);
+    }
   }
 
   private void renderTopBar(GuiGraphics g, ReplayServer server) {
@@ -656,14 +915,13 @@ public final class TimelineScreen extends Screen {
   private double lastMouseX;
 
   private void renderOutliner(GuiGraphics g, int mouseX, int mouseY) {
-    int x0 = RAIL_W;
-    int x1 = RAIL_W + OUTLINER_W - 1;
-    Draw.label(g, font, Component.translatable("reizo.scene.title").getString(), x0 + 6, TOP_H + 6, Theme.TEXT);
+    int x0 = sX0;
+    int x1 = sX1 - 1;
     collectScene();
     String count = Integer.toString(sceneRows.size());
-    Draw.label(g, font, count, x1 - 6 - Draw.width(font, count), TOP_H + 6, Theme.FAINT);
-    int top = TOP_H + 18;
-    int rows = Math.max(0, (timelineY - 4 - top) / ROW_H);
+    Draw.label(g, font, count, x1 - 20 - Draw.width(font, count), sY0 + 3, Theme.FAINT);
+    int top = sY0 + TITLE_H + 3;
+    int rows = Math.max(0, (sY1 - 3 - top) / ROW_H);
     sceneScroll = Math.max(0, Math.min(sceneScroll, Math.max(0, sceneRows.size() - rows)));
     if (sceneRows.isEmpty()) {
       Draw.label(g, font, Component.translatable("reizo.scene.empty").getString(), x0 + 6, top + 2, Theme.FAINT);
@@ -729,33 +987,19 @@ public final class TimelineScreen extends Screen {
   }
 
   private void renderInspector(GuiGraphics g) {
-    int x0 = width - INSPECTOR_W + 4;
-    int x1 = width - 4;
-    int y = TOP_H + 24;
+    int x0 = iX0 + 4;
+    int x1 = iX1 - 4;
+    int y = inspContentY() - inspectorScroll;
+    g.enableScissor(iX0, inspContentY() - 2, iX1, iY1 - 1);
     switch (tab) {
       case KEYFRAME -> {
         List<CameraKeyframe> chosen = selectedKeyframes();
         if (chosen.size() == 1) {
           CameraKeyframe k = chosen.get(0);
-          String[][] rows = {
-            {"reizo.inspector.time", ReplayHud.time(k.timeMs()) + "." + (k.timeMs() % 1000) / 100},
-            {"X", num(k.x())},
-            {"Y", num(k.y())},
-            {"Z", num(k.z())},
-            {"reizo.inspector.yaw", num(k.yaw()) + "°"},
-            {"reizo.inspector.pitch", num(k.pitch()) + "°"},
-            {"reizo.inspector.roll", num(k.roll()) + "°"},
-            {"reizo.inspector.fov", num(k.fov()) + "°"},
-          };
-          Draw.diamond(g, x0 + 3, y + 3, 3, Theme.TRACK_CAMERA);
-          Draw.label(g, font, Component.translatable("reizo.inspector.camera_key").getString(), x0 + 10, y, Theme.TEXT);
-          y += 12;
-          for (String[] r : rows) {
-            String label = r[0].length() == 1 ? r[0] : Component.translatable(r[0]).getString();
-            Draw.label(g, font, label, x0, y, Theme.DIM);
-            Draw.label(g, font, r[1], x1 - Draw.width(font, r[1]), y, Theme.TEXT);
-            y += 10;
-          }
+          Draw.diamond(g, x0 + 4, y + 5, 3, Theme.TRACK_CAMERA);
+          String time = ReplayHud.time(k.timeMs()) + "." + (k.timeMs() % 1000) / 100;
+          Draw.label(g, font, Component.translatable("reizo.inspector.camera_key").getString(), x0 + 11, y + 2, Theme.TEXT);
+          Draw.label(g, font, time, x1 - Draw.width(font, time), y + 2, Theme.DIM);
         } else if (chosen.isEmpty()) {
           Draw.wrap(
               g,
@@ -771,13 +1015,13 @@ public final class TimelineScreen extends Screen {
               font,
               Component.translatable("reizo.inspector.many", chosen.size()).getString(),
               x0,
-              y,
+              y + 2,
               Theme.TEXT);
         }
-        String mode =
-            ReplayEditor.path().interpolation().name().toLowerCase(Locale.ROOT).replace('_', '-')
-                + (ReplayEditor.path().easing().name().startsWith("EASE") ? " + ease" : "");
-        Draw.label(g, font, Draw.fit(font, mode, x1 - x0), x0, timelineY - 12, Theme.FAINT);
+        if (smoothingButton != null) {
+          smoothingButton.setMessage(
+              Component.translatable("reizo.inspector.smoothing", smoothingName()));
+        }
       }
       case LOOK -> {
         if (letterboxButton != null) {
@@ -791,15 +1035,15 @@ public final class TimelineScreen extends Screen {
         }
       }
       case WORLD -> {
-        String hidden =
-            Component.translatable("reizo.inspector.hidden_count", ReplayEntityHider.hiddenCount())
-                .getString();
-        int hy = TOP_H + 24 + sliders.size() * 24 + 4 + 20;
-        if (hy < timelineY - 10) {
-          Draw.label(g, font, hidden, x0, hy, Theme.DIM);
+        if (hiddenTextY > 0 && hiddenTextY < iY1 - 10) {
+          String hidden =
+              Component.translatable("reizo.inspector.hidden_count", ReplayEntityHider.hiddenCount())
+                  .getString();
+          Draw.label(g, font, hidden, x0, hiddenTextY, Theme.DIM);
         }
       }
     }
+    g.disableScissor();
   }
 
   private static String num(double v) {
@@ -969,16 +1213,36 @@ public final class TimelineScreen extends Screen {
 
   @Override
   public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    if (popup != null) {
+      PopupMenu open = popup;
+      popup = null;
+      if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
+        open.click(event.x(), event.y());
+      }
+      return true;
+    }
     if (super.mouseClicked(event, doubleClick)) {
       return true;
     }
     double mx = event.x();
     double my = event.y();
+    if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
+      return contextMenu(mx, my);
+    }
     if (event.button() != InputConstants.MOUSE_BUTTON_LEFT) {
       return false;
     }
-    if (showLeft && mx >= RAIL_W && mx < RAIL_W + OUTLINER_W && my >= TOP_H && my < timelineY) {
+    if (showLeft && mx >= sX0 && mx < sX1 && my >= sY0 && my < sY0 + TITLE_H) {
+      return startMove(1, mx, my, doubleClick);
+    }
+    if (showRight && mx >= iX0 && mx < iX1 && my >= iY0 && my < iY0 + TITLE_H) {
+      return startMove(2, mx, my, doubleClick);
+    }
+    if (showLeft && mx >= sX0 && mx < sX1 && my >= sY0 && my < sY1) {
       return clickScene(mx, my);
+    }
+    if (showRight && mx >= iX0 && mx < iX1 && my >= iY0 && my < iY1) {
+      return true;
     }
     if (mx < left || mx > right) {
       return false;
@@ -1042,8 +1306,73 @@ public final class TimelineScreen extends Screen {
     return true;
   }
 
+  /** Starts moving a panel by its title bar; a double-click docks a floating panel again. */
+  private boolean startMove(int panel, double mx, double my, boolean doubleClick) {
+    if (doubleClick) {
+      if (panel == 1) {
+        sceneDock = sceneDock == Dock.FLOAT ? Dock.LEFT : Dock.FLOAT;
+      } else {
+        inspectorDock = inspectorDock == Dock.FLOAT ? Dock.RIGHT : Dock.FLOAT;
+      }
+      rebuildWidgets();
+      return true;
+    }
+    movingPanel = panel;
+    moveOffX = mx - (panel == 1 ? sX0 : iX0);
+    moveOffY = my - (panel == 1 ? sY0 : iY0);
+    drag = Drag.PANEL;
+    return true;
+  }
+
+  /** Where a panel dropped at (mx, my) goes: a side when near an edge, else floating there. */
+  private Dock dropTarget(double mx) {
+    if (mx < RAIL_W + 50) {
+      return Dock.LEFT;
+    }
+    if (mx > width - 50) {
+      return Dock.RIGHT;
+    }
+    return Dock.FLOAT;
+  }
+
+  private void renderDropPreview(GuiGraphics g, int mouseX, int mouseY) {
+    Dock target = dropTarget(mouseX);
+    int w = movingPanel == 1 ? OUTLINER_W : INSPECTOR_W;
+    int x0;
+    int y0;
+    int y1;
+    if (target == Dock.FLOAT) {
+      x0 = clampX((int) (mouseX - moveOffX), w);
+      y0 = clampY((int) (mouseY - moveOffY), 60);
+      y1 = Math.min(timelineY - 2, y0 + (movingPanel == 1 ? 200 : 300));
+    } else {
+      x0 = target == Dock.LEFT ? RAIL_W : width - w;
+      y0 = TOP_H;
+      y1 = timelineY;
+    }
+    Draw.round(g, x0, y0, x0 + w, y1, 5, Theme.ACCENT_WASH);
+    Draw.outline(g, x0, y0, x0 + w, y1, Theme.ACCENT);
+  }
+
+  private void dropPanel(double mx, double my) {
+    Dock target = dropTarget(mx);
+    int x = (int) (mx - moveOffX);
+    int y = (int) (my - moveOffY);
+    if (movingPanel == 1) {
+      sceneDock = target;
+      sceneFloatX = x;
+      sceneFloatY = y;
+    } else {
+      inspectorDock = target;
+      inspectorFloatX = x;
+      inspectorFloatY = y;
+    }
+    movingPanel = 0;
+    rebuildWidgets();
+  }
+
   private boolean clickScene(double mx, double my) {
-    int top = TOP_H + 18;
+    int top = sY0 + TITLE_H + 3;
     if (my < top) {
       return true;
     }
@@ -1052,7 +1381,7 @@ public final class TimelineScreen extends Screen {
       return true;
     }
     Entity e = sceneRows.get(index);
-    if (mx >= RAIL_W + OUTLINER_W - 15) {
+    if (mx >= sX1 - 16) {
       ReplayEntityHider.toggle(e, playhead());
     } else {
       lookAt(e);
@@ -1111,7 +1440,7 @@ public final class TimelineScreen extends Screen {
         centerOverview(event.x());
         return true;
       }
-      case SEEK, BOX -> {
+      case SEEK, BOX, PANEL -> {
         return true;
       }
       default -> {
@@ -1125,6 +1454,7 @@ public final class TimelineScreen extends Screen {
     Drag was = drag;
     drag = Drag.NONE;
     switch (was) {
+      case PANEL -> dropPanel(event.x(), event.y());
       case SEEK -> ReplayPlayback.seekTo(clampTime(view.xToTime(event.x() - left)));
       case KEYFRAMES -> {
         if (dragRecorded) {
@@ -1144,8 +1474,21 @@ public final class TimelineScreen extends Screen {
 
   @Override
   public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {
-    if (showLeft && mx >= RAIL_W && mx < RAIL_W + OUTLINER_W && my >= TOP_H && my < timelineY) {
+    if (showLeft && mx >= sX0 && mx < sX1 && my >= sY0 && my < sY1) {
       sceneScroll = Math.max(0, sceneScroll - (int) Math.signum(vertical) * 3);
+      return true;
+    }
+    if (showRight && mx >= iX0 && mx < iX1 && my >= iY0 && my < iY1) {
+      if (super.mouseScrolled(mx, my, horizontal, vertical)) {
+        return true;
+      }
+      int room = iY1 - 2 - inspContentY();
+      int max = Math.max(0, inspectorContent - room);
+      int next = Math.max(0, Math.min(max, inspectorScroll - (int) Math.signum(vertical) * 18));
+      if (next != inspectorScroll) {
+        inspectorScroll = next;
+        rebuildWidgets();
+      }
       return true;
     }
     if (my < timelineY) {
@@ -1216,11 +1559,114 @@ public final class TimelineScreen extends Screen {
     return best;
   }
 
+  // --- Menus ----------------------------------------------------------------------------
+
+  private static Component t(String key) {
+    return Component.translatable(key);
+  }
+
+  private void openMenu(String name, int x, int y) {
+    Minecraft mc = Minecraft.getInstance();
+    PopupMenu m = new PopupMenu();
+    switch (name) {
+      case "file" -> m.add(t("reizo.menu.replays"), "", () -> mc.setScreen(new ReplayBrowserScreen(this)))
+          .add(t("reizo.timeline.export"), "", () -> mc.setScreen(new ExportSettingsScreen(this)))
+          .separator()
+          .add(t("reizo.menu_bar.close"), "Esc", this::onClose);
+      case "edit" -> m.add(t("reizo.menu_bar.undo"), "Ctrl+Z", this::undo, ReplayEditor::canUndo)
+          .add(t("reizo.menu_bar.redo"), "Ctrl+Y", this::redo, ReplayEditor::canRedo)
+          .separator()
+          .add(t("reizo.menu_bar.copy"), "Ctrl+C", this::copy, () -> !selection.isEmpty())
+          .add(t("reizo.menu_bar.paste"), "Ctrl+V", this::paste, () -> !clipboard.isEmpty())
+          .add(t("reizo.menu_bar.select_all"), "Ctrl+A", this::selectAll)
+          .add(t("reizo.menu_bar.delete"), "Del", this::deleteSelection);
+      case "view" -> m.add(t("reizo.menu_bar.panels"), "Tab", this::togglePanels)
+          .add(t("reizo.menu_bar.fit"), "F", view::showAll)
+          .add(t("reizo.menu_bar.path_visible"), "", PathVisualizer::toggle)
+          .separator()
+          .add(t("reizo.editor.view.free"), "", () -> setView("free"))
+          .add(t("reizo.editor.view.pov"), "", () -> setView("pov"))
+          .add(t("reizo.editor.view.follow"), "", () -> setView("follow"))
+          .add(t("reizo.editor.view.path"), "", () -> setView("path"));
+      case "camera" -> m.add(t("reizo.menu_bar.add_key"), "N", this::addKeyframe)
+          .add(t("reizo.timeline.smooth"), "", ReplayEditor::cycleSmoothing)
+          .separator()
+          .add(t("reizo.menu_bar.in"), "I", () -> ReplayEditor.setRegion(true, playhead()))
+          .add(t("reizo.menu_bar.out"), "O", () -> ReplayEditor.setRegion(false, playhead()))
+          .add(t("reizo.menu_bar.clear_region"), "Shift+I", this::clearRegion)
+          .separator()
+          .add(t("reizo.inspector.open_effects"), "", () -> mc.setScreen(new EffectsScreen(this)))
+          .add(t("reizo.inspector.open_settings"), "", () -> mc.setScreen(new KeyframedSettingsScreen(this)));
+      default -> {}
+    }
+    popup = m.at(font, x, y, width, height);
+  }
+
+  /** Right-click menus on keyframes, tracks, the ruler and the scene list. */
+  private boolean contextMenu(double mx, double my) {
+    PopupMenu m = new PopupMenu();
+    if (showLeft && mx >= sX0 && mx < sX1 && my >= sY0 + TITLE_H + 3 && my < sY1) {
+      int index = sceneScroll + (int) ((my - sY0 - TITLE_H - 3) / ROW_H);
+      if (index < 0 || index >= sceneRows.size()) {
+        return false;
+      }
+      Entity e = sceneRows.get(index);
+      m.add(t("reizo.menu_bar.look_at"), "", () -> lookAt(e))
+          .add(
+              t(ReplayEntityHider.isHidden(e) ? "reizo.menu_bar.show" : "reizo.menu_bar.hide"),
+              "",
+              () -> ReplayEntityHider.toggle(e, playhead()));
+    } else if (mx >= left && mx <= right) {
+      layoutLanes();
+      long time = clampTime(view.xToTime(mx - left));
+      int cy = laneY(Track.CAMERA);
+      if (my >= rulerY && my < rulerY + RULER_H) {
+        m.add(t("reizo.menu_bar.seek_here"), "", () -> ReplayPlayback.seekTo(time))
+            .add(t("reizo.menu_bar.in_here"), "", () -> ReplayEditor.setRegion(true, time))
+            .add(t("reizo.menu_bar.out_here"), "", () -> ReplayEditor.setRegion(false, time));
+      } else if (cy >= 0 && my >= cy && my < cy + LANE_H) {
+        CameraKeyframe k = keyframeAt(mx);
+        if (k != null) {
+          if (!selection.contains(k.timeMs())) {
+            selection.clear();
+            selection.add(k.timeMs());
+          }
+          m.add(t("reizo.inspector.goto"), "", () -> ReplayPlayback.seekTo(k.timeMs()))
+              .add(t("reizo.menu_bar.copy"), "Ctrl+C", this::copy)
+              .add(t("reizo.menu_bar.delete"), "Del", this::deleteSelection);
+        } else {
+          m.add(t("reizo.menu_bar.add_key"), "N", this::addKeyframe)
+              .add(t("reizo.menu_bar.paste"), "Ctrl+V", this::paste, () -> !clipboard.isEmpty())
+              .add(t("reizo.menu_bar.select_all"), "Ctrl+A", this::selectAll);
+        }
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
+    popup = m.at(font, (int) mx, (int) my, width, height);
+    return true;
+  }
+
+  private void copy() {
+    clipboard = KeyframeEdits.copy(ReplayEditor.path(), selection);
+  }
+
+  private void clearRegion() {
+    ReplayEditor.setRegion(true, -1);
+    ReplayEditor.setRegion(false, -1);
+  }
+
   // --- Keys -------------------------------------------------------------------------------
 
   @Override
   public boolean keyPressed(KeyEvent event) {
-    if (getFocused() instanceof FlatSlider && isDragging()) {
+    if (popup != null && event.key() == InputConstants.KEY_ESCAPE) {
+      popup = null;
+      return true;
+    }
+    if (getFocused() instanceof DragField && isDragging()) {
       return super.keyPressed(event);
     }
     int key = event.key();
@@ -1242,7 +1688,7 @@ public final class TimelineScreen extends Screen {
           return true;
         }
         case InputConstants.KEY_C -> {
-          clipboard = KeyframeEdits.copy(ReplayEditor.path(), selection);
+          copy();
           return true;
         }
         case InputConstants.KEY_V -> {
@@ -1447,5 +1893,10 @@ public final class TimelineScreen extends Screen {
   /** Whether the outliner and inspector are shown, for tests. */
   public boolean sidePanelsShown() {
     return showLeft || showRight;
+  }
+
+  private static String smoothingName() {
+    return ReplayEditor.path().interpolation().name().toLowerCase(Locale.ROOT).replace('_', '-')
+        + (ReplayEditor.path().easing().name().startsWith("EASE") ? " + ease" : "");
   }
 }

@@ -55,6 +55,31 @@ public final class Draw {
    * window's pixel size.
    */
   public static void round(GuiGraphics g, int x0, int y0, int x1, int y1, int radius, int color) {
+    round(g, x0, y0, x1, y1, radius, color, true, true);
+  }
+
+  /** Colour {@code t} of the way from {@code a} to {@code b} (opaque result). */
+  public static int mix(int a, int b, double t) {
+    int r = (int) Math.round(((a >> 16) & 0xFF) * (1 - t) + ((b >> 16) & 0xFF) * t);
+    int gr = (int) Math.round(((a >> 8) & 0xFF) * (1 - t) + ((b >> 8) & 0xFF) * t);
+    int bl = (int) Math.round((a & 0xFF) * (1 - t) + (b & 0xFF) * t);
+    return 0xFF000000 | (r << 16) | (gr << 8) | bl;
+  }
+
+  /**
+   * Like {@link #round(GuiGraphics, int, int, int, int, int, int)}, rounding only the chosen ends,
+   * so two pieces can sit side by side without overlapping.
+   */
+  public static void round(
+      GuiGraphics g,
+      int x0,
+      int y0,
+      int x1,
+      int y1,
+      int radius,
+      int color,
+      boolean roundLeft,
+      boolean roundRight) {
     if (x1 <= x0 || y1 <= y0) {
       return;
     }
@@ -79,14 +104,20 @@ public final class Draw {
       double cover = solid - dx; // coverage of the edge pixel
       int top = py0 + i;
       int bottom = py1 - 1 - i;
-      g.fill(px0 + solid, top, px1 - solid, top + 1, color);
-      g.fill(px0 + solid, bottom, px1 - solid, bottom + 1, color);
+      int l = roundLeft ? solid : 0;
+      int rr = roundRight ? solid : 0;
+      g.fill(px0 + l, top, px1 - rr, top + 1, color);
+      g.fill(px0 + l, bottom, px1 - rr, bottom + 1, color);
       if (solid > 0 && cover > 0.02) {
         int edge = Theme.alpha(color, (int) Math.round(alpha * cover));
-        g.fill(px0 + solid - 1, top, px0 + solid, top + 1, edge);
-        g.fill(px1 - solid, top, px1 - solid + 1, top + 1, edge);
-        g.fill(px0 + solid - 1, bottom, px0 + solid, bottom + 1, edge);
-        g.fill(px1 - solid, bottom, px1 - solid + 1, bottom + 1, edge);
+        if (roundLeft) {
+          g.fill(px0 + solid - 1, top, px0 + solid, top + 1, edge);
+          g.fill(px0 + solid - 1, bottom, px0 + solid, bottom + 1, edge);
+        }
+        if (roundRight) {
+          g.fill(px1 - solid, top, px1 - solid + 1, top + 1, edge);
+          g.fill(px1 - solid, bottom, px1 - solid + 1, bottom + 1, edge);
+        }
       }
     }
     g.pose().popMatrix();

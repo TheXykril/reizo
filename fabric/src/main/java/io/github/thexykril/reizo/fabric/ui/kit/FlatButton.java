@@ -27,7 +27,9 @@ public class FlatButton extends Button {
     /** The accent fill: the main action of a panel. */
     ACCENT,
     /** A tab or segment: accent text and underline when selected. */
-    TAB
+    TAB,
+    /** A collapsible section header: an arrow and left-aligned text; selected means open. */
+    HEADER
   }
 
   private final Style style;
@@ -88,6 +90,7 @@ public class FlatButton extends Button {
           case TONAL -> sel ? Theme.ACCENT_WASH : hot ? Theme.HOVER : Theme.RAISED;
           case ACCENT -> hot ? Theme.ACCENT_HOVER : Theme.ACCENT;
           case TAB -> hot && !sel ? Theme.HOVER : 0;
+          case HEADER -> hot ? Theme.HOVER : Draw.mix(Theme.SURFACE, Theme.RAISED, 0.6);
         };
     if (fill != 0) {
       Draw.round(g, x0, y0, x1, y1, 2, fill);
@@ -104,6 +107,12 @@ public class FlatButton extends Button {
       color = style == Style.TAB ? Theme.TEXT : Theme.ACCENT_HOVER;
     } else {
       color = hot ? Theme.TEXT : (style == Style.TAB ? Theme.DIM : Theme.TEXT);
+    }
+    if (style == Style.HEADER) {
+      Icons.draw(g, sel ? "open" : "closed", x0 + 6, (y0 + y1) / 2, Theme.DIM);
+      Draw.label(
+          g, font, Draw.fit(font, getMessage().getString(), getWidth() - 16), x0 + 13, y0 + (getHeight() - 8) / 2, Theme.TEXT);
+      return;
     }
     if (icon != null && Icons.has(icon)) {
       Icons.draw(g, icon, (x0 + x1) / 2, (y0 + y1) / 2, color);

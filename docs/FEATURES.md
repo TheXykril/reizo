@@ -130,7 +130,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   person yet.
   - Layout (ADR 0015, docked editor): top bar (transport, time, speed, view Free/POV/Follow/Path,
     undo, redo, Export), tool rail (hide entity, effects, settings, panels), Scene outliner,
-    Inspector (Keyframe, Look, World tabs) and the timeline. The outliner shows from 560 GUI pixels
+    Inspector (Camera, Look, World tabs, drag-number fields in folding sections), a menu bar, right-click menus, panels that float or dock by their title bars and the timeline. The outliner shows from 560 GUI pixels
     wide, the Inspector from 440; Tab folds both. The in-game tests run at 320x240, where only the
     top bar, rail and timeline show, so the side panels are covered by screenshots only.
   - Tracks: time ruler, markers, camera keyframes, look (effects), world (time and weather),

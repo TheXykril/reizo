@@ -30,7 +30,10 @@ compatibility.
   (time of day, rain and thunder sliders); and a timeline with separate Markers, Camera, Look,
   World, Entities and Settings tracks. Tab folds the side panels; small windows keep only the top
   bar and the timeline. Text uses the Inter font and shapes have smooth corners, so the editor no
-  longer looks like a Minecraft menu. The Inspector's Look tab holds the effect sliders.
+  longer looks like a Minecraft menu. The Inspector's Look tab holds the effects. Numbers are drag fields (drag, Shift for fine steps,
+  scroll, double-click to reset), Inspector sections fold, and there is a menu bar (File, Edit,
+  View, Camera) and right-click menus on scene rows, the ruler and camera keyframes. The Scene and
+  Inspector panels can be dragged out by their title bars to float, and docked left or right.
 - Hide entities in a replay: press H while looking at a mob, item or player to hide it from that
   moment on (press again to show it). Hidden entities are keyframed switches in Timeline →
   Settings, undoable, saved with the project and hidden in exports too.

@@ -15,8 +15,8 @@ screen, effects, audio, shadow recording, multi-version.
 ## 2. Latest completed tasks
 
 - **Docked editor UI (ADR 0015, Proposed), PR #69, waiting for the owner's review.** Kit in
-  `fabric/ui/kit` (Theme, Draw, Icons, FlatButton, FlatSlider); `TimelineScreen` is now the whole
-  editor (top bar, rail, Scene outliner, Inspector tabs, six timeline tracks). Side panels need
+  `fabric/ui/kit` (Theme, Draw, Icons, FlatButton, DragField, PopupMenu); `TimelineScreen` is now the whole
+  editor (top bar, rail, Scene outliner, Inspector tabs with drag fields and folding sections, menu bar, context menus, floating/docking panels, six timeline tracks). Widgets draw opaque pieces (no stacked translucent fills). Side panels need
   560/440 GUI pixels, so the 320×240 gametests only cover the top bar, rail and timeline; panels
   were checked by screenshots at GUI scale 2 on a 1280×720 window. Next: move Effects, Settings and
   Export into Inspector tabs on the kit, then the M9 clip track. Do not name a kit method `text`,
