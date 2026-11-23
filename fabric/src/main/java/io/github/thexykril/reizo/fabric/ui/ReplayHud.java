@@ -39,58 +39,74 @@ public final class ReplayHud {
   private static void render(GuiGraphics g) {
     ReplayServer server = ReplayPlayback.current();
     Minecraft mc = Minecraft.getInstance();
-    if (server == null || Compat.hudHidden(mc) || mc.screen instanceof TimelineScreen) {
+    // The timeline has its own transport; export settings sit where the bar would be.
+    if (server == null
+        || Compat.hudHidden(mc)
+        || mc.screen instanceof TimelineScreen
+        || mc.screen instanceof ExportSettingsView) {
       return;
     }
     Theme.refresh();
     long duration = Math.max(1, server.script().durationMs());
     long time = Math.min(server.replayTimeMs(), duration);
     Font font = mc.font;
-    int width = Math.min(360, g.guiWidth() - 20);
+    int width = Math.min(400, g.guiWidth() - 16);
     int x = (g.guiWidth() - width) / 2;
     int height = HEIGHT - 6;
     int y = g.guiHeight() - HEIGHT;
-    Draw.round(g, x - 1, y - 1, x + width + 1, y + height + 1, 6, Theme.alpha(Theme.LINE, 0xC0));
-    Draw.round(g, x, y, x + width, y + height, 5, Theme.alpha(Theme.GROUND, 0xE0));
+    // A floating card like OneConfig's panels: soft edge, no hard border.
+    Draw.round(g, x, y, x + width, y + height, 10, Theme.alpha(Theme.GROUND, 0xE8));
 
-    // Play state icon.
-    int ix = x + 8;
-    int iy = y + 4;
+    // Play state in a round button.
+    int bx = x + 4;
+    int by = y + 3;
+    int bs = height - 6;
+    Draw.round(g, bx, by, bx + bs, by + bs, bs / 2, Theme.HOVER);
+    int cx = bx + bs / 2;
+    int cy = by + bs / 2;
     if (server.clock().isRunning()) {
-      g.fill(ix, iy, ix + 2, iy + 7, Theme.TEXT);
-      g.fill(ix + 4, iy, ix + 6, iy + 7, Theme.TEXT);
+      Draw.round(g, cx - 3, cy - 3, cx - 1, cy + 3, 1, Theme.TEXT);
+      Draw.round(g, cx + 1, cy - 3, cx + 3, cy + 3, 1, Theme.TEXT);
     } else {
-      for (int i = 0; i < 4; i++) {
-        g.fill(ix + i, iy + i, ix + i + 1, iy + 7 - i, Theme.TEXT);
-      }
+      playTriangle(g, cx, cy, Theme.TEXT);
     }
-    String clock =
-        RecordingIndicator.formatElapsed(time) + " / " + RecordingIndicator.formatElapsed(duration);
-    Draw.label(g, font, clock, ix + 11, y + 3, Theme.TEXT);
 
+    // Time: current bright, length dim.
+    int tx = bx + bs + 6;
+    int ty = y + 3;
+    String now = RecordingIndicator.formatElapsed(time);
+    Draw.label(g, font, now, tx, ty, Theme.TEXT);
+    Draw.label(
+        g,
+        font,
+        " / " + RecordingIndicator.formatElapsed(duration),
+        tx + Draw.width(font, now),
+        ty,
+        Theme.DIM);
+
+    // Right: speed and camera chips, then the editor key.
+    String hint = RecorderKeys.timelineKeyName() + "  Editor";
+    int rx = x + width - 6;
+    rx = chip(g, font, hint, rx, ty, Theme.ACCENT_WASH, Theme.TEXT) - 4;
     String mode =
         ReplayEditor.isPathPlaying() ? "path" : ReplayCamera.mode().name().toLowerCase(Locale.ROOT);
-    String right = speed(server.clock().speed()) + "x  ·  " + mode;
-    String hint = RecorderKeys.timelineKeyName() + "  Editor";
-    int hw = Draw.width(font, hint) + 8;
-    int hx = x + width - 6 - hw;
-    Draw.round(g, hx, y + 2, hx + hw, y + 12, 3, Theme.RAISED);
-    Draw.label(g, font, hint, hx + 4, y + 3, Theme.DIM);
-    Draw.label(g, font, right, hx - 8 - Draw.width(font, right), y + 3, Theme.DIM);
+    rx = chip(g, font, mode, rx, ty, Theme.RAISED, Theme.DIM) - 4;
+    chip(g, font, speed(server.clock().speed()) + "×", rx, ty, Theme.RAISED, Theme.DIM);
 
-    int barX = x + 8;
-    int barW = width - 16;
-    int barY = y + height - 6;
-    Draw.round(g, barX, barY, barX + barW, barY + 3, 1, Theme.TRACK_BG);
+    // Progress: a slider track like OneConfig's, with a round thumb.
+    int barX = tx;
+    int barW = x + width - 10 - barX;
+    int barY = y + height - 7;
+    Draw.round(g, barX, barY, barX + barW, barY + 3, 2, Theme.TRACK_BG);
     int filled = (int) (barW * time / duration);
     if (filled > 1) {
-      Draw.round(g, barX, barY, barX + filled, barY + 3, 1, Theme.ACCENT);
+      Draw.round(g, barX, barY, barX + filled, barY + 3, 2, Theme.ACCENT);
     }
     RecordingMetadata meta = ReplayPlayback.metadata();
     if (meta != null) {
       for (RecordingMetadata.Marker m : meta.markers) {
         int mx = barX + (int) (barW * Math.min(m.timeMs, duration) / duration);
-        g.fill(mx, barY - 2, mx + 1, barY + 5, Theme.TRACK_MARKER);
+        Draw.round(g, mx - 1, barY - 2, mx + 1, barY + 5, 1, Theme.TRACK_MARKER);
       }
     }
     for (var k : ReplayEditor.path().keyframes()) {
@@ -98,7 +114,33 @@ public final class ReplayHud {
       Draw.diamond(g, kx, barY + 1, 2, Theme.TEXT);
     }
     int px = barX + filled;
-    Draw.round(g, px - 2, barY - 2, px + 3, barY + 5, 2, Theme.TEXT);
+    Draw.round(g, px - 4, barY - 3, px + 4, barY + 5, 4, 0xFFFFFFFF);
+  }
+
+  /** A play triangle centred on (cx, cy), 7 GUI pixels tall, drawn at window pixels. */
+  private static void playTriangle(GuiGraphics g, int cx, int cy, int color) {
+    int s = Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
+    int h = 7 * s;
+    int left = (cx - 2) * s;
+    int top = cy * s - h / 2;
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    for (int row = 0; row < h; row++) {
+      double mid = Math.abs(row + 0.5 - h / 2.0);
+      int len = (int) Math.round((h / 2.0 - mid) * 1.7);
+      if (len > 0) {
+        g.fill(left, top + row, left + len, top + row + 1, color);
+      }
+    }
+    g.pose().popMatrix();
+  }
+
+  /** A small rounded label ending at {@code right}; returns its left edge. */
+  private static int chip(GuiGraphics g, Font font, String text, int right, int y, int bg, int fg) {
+    int w = Draw.width(font, text) + 8;
+    Draw.round(g, right - w, y - 1, right, y + 10, 4, bg);
+    Draw.label(g, font, text, right - w + 4, y, fg);
+    return right - w;
   }
 
   public static String time(long ms) {
