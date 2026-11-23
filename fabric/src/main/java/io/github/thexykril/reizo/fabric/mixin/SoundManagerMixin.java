@@ -20,5 +20,10 @@ abstract class SoundManagerMixin {
       SoundInstance sound,
       CallbackInfoReturnable<net.minecraft.client.sounds.SoundEngine.PlayResult> cir) {
     ExportSession.onSound(sound);
+    //? if <26.3 {
+    // The mining hit sound; 26.3 plays it from a level event, recorded in LocalEffects.
+    io.github.thexykril.reizo.fabric.capture.LocalEffects.miningSound(
+        sound.getX(), sound.getY(), sound.getZ());
+    //?}
   }
 }

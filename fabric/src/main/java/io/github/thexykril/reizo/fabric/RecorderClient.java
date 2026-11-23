@@ -233,6 +233,7 @@ public final class RecorderClient implements ClientModInitializer {
       capture.start(meta, () -> WorldSnapshot.capture(mc));
       sampler.reset();
       equipment.reset();
+      io.github.thexykril.reizo.fabric.capture.LocalEffects.reset();
       hud.reset();
       screens.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
@@ -303,6 +304,23 @@ public final class RecorderClient implements ClientModInitializer {
     long start = System.nanoTime();
     boolean worked = tickShadow(mc);
     RecordingSession s = session();
+    // The local player's own block cracks, particles and sounds collected this tick, for both the
+    // recording and the shadow buffer.
+    List<byte[]> effects =
+        mc.getConnection() == null
+            ? List.of()
+            : io.github.thexykril.reizo.fabric.capture.LocalEffects.drain(
+                mc.getConnection().registryAccess());
+    ShadowBuffer shadowBuffer = capture.shadow();
+    if (shadowBuffer != null && worked) {
+      for (byte[] effect : effects) {
+        shadowBuffer.onPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, effect);
+      }
+    }
+    boolean recording =
+        s != null && mc.player != null && s.state() == RecordingSession.State.RECORDING;
+    io.github.thexykril.reizo.fabric.capture.LocalEffects.setEnabled(
+        !ReplayPlayback.isActive() && (recording || worked));
     if (s == null || mc.player == null || s.state() != RecordingSession.State.RECORDING) {
       if (worked) {
         io.github.thexykril.reizo.fabric.capture.RecorderStats.tick(System.nanoTime() - start);
@@ -317,6 +335,9 @@ public final class RecorderClient implements ClientModInitializer {
       byte[] held = equipment.sample(mc.player, mc.getConnection().registryAccess());
       if (held != null) {
         s.submitPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
+      }
+      for (byte[] effect : effects) {
+        s.submitPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, effect);
       }
       byte[] hudBytes = hud.sample(mc, mc.player, mc.getConnection().registryAccess());
       if (hudBytes != null) {

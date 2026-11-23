@@ -94,6 +94,15 @@ final class PlayTransformer {
   private final int respawnId;
   private final int tickingStateId;
   private final int startConfigurationId;
+  private final int setEntityDataId;
+
+  /**
+   * The recorded player's latest entity data, by accessor id. The server sends a player's own data
+   * (skin layers, main hand, shared flags) before the first local player sample adds the entity,
+   * and the client drops data for an entity it does not have; it is sent again after each add.
+   */
+  private final java.util.Map<Integer, SynchedEntityData.DataValue<?>> recordedPlayerData =
+      new java.util.LinkedHashMap<>();
 
   /**
    * Screen and container packets meant for the recorded player. The camera must not open the
@@ -134,6 +143,7 @@ final class PlayTransformer {
     this.abilitiesId = idOf(new ClientboundPlayerAbilitiesPacket(new Abilities()));
     this.playerInfoId = peekId(playerInfo(new UUID(0, 0), "x", GameType.SURVIVAL, false));
     this.tickingStateId = idOf(new ClientboundTickingStatePacket(20f, false));
+    this.setEntityDataId = idOf(new ClientboundSetEntityDataPacket(0, List.of()));
     this.startConfigurationId =
         idOf(net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket.INSTANCE);
     this.gameEventId =
@@ -249,6 +259,16 @@ final class PlayTransformer {
       }
       return List.of(bytes);
     }
+    if (id == setEntityDataId && recordedEntityId >= 0) {
+      ClientboundSetEntityDataPacket p = (ClientboundSetEntityDataPacket) decode(bytes);
+      if (p.id() == recordedEntityId) {
+        for (SynchedEntityData.DataValue<?> value : p.packedItems()) {
+          recordedPlayerData.put(value.id(), value);
+        }
+        return recordedPlayerAdded ? List.of(bytes) : List.of();
+      }
+      return List.of(bytes);
+    }
     if (id == tickingStateId) {
       // The replay server sends the tick state itself, so the replay speed and pause apply on top
       // of the recorded rate (see ReplayServer).
@@ -312,6 +332,12 @@ final class PlayTransformer {
                   0,
                   Vec3.ZERO,
                   s.headYRot())));
+      if (!recordedPlayerData.isEmpty()) {
+        out.add(
+            encode(
+                new ClientboundSetEntityDataPacket(
+                    recordedEntityId, List.copyOf(recordedPlayerData.values()))));
+      }
     }
     out.add(
         encode(
@@ -328,11 +354,23 @@ final class PlayTransformer {
     out.add(rotateHead(recordedEntityId, s.headYRot()));
     boolean swinging = s.has(LocalPlayerState.FLAG_SWINGING);
     if (swinging && s.swingTime() < lastSwingTime) {
+      //? if >=26.3 {
+      /*// 26.3 moved swings out of the animate packet into their own packet.
+      out.add(
+          encode(
+              new net.minecraft.network.protocol.game.ClientboundSwingAnimationPacket(
+                  recordedEntityId,
+                  s.has(LocalPlayerState.FLAG_SWING_OFFHAND)
+                      ? net.minecraft.world.InteractionHand.OFF_HAND
+                      : net.minecraft.world.InteractionHand.MAIN_HAND,
+                  net.minecraft.world.item.component.SwingAnimation.DEFAULT)));
+      *///?} else {
       int action =
           s.has(LocalPlayerState.FLAG_SWING_OFFHAND)
               ? ANIMATE_SWING_OFF_HAND
               : ANIMATE_SWING_MAIN_HAND;
       out.add(animate(recordedEntityId, action));
+      //?}
     }
     lastSwingTime = swinging ? s.swingTime() : Integer.MAX_VALUE;
     byte[] data = poseData(s);
@@ -422,7 +460,12 @@ final class PlayTransformer {
   private byte[] poseData(LocalPlayerState s) {
     Pose[] poses = Pose.values();
     int pose = s.pose() < poses.length ? s.pose() : Pose.STANDING.ordinal();
-    int living = s.has(LocalPlayerState.FLAG_USING_ITEM) ? 1 : 0;
+    // LivingEntity's flags byte: 1 = using an item, 2 = with the off hand (eating, drinking,
+    // blocking, drawing a bow show on the right arm and spawn the item's particles).
+    int living = 0;
+    if (s.has(LocalPlayerState.FLAG_USING_ITEM)) {
+      living = s.has(LocalPlayerState.FLAG_USING_OFFHAND) ? 3 : 1;
+    }
     if (pose == lastPose && living == lastLivingFlags) {
       return null;
     }

@@ -28,7 +28,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
 | World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; basic playback (GT) |
 | Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; replayed on the recorded player |
 | Inventory / equipment | ✓ | ✓ | ✓ | ✓ | partial | GT | Inventory in recorded packets; own held items and armor recorded as equipment packets and shown on playback |
-| Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | — | Server-sent ones are in packets; client-only effects not captured |
+| Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | GT | Server-sent ones are in packets. The local player's own effects that the server sends only to others are recorded as vanilla packets: breaking stages, block break particles and sound, mining particles, placing sounds, footsteps (GT `recordMidSessionWhileWalking`). Other client-only effects are not captured |
 | Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | GT | `recordOnDedicatedServer`: auto-record on joining a dedicated server over the network (compressed), server-spawned entity recorded and shown in playback; a server switch in the middle carries on and replays. Not tested: real proxies, real public servers |
 | Start mid-session with full world | ✓ | ✓ | ? | ✗ | partial | GT | Config + login prelude only; loaded chunks missing until world snapshots (M2) |
 | Replay metadata (version, server, player, markers) | ? | ✓ | ✓ | ✓ | implemented | UT, GT | |
@@ -44,7 +44,9 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   separate player entity with the recorded UUID; after a recorded walk it ends at the recorded end
   position within 0.5 blocks; also works for mid-session recordings). Movement, rotation, head
   rotation, arm swing, pose (crouching, swimming, sleeping, elytra pose) and item use; held items
-  and armor (GT `playBackWalk`: sword in hand, helmet worn and crouching at the end). Missing: the
+  and armor (GT `playBackWalk`: sword in hand, helmet worn and crouching at the end); second skin
+  layer (GT `playBack`, `playBackWalk`); block breaking cracks and the mining arm swing (GT
+  `playBackWalk`); off-hand item use. Missing: the
   elytra and burning/invisible flags come only from the server's own packets.
 - **Recorded player's HUD in player view (POV):** **partial**, evidence GT (`recordFromJoin`:
   `PLAYER_HUD` frames recorded and their items decode; `checkReplayControls`: the overlay is drawn

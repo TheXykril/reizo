@@ -8,6 +8,14 @@ compatibility.
 
 ### Fixed
 
+- The recorded player now shows the second skin layer (hat, jacket, sleeves, trousers) in replays.
+  The server sends it before the player appears in the replay, and it was dropped.
+- Breaking blocks shows in replays: the cracks, the block's break particles and sound, and the
+  particles mining knocks off. Placing sounds and the recorded player's footsteps are heard too.
+  The server sends these to other players only, so they are now recorded from your own client.
+- Eating, drinking or blocking with the off hand shows on the right arm in replays.
+- The recorded player's arm swings again in 26.3 replays (26.3 sends swings in a new packet).
+
 - A chest or other container the recorded player opened no longer opens on the viewer's screen
   during a replay (where it stayed open and took over the controls).
 - The settings screen fits at GUI scale 3 on a 720p window again.
