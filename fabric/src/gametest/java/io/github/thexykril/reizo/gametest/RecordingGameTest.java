@@ -672,6 +672,22 @@ public final class RecordingGameTest implements FabricClientGameTest {
    * Plays the join recording back: the client must enter the recorded world through the replay
    * server, receive every play packet, load the recorded chunks, and not record the replay.
    */
+  /**
+   * The Quick Play log, which launchers show as the last played world, still names the recorded
+   * singleplayer world while a replay runs: the replay server must not be logged.
+   */
+  private void checkQuickPlayLog(ClientGameTestContext context) {
+    Path log = context.computeOnClient(mc -> mc.gameDirectory.toPath().resolve("quickplay/log.json"));
+    String text;
+    try {
+      text = java.nio.file.Files.readString(log);
+    } catch (java.io.IOException e) {
+      throw new AssertionError("no Quick Play log at " + log, e);
+    }
+    check(text.contains("singleplayer"), "Quick Play log lost the last world: " + text);
+    check(!text.contains("multiplayer"), "the replay was logged as last played: " + text);
+  }
+
   private void playBack(ClientGameTestContext context, Path archive) {
     RecordingMetadata meta = metadata(archive);
     context.runOnClient(
@@ -730,6 +746,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         context.computeOnClient(mc -> mc.level != null && ReplayPlayback.isActive()),
         "replay connection dropped");
     checkReplayControls(context);
+    checkQuickPlayLog(context);
 
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     LOGGER.info("playBack: left the replay");

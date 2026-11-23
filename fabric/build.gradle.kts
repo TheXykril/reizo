@@ -61,6 +61,8 @@ extensions.configure<FabricApiExtension> {
 // lockstep with client frames. A small window keeps frames cheap enough for the world to load.
 loom.runs.matching { it.name == "clientGameTest" }.configureEach {
     programArgs("--width", "320", "--height", "240")
+    // As launchers do: Minecraft writes the last played world here; replays must not replace it.
+    programArgs("--quickPlayPath", "quickplay/log.json")
     // Playback feeds the client from a raw socket, so packets are not sent through a Connection
     // the gametest framework can count; its packet synchronizer would report a false error.
     vmArgs("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
