@@ -27,9 +27,20 @@ public final class LocalPlayerSampler {
     if (player.isUsingItem()) {
       flags |= LocalPlayerState.FLAG_USING_ITEM;
     }
-    if (player.swinging) {
+    //? if >=26.1 {
+    /*var swing = player.getCurrentSwing();
+    boolean swinging = swing != null;
+    boolean offHand = swinging && swing.hand() == InteractionHand.OFF_HAND;
+    // 26.x keeps the swing tick count private; its progress (0 to 1) restarts the same way.
+    int swingTime = Math.round(player.getSwingAnimation(1f) * 1000);
+    *///?} else {
+    boolean swinging = player.swinging;
+    boolean offHand = player.swingingArm == InteractionHand.OFF_HAND;
+    int swingTime = player.swingTime;
+    //?}
+    if (swinging) {
       flags |= LocalPlayerState.FLAG_SWINGING;
-      if (player.swingingArm == InteractionHand.OFF_HAND) {
+      if (offHand) {
         flags |= LocalPlayerState.FLAG_SWING_OFFHAND;
       }
     }
@@ -45,7 +56,7 @@ public final class LocalPlayerSampler {
             player.yBodyRot,
             player.getPose().ordinal(),
             flags,
-            player.swingTime);
+            swingTime);
     if (state.equals(last)) {
       return null; // standing still: no need to write a frame every tick
     }

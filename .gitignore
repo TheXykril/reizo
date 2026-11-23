@@ -17,3 +17,5 @@ bin/
 *.reizo
 *.recording/
 .env
+fabric/versions/*/build/
+fabric/versions/*/run/

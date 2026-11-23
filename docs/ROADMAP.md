@@ -78,9 +78,11 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 Plan: [ADR 0007](DECISIONS/0007-multi-version-strategy.md) (accepted). Starts only after M1–M4 work
 on 1.21.11.
 
-- Stonecutter multi-version build, then Minecraft 26.3 (newest, OneClient mod's target) (#19)
+- Stonecutter multi-version build, then Minecraft 26.3 (newest, OneClient mod's target) (#19).
+  Done on branch `feat/multi-version` (in review): both versions pass all 20 gametests.
 - The rest of OneClient's versions: 1.21.1, 1.21.10, 26.1.2, 26.2 (#21)
-- CI matrix: newest of each family on PRs, all versions on main (#22)
+- CI matrix: newest of each family on PRs, all versions on main (#22). First step done: CI builds
+  and gametests 1.21.11 and 26.3.
 - Move timeline, camera-path and export logic into `core` so other adapters reuse it (#23)
 - 1.8.9 spike on Ornithe (capture + file, Java-level question for `core`), then the full port (#24, #25)
 - Not planned: 1.9–1.20.6 and Forge/NeoForge (new ADR if demand appears)

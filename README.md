@@ -25,8 +25,8 @@ working without an executed test or a documented manual check.
 
 ## Requirements
 
-- Minecraft **1.21.11** with Fabric Loader ≥ 0.20.1 and Fabric API
-- Java 21+
+- Minecraft **1.21.11** (Java 21+) or **26.3** (Java 25+), with Fabric Loader ≥ 0.20.1 and Fabric API.
+  26.3 support is new and not yet tested by hand.
 
 ## Using it (current build)
 
@@ -40,11 +40,11 @@ working without an executed test or a documented manual check.
 
 ```sh
 ./gradlew build                     # compile, format check, unit tests, mod jar
-./gradlew :fabric:runClient         # development client
-xvfb-run -a ./gradlew :fabric:runClientGameTest   # in-game end-to-end tests (headless)
+./gradlew :fabric:1.21.11:runClient         # development client
+xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest   # in-game end-to-end tests (headless)
 ```
 
-The mod jar is written to `fabric/build/libs/`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Each Minecraft version builds its own jar, in `fabric/versions/<version>/build/libs/`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Documentation
 

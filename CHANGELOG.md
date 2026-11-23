@@ -16,6 +16,9 @@ compatibility.
 
 ### Added
 
+- Minecraft 26.3 support (a separate jar, built from the same sources with Stonecutter). Not
+  yet tested by hand. Recordings play only on the version that made them.
+
 - Separate "Sound" and "Music" levels in the export settings.
 - "Replays" in the top-left corner of OneClient's main menu, and an "Open replays" key (unbound by
   default) that opens the replay browser from any main menu or in game.

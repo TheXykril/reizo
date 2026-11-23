@@ -8,7 +8,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.platform.Window;
 import java.util.Locale;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * A modifier key required together with a key mapping. Vanilla key mappings have no modifiers, so
@@ -16,9 +15,9 @@ import org.lwjgl.glfw.GLFW;
  */
 public enum KeyModifier {
   NONE(-1, -1),
-  SHIFT(GLFW.GLFW_KEY_LEFT_SHIFT, GLFW.GLFW_KEY_RIGHT_SHIFT),
-  CONTROL(GLFW.GLFW_KEY_LEFT_CONTROL, GLFW.GLFW_KEY_RIGHT_CONTROL),
-  ALT(GLFW.GLFW_KEY_LEFT_ALT, GLFW.GLFW_KEY_RIGHT_ALT);
+  SHIFT(InputConstants.KEY_LSHIFT, InputConstants.KEY_RSHIFT),
+  CONTROL(InputConstants.KEY_LCONTROL, InputConstants.KEY_RCONTROL),
+  ALT(InputConstants.KEY_LALT, InputConstants.KEY_RALT);
 
   private final int left;
   private final int right;
@@ -30,9 +29,15 @@ public enum KeyModifier {
 
   /** Whether the modifier is held (always true for {@link #NONE}). */
   public boolean isDown(Window window) {
-    return this == NONE
-        || InputConstants.isKeyDown(window, left)
-        || InputConstants.isKeyDown(window, right);
+    return this == NONE || isKeyDown(window, left) || isKeyDown(window, right);
+  }
+
+  private static boolean isKeyDown(Window window, int key) {
+    //? if >=26.1 {
+    /*return InputConstants.isKeyDown(key);
+    *///?} else {
+    return InputConstants.isKeyDown(window, key);
+    //?}
   }
 
   public Component label() {

@@ -18,6 +18,30 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(Minecraft.class)
 abstract class MinecraftMixin {
+  //? if >=26.1 {
+  /*@ModifyArg(
+      method = "runTick",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/DeltaTracker$Timer;advanceGameTime(J)I"),
+      index = 0)
+  private long reizo$exportClock(long realMillis) {
+    return ExportSession.timerMillis(realMillis);
+  }
+
+  // 26.x advances the real-time clock separately, in renderFrame; it follows the same clock.
+  @ModifyArg(
+      method = "renderFrame",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/DeltaTracker$Timer;advanceRealTime(J)V"),
+      index = 0)
+  private long reizo$exportRealClock(long realMillis) {
+    return ExportSession.lastTimerMillis(realMillis);
+  }
+  *///?} else {
   @ModifyArg(
       method = "runTick",
       at =
@@ -28,6 +52,7 @@ abstract class MinecraftMixin {
   private long reizo$exportClock(long realMillis) {
     return ExportSession.timerMillis(realMillis);
   }
+  //?}
 
   @Inject(method = "runTick", at = @At("TAIL"))
   private void reizo$afterFrame(boolean advanceGameTime, CallbackInfo ci) {

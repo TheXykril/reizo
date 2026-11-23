@@ -149,7 +149,7 @@ public final class ReplayBrowserScreen extends Screen {
 
   /** Presses Play. */
   public void pressPlay() {
-    play.onPress(new net.minecraft.client.input.KeyEvent(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, 0, 0));
+    play.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0));
   }
 
   // ---- actions ----

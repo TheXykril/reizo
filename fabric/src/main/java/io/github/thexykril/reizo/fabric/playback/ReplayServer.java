@@ -211,7 +211,7 @@ public final class ReplayServer implements AutoCloseable {
   private void serve(OutputStream out) throws IOException, InterruptedException {
     awaitOrClosed(helloReceived);
     writeFrame(
-        out, encode(LoginProtocols.CLIENTBOUND, new ClientboundLoginFinishedPacket(profile)));
+        out, encode(LoginProtocols.CLIENTBOUND, loginFinished(profile)));
     out.flush();
     awaitOrClosed(loginAcknowledged);
 
@@ -685,5 +685,14 @@ public final class ReplayServer implements AutoCloseable {
     } catch (Exception ignored) {
       // Closing during shutdown; nothing useful to do.
     }
+  }
+
+  private static ClientboundLoginFinishedPacket loginFinished(GameProfile profile) {
+    //? if >=26.1 {
+    /*// The session id only feeds telemetry.
+    return new ClientboundLoginFinishedPacket(profile, java.util.UUID.randomUUID());
+    *///?} else {
+    return new ClientboundLoginFinishedPacket(profile);
+    //?}
   }
 }

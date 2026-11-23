@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.export;
 
+import io.github.thexykril.reizo.fabric.compat.Compat;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -72,6 +73,7 @@ public final class ExportSession {
   // Whether the frame being rendered now shows the next frame's time (decided once per frame).
   private boolean readyThisFrame;
   private boolean hideGuiBefore;
+  private long lastTimerMs = -1;
   private boolean pathBefore;
   private String error;
 
@@ -130,7 +132,7 @@ public final class ExportSession {
     }
     ExportSession s =
         new ExportSession(plan, output, settings, ffmpeg, audio, soundVolume, musicVolume, onEnd);
-    s.hideGuiBefore = mc.options.hideGui;
+    s.hideGuiBefore = Compat.hudHidden(mc);
     s.pathBefore = ReplayEditor.isPathPlaying();
     current = s;
     server.setPaused(true);
@@ -282,7 +284,17 @@ public final class ExportSession {
     // here, before the frame's ticks, so the capture after it matches what was rendered.
     s.readyThisFrame = s.frameReady() && s.encoder.hasRoom();
     int shown = s.readyThisFrame ? s.frame : Math.max(0, s.frame - 1);
-    return s.virtualBaseMs + Math.round(s.plan.timeOfSample(shown) - s.plan.startMs());
+    s.lastTimerMs = s.virtualBaseMs + Math.round(s.plan.timeOfSample(shown) - s.plan.startMs());
+    return s.lastTimerMs;
+  }
+
+  /** The time {@link #timerMillis} last gave this frame, for clocks read after it (26.x). */
+  public static long lastTimerMillis(long realMillis) {
+    ExportSession s = current;
+    if (s == null || s.state != State.RUNNING || s.lastTimerMs < 0) {
+      return realMillis;
+    }
+    return s.lastTimerMs;
   }
 
   /** Called after each rendered frame. */
@@ -320,10 +332,10 @@ public final class ExportSession {
                   settings.outHeight(),
                   target.width,
                   target.height,
-                  RenderSystem.getDevice().getMaxTextureSize());
+                  Compat.maxTextureSize());
           if (!size.matches(target.width, target.height)) {
             renderOverride = size;
-            mc.resizeDisplay();
+            Compat.resizeRenderTargets(mc);
             LOGGER.info("Rendering the export at {}x{}", size.width(), size.height());
             return; // the next frame renders at the new size
           }
@@ -339,7 +351,7 @@ public final class ExportSession {
           end(State.FAILED, "could not start FFmpeg: " + e.getMessage());
           return;
         }
-        mc.options.hideGui = true;
+        Compat.setHudHidden(mc, true);
         ReplayEditor.setPathPlaying(true);
         server.setManual(true, plan.startMs());
         server.advanceTo(Math.round(plan.timeOfSample(0)), 1);
@@ -494,10 +506,10 @@ public final class ExportSession {
       }
     }
     Minecraft mc = Minecraft.getInstance();
-    mc.options.hideGui = hideGuiBefore;
+    Compat.setHudHidden(mc, hideGuiBefore);
     if (renderOverride != null) {
       renderOverride = null;
-      mc.resizeDisplay();
+      Compat.resizeRenderTargets(mc);
     }
     mc.updateTitle();
     ReplayEditor.setPathPlaying(pathBefore);

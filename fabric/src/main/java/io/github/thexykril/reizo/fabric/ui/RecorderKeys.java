@@ -14,7 +14,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 /**
  * Recorder and replay key bindings, all rebindable in Controls. Of the recorder keys only toggle
@@ -64,7 +63,7 @@ public final class RecorderKeys {
     // vanilla key mappings have none (see KeyModifier).
     toggle =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.toggle", GLFW.GLFW_KEY_R, category));
+            new KeyMapping("key.reizo.toggle", InputConstants.KEY_R, category));
     pause =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping(
@@ -104,65 +103,65 @@ public final class RecorderKeys {
             Identifier.fromNamespaceAndPath(RecorderClient.MOD_ID, "replay"));
     replayCamera =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_camera", GLFW.GLFW_KEY_V, replay));
+            new KeyMapping("key.reizo.replay_camera", InputConstants.KEY_V, replay));
     replayPause =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_pause", GLFW.GLFW_KEY_K, replay));
+            new KeyMapping("key.reizo.replay_pause", InputConstants.KEY_K, replay));
     replaySlower =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_slower", GLFW.GLFW_KEY_LEFT_BRACKET, replay));
+            new KeyMapping("key.reizo.replay_slower", InputConstants.KEY_LBRACKET, replay));
     replayFaster =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_faster", GLFW.GLFW_KEY_RIGHT_BRACKET, replay));
+            new KeyMapping("key.reizo.replay_faster", InputConstants.KEY_RBRACKET, replay));
     replayBack =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_back", GLFW.GLFW_KEY_LEFT, replay));
+            new KeyMapping("key.reizo.replay_back", InputConstants.KEY_LEFT, replay));
     replayForward =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_forward", GLFW.GLFW_KEY_RIGHT, replay));
+            new KeyMapping("key.reizo.replay_forward", InputConstants.KEY_RIGHT, replay));
     replayPrevMarker =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_prev_marker", GLFW.GLFW_KEY_COMMA, replay));
+            new KeyMapping("key.reizo.replay_prev_marker", InputConstants.KEY_COMMA, replay));
     replayNextMarker =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.replay_next_marker", GLFW.GLFW_KEY_PERIOD, replay));
+            new KeyMapping("key.reizo.replay_next_marker", InputConstants.KEY_PERIOD, replay));
     // Camera path keys; N, B and J are unused by vanilla (P is Social Interactions).
     keyframeAdd =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.keyframe_add", GLFW.GLFW_KEY_N, replay));
+            new KeyMapping("key.reizo.keyframe_add", InputConstants.KEY_N, replay));
     keyframeRemove =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.keyframe_remove", GLFW.GLFW_KEY_DELETE, replay));
+            new KeyMapping("key.reizo.keyframe_remove", InputConstants.KEY_DELETE, replay));
     pathToggle =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.path_toggle", GLFW.GLFW_KEY_B, replay));
+            new KeyMapping("key.reizo.path_toggle", InputConstants.KEY_B, replay));
     pathSmoothing =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.path_smoothing", GLFW.GLFW_KEY_J, replay));
+            new KeyMapping("key.reizo.path_smoothing", InputConstants.KEY_J, replay));
     // Y is unused by vanilla.
     timeline =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.timeline", GLFW.GLFW_KEY_Y, replay));
+            new KeyMapping("key.reizo.timeline", InputConstants.KEY_Y, replay));
     // Free camera roll and FOV (stored in new keyframes) and the path display. U, I, minus,
     // equals, 0 and G are unused by vanilla.
     rollLeft =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.roll_left", GLFW.GLFW_KEY_U, replay));
+            new KeyMapping("key.reizo.roll_left", InputConstants.KEY_U, replay));
     rollRight =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.roll_right", GLFW.GLFW_KEY_I, replay));
+            new KeyMapping("key.reizo.roll_right", InputConstants.KEY_I, replay));
     fovIn =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.fov_in", GLFW.GLFW_KEY_MINUS, replay));
+            new KeyMapping("key.reizo.fov_in", InputConstants.KEY_MINUS, replay));
     fovOut =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.fov_out", GLFW.GLFW_KEY_EQUAL, replay));
+            new KeyMapping("key.reizo.fov_out", InputConstants.KEY_EQUALS, replay));
     cameraReset =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.camera_reset", GLFW.GLFW_KEY_0, replay));
+            new KeyMapping("key.reizo.camera_reset", InputConstants.KEY_0, replay));
     pathDisplay =
         KeyBindingHelper.registerKeyBinding(
-            new KeyMapping("key.reizo.path_display", GLFW.GLFW_KEY_G, replay));
+            new KeyMapping("key.reizo.path_display", InputConstants.KEY_G, replay));
   }
 
   /** The key that opens the replay browser (unbound by default). */

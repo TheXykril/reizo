@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.playback;
 
+import io.github.thexykril.reizo.fabric.compat.Compat;
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.camera.CameraPath;
 import java.util.List;
@@ -50,8 +51,13 @@ public final class PathVisualizer {
 
   /** Registers the per-frame drawing. */
   public static void register() {
+    //? if >=26.1 {
+    /*net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents.END_EXTRACTION.register(
+        context -> draw(Minecraft.getInstance()));
+    *///?} else {
     net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents.END_EXTRACTION.register(
         context -> draw(Minecraft.getInstance()));
+    //?}
   }
 
   static void draw(Minecraft mc) {
@@ -61,13 +67,17 @@ public final class PathVisualizer {
         || server == null
         || path.isEmpty()
         || ReplayEditor.isPathPlaying()
-        || mc.options.hideGui
+        || Compat.hudHidden(mc)
         || mc.level == null) {
       return;
     }
     // Add to the level renderer's own frame collection explicitly: frames rendered outside the
     // normal game loop (test screenshots, for one) have no collection open.
+    //? if >=26.1 {
+    /*var collection = mc.levelExtractor.collectPerFrameMainThreadGizmos();
+    *///?} else {
     var collection = mc.levelRenderer.collectPerFrameGizmos();
+    //?}
     try {
       drawPath(path, server);
     } finally {

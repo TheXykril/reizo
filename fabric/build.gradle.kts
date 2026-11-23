@@ -1,13 +1,26 @@
-// Fabric client mod for Minecraft 1.21.11 (Mojang mappings).
-// Thin adapter layer: hooks Minecraft and forwards data to :core.
+// Fabric client mod, built once per Minecraft version by Stonecutter (:fabric:<version>, ADR 0007).
+// Every version shares fabric/src; differences are //? blocks. Thin adapter layer: hooks Minecraft
+// and forwards data to :core. Names are Mojang's (mapped for 1.21.x, unobfuscated from 26.1).
+import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.api.fabricapi.FabricApiExtension
+
 plugins {
-    alias(libs.plugins.loom)
+    java
 }
 
 val modId = providers.gradleProperty("mod_id").get()
+val minecraftVersion = property("minecraft_version") as String
+val remap = (property("loom_remap") as String).toBoolean()
+val javaVersion = property("java_version") as String
+val fabricApiVersion = property("fabric_api_version") as String
+
+// Obfuscated versions need the remapping Loom; 26.x is unobfuscated.
+apply(plugin = if (remap) "net.fabricmc.fabric-loom-remap" else "net.fabricmc.fabric-loom")
+val loom = extensions.getByType<LoomGradleExtensionAPI>()
+val modImplementation = if (remap) "modImplementation" else "implementation"
 
 base {
-    archivesName.set("$modId-fabric-${libs.versions.minecraft.get()}")
+    archivesName.set("$modId-fabric-$minecraftVersion")
 }
 
 repositories {
@@ -18,11 +31,7 @@ repositories {
     }
 }
 
-loom {
-    // Mixins live in the client source set only; the mod is client-side.
-    mixin {
-        defaultRefmapName.set("$modId.refmap.json")
-    }
+loom.apply {
     runs {
         named("client") {
             client()
@@ -38,7 +47,7 @@ loom {
 
 // Client gametests: a real Minecraft client creates a singleplayer world and records it.
 // Source set: src/gametest. Run headless with: xvfb-run ./gradlew :fabric:runClientGameTest
-fabricApi {
+extensions.configure<FabricApiExtension> {
     configureTests {
         createSourceSet.set(true)
         modId.set("$modId-gametest")
@@ -58,10 +67,12 @@ loom.runs.matching { it.name == "clientGameTest" }.configureEach {
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:${libs.versions.minecraft.get()}")
-    mappings(loom.officialMojangMappings())
+    "minecraft"("com.mojang:minecraft:$minecraftVersion")
+    if (remap) {
+        "mappings"(loom.officialMojangMappings())
+    }
     modImplementation(libs.fabric.loader)
-    modImplementation(libs.fabric.api)
+    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
 
     // Optional OneConfig settings page (only its Minecraft-independent config API is needed).
     compileOnly("org.polyfrost.oneconfig:config:${libs.versions.oneconfig.get()}") { isTransitive = false }
@@ -76,7 +87,7 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.2.20") { isTransitive = false }
 
     implementation(project(":core"))
-    include(project(":core"))
+    "include"(project(":core"))
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -87,7 +98,8 @@ tasks.processResources {
     val props =
         mapOf(
             "version" to project.version.toString(),
-            "minecraft_version" to libs.versions.minecraft.get(),
+            "minecraft_version" to minecraftVersion,
+            "java_version" to javaVersion,
             "loader_version" to
                 libs.versions.fabric.loader
                     .get(),
@@ -95,3 +107,135 @@ tasks.processResources {
     inputs.properties(props)
     filesMatching("fabric.mod.json") { expand(props) }
 }
+
+// Renames between Minecraft versions, applied by Stonecutter when it generates a version's sources.
+// Each rule is a regex pair (forward, then reverse) so switching the active version round-trips.
+// Anything that is not a plain rename lives in //? blocks or in fabric/compat.
+val sc = extensions.getByType<dev.kikugie.stonecutter.build.StonecutterBuildExtension>()
+val is26 = sc.eval(sc.current.version, ">=26.1")
+
+fun rename(
+    from: String,
+    to: String,
+    reverseFrom: String,
+    reverseTo: String,
+) = sc.replacements.regex(is26) { replace(from, to, reverseFrom, reverseTo) }
+
+fun word(
+    from: String,
+    to: String,
+) = rename("\\b$from\\b", to, "\\b$to\\b", from)
+
+// 26.1 renamed GuiGraphics and the render methods to "extract" its render state.
+word("GuiGraphics", "GuiGraphicsExtractor")
+rename(
+    "public void render\\((?=GuiGraphics)",
+    "public void extractRenderState(",
+    "public void extractRenderState\\(",
+    "public void render(",
+)
+rename("\\bsuper\\.render\\(", "super.extractRenderState(", "\\bsuper\\.extractRenderState\\(", "super.render(")
+rename(
+    "public void renderBackground\\(",
+    "public void extractBackground(",
+    "public void extractBackground\\(",
+    "public void renderBackground(",
+)
+rename(
+    "public void renderContent\\(",
+    "public void extractContent(",
+    "public void extractContent\\(",
+    "public void renderContent(",
+)
+rename("\\.drawString\\(", ".text(", "\\.text\\(", ".drawString(")
+rename("\\.drawCenteredString\\(", ".centeredText(", "\\.centeredText\\(", ".drawCenteredString(")
+rename("\\.drawWordWrap\\(", ".textWithWordWrap(", "\\.textWithWordWrap\\(", ".drawWordWrap(")
+// Screens moved to Minecraft.gui.
+rename(
+    "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.screen\\b(?!\\()",
+    "$1.gui.screen()",
+    "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.gui\\.screen\\(\\)",
+    "$1.screen",
+)
+rename(
+    "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.setScreen\\(",
+    "$1.gui.setScreen(",
+    "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.gui\\.setScreen\\(",
+    "$1.setScreen(",
+)
+// Fabric API renames.
+rename("\\bScreens\\.getButtons\\(", "Screens.getWidgets(", "\\bScreens\\.getWidgets\\(", "Screens.getButtons(")
+rename("\\.client\\.keybinding\\.v1\\.", ".client.keymapping.v1.", "\\.client\\.keymapping\\.v1\\.", ".client.keybinding.v1.")
+word("KeyBindingHelper", "KeyMappingHelper")
+word("registerKeyBinding", "registerKeyMapping")
+word("ClientCommandManager", "ClientCommands")
+// 26.1 moved input from GLFW to SDL: key codes are scancodes, read through InputConstants.
+rename("\\bType\\.KEYSYM\\b", "Type.KEYBOARD", "\\bType\\.KEYBOARD\\b", "Type.KEYSYM")
+// Accessors that moved in 26.1.
+rename(
+    "\\b(mc|minecraft|client)\\.getToastManager\\(\\)",
+    "$1.gui.toastManager()",
+    "\\b(mc|minecraft|client)\\.gui\\.toastManager\\(\\)",
+    "$1.getToastManager()",
+)
+rename(
+    "\\.gui\\.setOverlayMessage\\(",
+    ".gui.hud.setOverlayMessage(",
+    "\\.gui\\.hud\\.setOverlayMessage\\(",
+    ".gui.setOverlayMessage(",
+)
+rename(
+    "\\bUtil\\.getPlatform\\(\\)\\.openPath\\(",
+    "com.mojang.blaze3d.Blaze3D.openPath(",
+    "\\bcom\\.mojang\\.blaze3d\\.Blaze3D\\.openPath\\(",
+    "Util.getPlatform().openPath(",
+)
+rename(
+    "\\b(mc|minecraft|client)\\.getMainRenderTarget\\(\\)",
+    "$1.gameRenderer.mainRenderTarget()",
+    "\\b(mc|minecraft|client)\\.gameRenderer\\.mainRenderTarget\\(\\)",
+    "$1.getMainRenderTarget()",
+)
+rename(
+    "\\.gameRenderer\\.getMainCamera\\(\\)",
+    ".gameRenderer.mainCamera()",
+    "\\.gameRenderer\\.mainCamera\\(\\)",
+    ".gameRenderer.getMainCamera()",
+)
+rename(
+    "\\.resolve\\((\\w+)\\.getSoundManager\\(\\)\\)",
+    ".getOrResolve($1.getSoundManager())",
+    "\\.getOrResolve\\((\\w+)\\.getSoundManager\\(\\)\\)",
+    ".resolve($1.getSoundManager())",
+)
+rename(
+    "(?<![\\w.])EntityType\\.([A-Z_]+)\\b",
+    "net.minecraft.world.entity.EntityTypes.$1",
+    "\\bnet\\.minecraft\\.world\\.entity\\.EntityTypes\\.([A-Z_]+)\\b",
+    "EntityType.$1",
+)
+// Fabric's client gametest API: worlds are reached through their server connection.
+rename(
+    "\\bworld\\.getClientWorld\\(\\)",
+    "world.getConnection()",
+    "\\bworld\\.getConnection\\(\\)",
+    "world.getClientWorld()",
+)
+rename(
+    "\\bconnection\\.getClientWorld\\(\\)\\.",
+    "connection.",
+    "\\bconnection\\.(?=waitFor)",
+    "connection.getClientWorld().",
+)
+rename(
+    "\\bTestServerConnection connection = ",
+    "TestDedicatedServerConnection connection = ",
+    "\\bTestDedicatedServerConnection connection = ",
+    "TestServerConnection connection = ",
+)
+rename(
+    "\\.v1\\.context\\.TestServerConnection;",
+    ".v1.context.TestDedicatedServerConnection;",
+    "\\.v1\\.context\\.TestDedicatedServerConnection;",
+    ".v1.context.TestServerConnection;",
+)

@@ -140,7 +140,11 @@ final class PlayTransformer {
                     net.minecraft.world.level.Level.OVERWORLD,
                     0,
                     GameType.SPECTATOR,
+                    //? if >=26.1 {
+                    /*java.util.Optional.empty(),
+                    *///?} else {
                     null,
+                    //?}
                     false,
                     false,
                     java.util.Optional.empty(),
@@ -279,7 +283,13 @@ final class PlayTransformer {
         encode(
             new ClientboundEntityPositionSyncPacket(
                 recordedEntityId,
+                //? if >=26.1 {
+                /*net.minecraft.world.entity.PositionPath.of(pos),
+                s.yRot(),
+                s.xRot(),
+                *///?} else {
                 new PositionMoveRotation(pos, Vec3.ZERO, s.yRot(), s.xRot()),
+                //?}
                 s.has(LocalPlayerState.FLAG_ON_GROUND))));
     out.add(rotateHead(recordedEntityId, s.headYRot()));
     boolean swinging = s.has(LocalPlayerState.FLAG_SWINGING);
@@ -317,6 +327,9 @@ final class PlayTransformer {
             p.showDeathScreen(),
             p.doLimitedCrafting(),
             spectator(p.commonPlayerSpawnInfo()),
+            //? if >=26.1 {
+            /*p.onlineMode(),
+            *///?}
             p.enforcesSecureChat()));
   }
 
@@ -326,7 +339,11 @@ final class PlayTransformer {
         info.dimension(),
         info.seed(),
         GameType.SPECTATOR,
+        //? if >=26.1 {
+        /*java.util.Optional.of(info.gameType()),
+        *///?} else {
         info.gameType(),
+        //?}
         info.isDebug(),
         info.isFlat(),
         info.lastDeathLocation(),

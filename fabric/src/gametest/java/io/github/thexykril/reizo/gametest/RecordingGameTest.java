@@ -42,6 +42,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.GraphicsPreset;
 import net.minecraft.client.Minecraft;
@@ -54,7 +55,7 @@ import net.minecraft.network.protocol.configuration.ConfigurationProtocols;
 import net.minecraft.network.protocol.game.GameProtocols;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.world.level.GameType;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -360,11 +361,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
           var key = io.github.thexykril.reizo.fabric.ui.RecorderKeys.openReplays();
           key.setKey(
               com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(
-                  org.lwjgl.glfw.GLFW.GLFW_KEY_F7));
+                  com.mojang.blaze3d.platform.InputConstants.KEY_F7));
           net.minecraft.client.KeyMapping.resetMapping();
         });
     try {
-      context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_F7);
+      context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_F7);
       context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
       context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
       context.waitTicks(2);
@@ -373,7 +374,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
       context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
       context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
       context.waitTicks(2);
-      context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_F7);
+      context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_F7);
       context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
     } finally {
       context.runOnClient(
@@ -435,7 +436,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           s -> {
             var player = s.getPlayerList().getPlayers().get(0);
             var pig =
-                net.minecraft.world.entity.EntityType.PIG.create(
+                EntityType.PIG.create(
                     player.level(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
             pig.setPos(player.getX() + 2, player.getY(), player.getZ());
             pig.setNoAi(true);
@@ -461,7 +462,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           s -> {
             var player = s.getPlayerList().getPlayers().get(0);
             var pig =
-                net.minecraft.world.entity.EntityType.PIG.create(
+                EntityType.PIG.create(
                     player.level(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
             pig.setPos(player.getX() - 2, player.getY(), player.getZ());
             pig.setNoAi(true);
@@ -601,7 +602,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
       return null;
     }
     for (var e : mc.level.entitiesForRendering()) {
-      if (e.getType() == net.minecraft.world.entity.EntityType.PIG
+      if (e.getType() == EntityType.PIG
           && e.getCustomName() != null
           && name.equals(e.getCustomName().getString())) {
         return e;
@@ -733,7 +734,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     int recordedId =
         context.computeOnClient(mc -> ReplayPlayback.current().view().recordedEntityId());
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.getInput().pressKey(InputConstants.KEY_V);
     context.waitTicks(2);
     check(ReplayCamera.mode() == ReplayCamera.Mode.POV, "camera mode " + ReplayCamera.mode());
     check(
@@ -743,7 +744,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
                     && mc.options.getCameraType() == CameraType.FIRST_PERSON),
         "player view does not look through the recorded player");
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.getInput().pressKey(InputConstants.KEY_V);
     context.waitTicks(2);
     check(ReplayCamera.mode() == ReplayCamera.Mode.FOLLOW, "camera mode " + ReplayCamera.mode());
     check(
@@ -753,7 +754,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
                     && mc.options.getCameraType() == CameraType.THIRD_PERSON_BACK),
         "follow camera is not behind the recorded player");
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_V);
+    context.getInput().pressKey(InputConstants.KEY_V);
     context.waitTicks(2);
     check(ReplayCamera.mode() == ReplayCamera.Mode.FREE, "camera mode " + ReplayCamera.mode());
     check(
@@ -763,22 +764,22 @@ public final class RecordingGameTest implements FabricClientGameTest {
                     && mc.options.getCameraType() == CameraType.FIRST_PERSON),
         "free camera is not the spectator camera");
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_K);
+    context.getInput().pressKey(InputConstants.KEY_K);
     context.waitFor(mc -> mc.level.tickRateManager().isFrozen(), 20 * 5);
     check(!ReplayPlayback.current().clock().isRunning(), "replay clock still running");
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_RIGHT_BRACKET);
+    context.getInput().pressKey(InputConstants.KEY_RBRACKET);
     context.waitFor(mc -> mc.level.tickRateManager().tickrate() == 40f, 20 * 5);
-    context.getInput().pressKey(GLFW.GLFW_KEY_K);
+    context.getInput().pressKey(InputConstants.KEY_K);
     context.waitFor(mc -> !mc.level.tickRateManager().isFrozen(), 20 * 5);
     check(ReplayPlayback.current().clock().speed() == 2.0, "speed did not step to 2x");
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_LEFT_BRACKET);
+    context.getInput().pressKey(InputConstants.KEY_LBRACKET);
     context.waitFor(mc -> mc.level.tickRateManager().tickrate() == 20f, 20 * 5);
 
     // The replay has finished; the back key restarts it through a reconfiguration.
     Object levelBefore = context.computeOnClient(mc -> mc.level);
-    context.getInput().pressKey(GLFW.GLFW_KEY_LEFT);
+    context.getInput().pressKey(InputConstants.KEY_LEFT);
     context.waitFor(
         mc -> {
           ReplayServer replay = ReplayPlayback.current();
@@ -794,7 +795,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(
         context.computeOnClient(mc -> mc.player.isSpectator()),
         "camera is not a spectator after a backwards seek");
-    context.getInput().pressKey(GLFW.GLFW_KEY_RIGHT);
+    context.getInput().pressKey(InputConstants.KEY_RIGHT);
     context.waitFor(mc -> ReplayPlayback.current().seeksDone() == 2, 20 * 5);
     context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
     checkCameraPath(context);
@@ -1050,20 +1051,20 @@ public final class RecordingGameTest implements FabricClientGameTest {
       context.getInput().holdKeyFor(options -> options.keyUp, 40);
       context.waitTicks(5);
       // R alone must not stop it; Shift+R (the default, like Lunar) does.
-      context.getInput().pressKey(GLFW.GLFW_KEY_R);
+      context.getInput().pressKey(InputConstants.KEY_R);
       context.waitTicks(2);
       check(
           context.computeOnClient(mc -> RecorderClient.get().session()) != null,
           "R without Shift stopped the recording");
       // Shift is also sneak: hold it a moment so the recording ends crouching.
-      context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+      context.getInput().holdKey(InputConstants.KEY_LSHIFT);
       context.waitTicks(5);
       check(
           context.computeOnClient(
               mc -> mc.player.getPose() == net.minecraft.world.entity.Pose.CROUCHING),
           "player is not crouching before the stop");
-      context.getInput().pressKey(GLFW.GLFW_KEY_R);
-      context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+      context.getInput().pressKey(InputConstants.KEY_R);
+      context.getInput().releaseKey(InputConstants.KEY_LSHIFT);
       context.waitTicks(2);
       check(
           context.computeOnClient(mc -> RecorderClient.get().session()) == null,
@@ -1202,7 +1203,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
    * sits on the path at the replay time. The project is saved with the keyframes.
    */
   private void checkCameraPath(ClientGameTestContext context) {
-    context.getInput().pressKey(GLFW.GLFW_KEY_N);
+    context.getInput().pressKey(InputConstants.KEY_N);
     context.waitTicks(2);
     check(
         ReplayEditor.path().size() == 1, "N did not add a keyframe: " + ReplayEditor.path().size());
@@ -1221,7 +1222,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           ReplayEditor.putKeyframe(new CameraKeyframe(0, x, y, z, 0, 30, 0, 50));
           ReplayEditor.putKeyframe(new CameraKeyframe(duration, x + 10, y, z, 90, 30, 0, 50));
         });
-    context.getInput().pressKey(GLFW.GLFW_KEY_B);
+    context.getInput().pressKey(InputConstants.KEY_B);
     context.waitTicks(2);
     check(ReplayEditor.isPathPlaying(), "B did not start the camera path");
     // Pause halfway through the path (a backwards seek, so the world is rebuilt first).
@@ -1264,7 +1265,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
             });
     check(saved.cameraKeyframes.size() == 2, "project not saved with the keyframes");
     context.takeScreenshot("reizo-camera-path");
-    context.getInput().pressKey(GLFW.GLFW_KEY_B);
+    context.getInput().pressKey(InputConstants.KEY_B);
     context.runOnClient(mc -> ReplayPlayback.current().setPaused(false));
     context.waitTicks(2);
     check(!ReplayEditor.isPathPlaying(), "B did not stop the camera path");
@@ -1282,7 +1283,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         mc ->
             ReplayEditor.putKeyframe(
                 new CameraKeyframe(middle, mc.player.getX(), mc.player.getEyeY(), 0, 0, 0, 0, 70)));
-    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().pressKey(InputConstants.KEY_Y);
     context.waitTicks(2);
     check(
         context.computeOnClient(mc -> mc.screen instanceof TimelineScreen),
@@ -1298,13 +1299,13 @@ public final class RecordingGameTest implements FabricClientGameTest {
             });
     // Drag the middle keyframe 30 GUI pixels to the left.
     context.getInput().setCursorPos((at[0] + 0.5) * scale, (at[1] + 0.5) * scale);
-    context.getInput().holdMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(1);
     for (int i = 0; i < 3; i++) {
       context.getInput().moveCursor(-10 * scale, 0);
       context.waitTicks(1);
     }
-    context.getInput().releaseMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
     context.waitTicks(2);
     List<Long> afterDrag = keyframeTimes();
     check(afterDrag.size() == 3, "drag changed the keyframe count: " + afterDrag);
@@ -1315,35 +1316,35 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(selected.equals(Set.of(moved)), "dragged keyframe not selected: " + selected);
 
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Z);
+    context.getInput().pressKey(InputConstants.KEY_Z);
     context.getInput().releaseControl();
     context.waitTicks(1);
     check(keyframeTimes().get(1) == middle, "Ctrl+Z did not undo the drag: " + keyframeTimes());
     context.getInput().holdControl();
-    context.getInput().pressKey(GLFW.GLFW_KEY_Y);
+    context.getInput().pressKey(InputConstants.KEY_Y);
     context.getInput().releaseControl();
     context.waitTicks(1);
     check(keyframeTimes().get(1) == moved, "Ctrl+Y did not redo the drag: " + keyframeTimes());
 
-    context.getInput().pressKey(GLFW.GLFW_KEY_I);
+    context.getInput().pressKey(InputConstants.KEY_I);
     context.waitTicks(1);
     long in = ReplayEditor.inMs();
     check(in >= 0, "I did not set the export start");
     context.takeScreenshot("reizo-timeline");
     context.getInput().holdShift();
-    context.getInput().pressKey(GLFW.GLFW_KEY_I);
+    context.getInput().pressKey(InputConstants.KEY_I);
     context.getInput().releaseShift();
     context.waitTicks(1);
     check(ReplayEditor.inMs() == -1, "Shift+I did not clear the export start");
 
     // Space pauses; then a click on the ruler at a quarter of the recording seeks there.
-    context.getInput().pressKey(GLFW.GLFW_KEY_SPACE);
+    context.getInput().pressKey(InputConstants.KEY_SPACE);
     context.waitTicks(1);
     check(!ReplayPlayback.current().clock().isRunning(), "Space did not pause the replay");
     int seeks = ReplayPlayback.current().seeksDone();
     var cameraBefore = context.computeOnClient(mc -> mc.player.position());
     context.getInput().setCursorPos((at[2] + 0.5) * scale, (at[3] + 0.5) * scale);
-    context.getInput().pressMouse(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
     context.waitFor(
         mc -> {
           ReplayServer r = ReplayPlayback.current();
@@ -1385,7 +1386,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
    */
   private void checkFreeCamera(ClientGameTestContext context) {
     check(ReplayCamera.mode() == ReplayCamera.Mode.FREE, "camera not free: " + ReplayCamera.mode());
-    context.getInput().holdKeyFor(GLFW.GLFW_KEY_I, 5);
+    context.getInput().holdKeyFor(InputConstants.KEY_I, 5);
     context.waitTicks(1);
     float roll = ReplayEditor.freeRoll();
     check(roll >= 8 && roll <= 12, "holding I did not roll right: " + roll);
@@ -1393,7 +1394,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         ReplayEditor.rollNow() == roll,
         "roll not applied to the camera: " + ReplayEditor.rollNow());
     float setting = context.computeOnClient(mc -> mc.options.fov().get().floatValue());
-    context.getInput().holdKeyFor(GLFW.GLFW_KEY_MINUS, 10);
+    context.getInput().holdKeyFor(InputConstants.KEY_MINUS, 10);
     context.waitTicks(1);
     float fov = ReplayEditor.fovNow();
     check(fov < setting - 7 && fov > setting - 13, "holding - did not zoom in: " + fov);
@@ -1406,7 +1407,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(
         k != null && k.roll() == roll && k.fov() == fov,
         "keyframe did not store roll and FOV: " + k);
-    context.getInput().pressKey(GLFW.GLFW_KEY_0);
+    context.getInput().pressKey(InputConstants.KEY_0);
     context.waitTicks(1);
     check(
         ReplayEditor.freeRoll() == 0 && Float.isNaN(ReplayEditor.fovNow()),
@@ -1432,10 +1433,10 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(PathVisualizer.isVisible(), "path display off by default");
     context.waitTicks(3);
     context.takeScreenshot("reizo-path-display");
-    context.getInput().pressKey(GLFW.GLFW_KEY_G);
+    context.getInput().pressKey(InputConstants.KEY_G);
     context.waitTicks(1);
     check(!PathVisualizer.isVisible(), "G did not hide the path");
-    context.getInput().pressKey(GLFW.GLFW_KEY_G);
+    context.getInput().pressKey(InputConstants.KEY_G);
     LOGGER.info("checkFreeCamera OK: roll {} and FOV {} stored in {}", roll, fov, k);
   }
 
@@ -1743,7 +1744,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
             .findFirst()
             .orElseThrow(() -> new AssertionError("no '" + key + "' button on " + mc.screen));
     ((net.minecraft.client.gui.components.Button) button)
-        .onPress(new net.minecraft.client.input.KeyEvent(GLFW.GLFW_KEY_ENTER, 0, 0));
+        .onPress(new net.minecraft.client.input.KeyEvent(InputConstants.KEY_RETURN, 0, 0));
   }
 
   // ---- verification helpers ----
