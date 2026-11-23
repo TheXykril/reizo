@@ -15,6 +15,17 @@ import net.minecraft.client.Minecraft;
 public final class Compat {
   private Compat() {}
 
+  /** A cycle button builder starting at {@code initial}. */
+  public static <T> net.minecraft.client.gui.components.CycleButton.Builder<T> cycle(
+      java.util.function.Function<T, net.minecraft.network.chat.Component> label, T initial) {
+    //? if >=1.21.11 {
+    return net.minecraft.client.gui.components.CycleButton.builder(label, initial);
+    //?} else {
+    /*return net.minecraft.client.gui.components.CycleButton.<T>builder(label)
+        .withInitialValue(initial);
+    *///?}
+  }
+
   /** Whether the HUD is hidden (F1). */
   public static boolean hudHidden(Minecraft mc) {
     //? if >=26.1 {
@@ -49,13 +60,33 @@ public final class Compat {
 
   /** The largest texture side the GPU accepts. */
   public static int maxTextureSize() {
-    //? if >=26.1 {
+    //? if >=26.3 {
     /*return RenderSystem.getDevice()
         .getDeviceInfo()
         .limits()
         .maxTextureSizeForFormat(com.mojang.renderpearl.api.GpuFormat.RGBA8_UNORM);
+    *///?} else if >=26.1 {
+    /*return RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize();
     *///?} else {
     return RenderSystem.getDevice().getMaxTextureSize();
     //?}
+  }
+
+  /** The camera's yaw in degrees. */
+  public static float cameraYaw(net.minecraft.client.Camera camera) {
+    //? if >=1.21.11 {
+    return camera.yRot();
+    //?} else {
+    /*return camera.getYRot();
+    *///?}
+  }
+
+  /** Whether Control (Command on macOS) is held for a key event. */
+  public static boolean controlDown(net.minecraft.client.input.KeyEvent event) {
+    //? if >=1.21.11 {
+    return event.hasControlDownWithQuirk();
+    //?} else {
+    /*return event.hasControlDown();
+    *///?}
   }
 }

@@ -44,7 +44,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.client.CameraType;
+//? if >=1.21.11 {
 import net.minecraft.client.GraphicsPreset;
+//?}
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.core.RegistryAccess;
@@ -406,7 +408,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.runOnClient(
         mc -> {
           Options options = mc.options;
+          //? if >=1.21.11 {
           options.applyGraphicsPreset(GraphicsPreset.FAST);
+          //?} else {
+          /*options.graphicsMode().set(net.minecraft.client.GraphicsStatus.FAST);
+          *///?}
           options.enableVsync().set(false);
           options.framerateLimit().set(10);
           options.renderDistance().set(2);
@@ -646,6 +652,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
         "no chunks recorded");
     check(meta.markers.size() == 1, "marker missing");
+    check(meta.client == null, "recorded as made in " + meta.client + " without OneClient");
     check(stats.hudFrames > 0, "no HUD frames recorded");
     check(stats.screenFrames > 0, "the open inventory was not recorded");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
@@ -1323,7 +1330,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         context.computeOnClient(
             mc -> {
               var p = mc.gameRenderer.getMainCamera().position();
-              return new double[] {p.x, p.y, p.z, mc.gameRenderer.getMainCamera().yRot()};
+              return new double[] {p.x, p.y, p.z, io.github.thexykril.reizo.fabric.compat.Compat.cameraYaw(mc.gameRenderer.getMainCamera())};
             });
     CameraKeyframe expected = ReplayEditor.path().sample(ReplayPlayback.current().clock().timeMs());
     check(
@@ -1598,7 +1605,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
             .findFirst()
             .orElse(null);
     check(loop != null, "the looping sound was not followed: " + s.soundCues());
-    float click = s.soundCues().get(0).gain();
+    // Find the click by name: a recorded sound can be captured before it.
+    var clickCue =
+        s.soundCues().stream()
+            .filter(c -> !c.positional() && c.clip().contains("click"))
+            .findFirst()
+            .orElse(null);
+    check(clickCue != null, "the button click was not captured: " + s.soundCues());
+    float click = clickCue.gain();
     check(click > 0 && click <= 0.5f + 1e-4f, "sound at 50% exported with gain " + click);
     check(
         loop.endMs() - loop.timeMs() > 700 && loop.endMs() - loop.timeMs() < 1500,

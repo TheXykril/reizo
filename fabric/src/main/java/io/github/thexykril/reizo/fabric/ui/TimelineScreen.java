@@ -510,7 +510,7 @@ public final class TimelineScreen extends Screen {
   public boolean keyPressed(KeyEvent event) {
     int key = event.key();
     Minecraft mc = Minecraft.getInstance();
-    boolean ctrl = event.hasControlDownWithQuirk() || mc.hasControlDown();
+    boolean ctrl = io.github.thexykril.reizo.fabric.compat.Compat.controlDown(event) || mc.hasControlDown();
     boolean shift = event.hasShiftDown() || mc.hasShiftDown();
     if (ctrl) {
       switch (key) {

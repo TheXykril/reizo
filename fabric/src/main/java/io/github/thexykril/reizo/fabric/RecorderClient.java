@@ -446,6 +446,9 @@ public final class RecorderClient implements ClientModInitializer {
             .getModContainer(MOD_ID)
             .map(c -> c.getMetadata().getVersion().getFriendlyString())
             .orElse("unknown");
+    meta.client = io.github.thexykril.reizo.fabric.compat.OneClientDetection.version()
+        .map(v -> "OneClient " + v)
+        .orElse(null);
     meta.localPlayerName = mc.getUser().getName();
     meta.localPlayerUuid = String.valueOf(mc.getUser().getProfileId());
     ServerData server = mc.getCurrentServer();

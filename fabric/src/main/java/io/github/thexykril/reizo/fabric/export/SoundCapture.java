@@ -199,7 +199,7 @@ final class SoundCapture {
         at.x,
         at.y,
         at.z,
-        camera.yRot());
+        io.github.thexykril.reizo.fabric.compat.Compat.cameraYaw(camera));
   }
 
   List<SoundCue> cues() {

@@ -4,7 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.playback;
 
-//? if >=26.1 {
+//? if >=26.3 {
 /*import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
@@ -20,6 +20,24 @@ import com.mojang.renderpearl.api.pipeline.PrimitiveTopology;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import com.mojang.renderpearl.api.pipeline.UniformType;
 import com.mojang.renderpearl.api.textures.FilterMode;
+import java.util.Optional;
+import java.util.OptionalDouble;
+*///?} else if >=26.1 {
+/*import com.mojang.blaze3d.GpuFormat;
+import com.mojang.blaze3d.PrimitiveTopology;
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.pipeline.BindGroupLayout;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.shaders.UniformType;
+import com.mojang.blaze3d.systems.CommandEncoder;
+import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import java.util.Optional;
 import java.util.OptionalDouble;
 *///?} else {
@@ -62,7 +80,7 @@ public final class EffectRenderer {
 
   private static RenderPipeline pipeline() {
     if (pipeline == null) {
-      //? if >=26.1 {
+      //? if >=26.3 {
       /*pipeline =
           RenderPipelines.register(
               RenderPipeline.builder()
@@ -73,6 +91,22 @@ public final class EffectRenderer {
                       BindGroupLayout.builder()
                           .withUniform("InSampler", UniformType.COMBINED_IMAGE_SAMPLER)
                           .withUniform("DepthSampler", UniformType.COMBINED_IMAGE_SAMPLER)
+                          .withUniform("ReizoGrade", UniformType.UNIFORM_BUFFER)
+                          .build())
+                  .withColorTargetState(ColorTargetState.DEFAULT)
+                  .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
+                  .build());
+      *///?} else if >=26.1 {
+      /*pipeline =
+          RenderPipelines.register(
+              RenderPipeline.builder()
+                  .withLocation(Identifier.fromNamespaceAndPath("reizo", "pipeline/grade"))
+                  .withVertexShader("core/screenquad")
+                  .withFragmentShader(Identifier.fromNamespaceAndPath("reizo", "post/grade"))
+                  .withBindGroupLayout(
+                      BindGroupLayout.builder()
+                          .withSampler("InSampler")
+                          .withSampler("DepthSampler")
                           .withUniform("ReizoGrade", UniformType.UNIFORM_BUFFER)
                           .build())
                   .withColorTargetState(ColorTargetState.DEFAULT)
@@ -116,8 +150,10 @@ public final class EffectRenderer {
     int h = main.height;
     if (copy == null || copy.width != w || copy.height != h) {
       if (copy == null) {
-        //? if >=26.1 {
+        //? if >=26.3 {
         /*copy = new TextureTarget("Reizo effects", w, h, GpuFormat.RGBA8_UNORM, null);
+        *///?} else if >=26.1 {
+        /*copy = new TextureTarget("Reizo effects", w, h, false, GpuFormat.RGBA8_UNORM);
         *///?} else {
         copy = new TextureTarget("Reizo effects", w, h, false);
         //?}
@@ -149,7 +185,7 @@ public final class EffectRenderer {
           .putVec4(grade.bloom(), grade.dof(), grade.focus(), 0)
           .putVec4(1f / w, 1f / h, depth0, depth1);
     }
-    //? if >=26.1 {
+    //? if >=26.3 {
     /*try (RenderPass pass =
         encoder.createRenderPass(
             () -> "Reizo effects",
@@ -169,7 +205,27 @@ public final class EffectRenderer {
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(3, 1, 0, 0);
     }
-    *///?} else {
+    *///?} else if >=26.1 {
+    /*try (RenderPass pass =
+        encoder.createRenderPass(
+            () -> "Reizo effects",
+            main.getColorTextureView(),
+            Optional.empty(),
+            null,
+            OptionalDouble.empty())) {
+      pass.setPipeline(pipeline());
+      pass.setUniform("ReizoGrade", ubo.currentBuffer());
+      pass.bindTexture(
+          "InSampler",
+          copy.getColorTextureView(),
+          RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+      pass.bindTexture(
+          "DepthSampler",
+          main.getDepthTextureView(),
+          RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+      pass.draw(3, 1, 0, 0);
+    }
+    *///?} else if >=1.21.11 {
     try (RenderPass pass =
         encoder.createRenderPass(
             () -> "Reizo effects", main.getColorTextureView(), OptionalInt.empty())) {
@@ -187,7 +243,22 @@ public final class EffectRenderer {
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(0, 3);
     }
-    //?}
+    //?} else {
+    /*// 1.21.10 binds textures without a sampler object: the filter lives on the texture.
+    copy.getColorTexture().setTextureFilter(FilterMode.LINEAR, false);
+    main.getDepthTexture().setTextureFilter(FilterMode.NEAREST, false);
+    try (RenderPass pass =
+        encoder.createRenderPass(
+            () -> "Reizo effects", main.getColorTextureView(), OptionalInt.empty())) {
+      pass.setPipeline(pipeline());
+      RenderSystem.bindDefaultUniforms(pass);
+      pass.setUniform("ReizoGrade", ubo.currentBuffer());
+      pass.bindSampler("InSampler", copy.getColorTextureView());
+      // The world's depth, for depth of field. The pass writes only color, so reading it is safe.
+      pass.bindSampler("DepthSampler", main.getDepthTextureView());
+      pass.draw(0, 3);
+    }
+    *///?}
     ubo.rotate();
     lastApplied = grade;
   }

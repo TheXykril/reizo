@@ -13,6 +13,8 @@ compatibility.
 - The settings screen fits at GUI scale 3 on a 720p window again.
 - Exporting a multiplayer recording from its very first moment waited forever on the loading
   screen.
+- Exporting across a recorded server switch could wait forever on the loading screen (seen on
+  26.2).
 - A backwards seek no longer moves the free camera to the world origin.
 - Seeking a paused replay to before its world had loaded left the client on the "reconfiguring"
   screen. Seeks now start no earlier than the recording's first world packet.
@@ -21,10 +23,12 @@ compatibility.
 
 - Time of day, rain and thunder can be keyframed in a replay (Timeline → Settings), for night shots,
   storms or timelapses. They show in exports; the recording itself is unchanged.
+- Minecraft 1.21.10 and 26.2 support (separate jars), so every OneClient version from 1.21.10 up
+  is covered. Only tested by the automated in-game tests so far.
+- Recordings made in OneClient note it (and its version) in their metadata.
 - The inventory and chest screens the recorded player opened now show in player view (POV) replays,
   with the mouse, hovered item and the item on the cursor. They can be turned off in the settings
   or keyframed in the editor.
-
 - The recorded player's HUD in player view (POV): hotbar with the selected slot and offhand,
   health, hunger, armor, experience and air, as they were while recording. It can be turned off in
   the settings or keyframed in the editor, and shows in exports.
