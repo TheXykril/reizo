@@ -31,7 +31,9 @@ public class FlatButton extends Button {
     /** A collapsible section header: an arrow and left-aligned text; selected means open. */
     HEADER,
     /** A settings row: label on the left, a value or a switch on the right. */
-    ROW
+    ROW,
+    /** A segment of a pill switch: the accent fill when selected. */
+    SEGMENT
   }
 
   private final Style style;
@@ -122,30 +124,36 @@ public class FlatButton extends Button {
               danger
                   ? (hot ? Draw.mix(Theme.DANGER, 0xFFFFFFFF, 0.15) : Theme.DANGER)
                   : (hot ? Theme.ACCENT_HOVER : Theme.ACCENT);
-          case TAB -> hot && !sel ? Theme.HOVER : 0;
-          case HEADER -> hot ? Theme.HOVER : Draw.mix(Theme.SURFACE, Theme.RAISED, 0.6);
+          case TAB -> sel ? Theme.RAISED : hot ? Theme.HOVER : 0;
+          case HEADER -> 0;
           case ROW -> hot ? Theme.HOVER : Theme.RAISED;
+          case SEGMENT -> sel ? (hot ? Theme.ACCENT_HOVER : Theme.ACCENT) : hot ? Theme.HOVER : 0;
         };
     if (fill != 0) {
-      Draw.round(g, x0, y0, x1, y1, style == Style.ROW ? 4 : 2, fill);
-    }
-    if (style == Style.TAB && sel) {
-      g.fill(x0 + 2, y1 - 1, x1 - 2, y1, Theme.ACCENT);
+      Draw.round(g, x0, y0, x1, y1, style == Style.ROW ? 4 : 3, fill);
     }
     int color;
     if (!active) {
       color = Theme.FAINT;
-    } else if (style == Style.ACCENT) {
+    } else if (style == Style.ACCENT || (style == Style.SEGMENT && sel)) {
       color = 0xFFFFFFFF;
     } else if (sel) {
       color = style == Style.TAB ? Theme.TEXT : Theme.ACCENT_HOVER;
     } else {
-      color = hot ? Theme.TEXT : (style == Style.TAB ? Theme.DIM : Theme.TEXT);
+      color =
+          hot ? Theme.TEXT : (style == Style.TAB || style == Style.SEGMENT ? Theme.DIM : Theme.TEXT);
     }
     if (style == Style.HEADER) {
-      Icons.draw(g, sel ? "open" : "closed", x0 + 6, (y0 + y1) / 2, Theme.DIM);
+      // A small caps section label; the chevron on the right folds it.
+      Icons.draw(g, sel ? "open" : "closed", x1 - 5, (y0 + y1) / 2, 6, hot ? Theme.TEXT : Theme.FAINT);
+      String caps = getMessage().getString().toUpperCase(java.util.Locale.ROOT);
       Draw.label(
-          g, font, Draw.fit(font, getMessage().getString(), getWidth() - 16), x0 + 13, y0 + (getHeight() - 8) / 2, Theme.TEXT);
+          g,
+          font,
+          Draw.fit(font, caps, getWidth() - 14),
+          x0 + 1,
+          y0 + (getHeight() - 8) / 2,
+          hot ? Theme.TEXT : Theme.DIM);
       return;
     }
     if (style == Style.ROW) {
@@ -171,7 +179,8 @@ public class FlatButton extends Button {
       return;
     }
     if (icon != null && Icons.has(icon)) {
-      Icons.draw(g, icon, (x0 + x1) / 2, (y0 + y1) / 2, color);
+      int size = Math.max(7, Math.min(10, Math.min(getWidth(), getHeight()) - 8));
+      Icons.draw(g, icon, (x0 + x1) / 2, (y0 + y1) / 2, size, color);
       return;
     }
     if (left && icon == null) {

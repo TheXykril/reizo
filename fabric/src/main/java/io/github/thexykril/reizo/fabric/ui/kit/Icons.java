@@ -72,13 +72,34 @@ public final class Icons {
 
   private Icons() {}
 
-  /** Whether {@code name} is a pixel icon. */
+  /** Whether {@code name} is an icon (a line icon, or a pixel icon). */
   public static boolean has(String name) {
-    return MASKS.containsKey(name);
+    return MASKS.containsKey(name) || LineIcons.has(line(name));
   }
 
-  /** Draws icon {@code name} centred on (cx, cy). */
+  /** The line icon standing in for a pixel icon's name. */
+  private static String line(String name) {
+    return switch (name) {
+      case "open" -> "down";
+      case "closed" -> "right";
+      default -> name;
+    };
+  }
+
+  /** Draws icon {@code name} centred on (cx, cy), 7 GUI pixels wide. */
   public static void draw(GuiGraphics g, String name, int cx, int cy, int color) {
+    draw(g, name, cx, cy, 7, color);
+  }
+
+  /**
+   * Draws icon {@code name} centred on (cx, cy), {@code size} GUI pixels wide: a sharp line icon,
+   * or with OneConfig's pixel themes the 7x7 pixel icon where there is one.
+   */
+  public static void draw(GuiGraphics g, String name, int cx, int cy, int size, int color) {
+    if (!(Theme.pixel() && MASKS.containsKey(name)) && LineIcons.has(line(name))) {
+      LineIcons.draw(g, line(name), cx, cy, size, color);
+      return;
+    }
     String[] mask = MASKS.get(name);
     if (mask == null) {
       return;

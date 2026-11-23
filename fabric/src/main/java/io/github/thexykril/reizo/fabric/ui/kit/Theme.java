@@ -95,7 +95,7 @@ public final class Theme {
     WARN = p.warn();
     TRACK_MARKER = WARN;
     TRACK_CAMERA = ACCENT;
-    PLAYHEAD = DANGER;
+    PLAYHEAD = p.textColor();
   }
 
   /** {@code color} with its alpha replaced. */

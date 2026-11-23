@@ -134,6 +134,16 @@ public final class DragField extends AbstractWidget {
     return true;
   }
 
+  /** Axis colours for X, Y and Z fields. */
+  private static int axisColor(String label) {
+    return switch (label) {
+      case "X" -> 0xFFE5484D;
+      case "Y" -> 0xFF46C46A;
+      case "Z" -> 0xFF4C8DFF;
+      default -> 0;
+    };
+  }
+
   @Override
   public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
     Font font = Minecraft.getInstance().font;
@@ -142,34 +152,73 @@ public final class DragField extends AbstractWidget {
     int x1 = x0 + getWidth();
     int y1 = y0 + getHeight();
     boolean hot = active && (isHoveredOrFocused() || dragging);
-    // Opaque, non-overlapping pieces: the GUI renderer may reorder overlapping translucent fills.
-    int ground = hot ? Theme.HOVER : Theme.RAISED;
     double v = value();
-    int fx = x0;
-    if (max > min && max - min < 1e6) {
-      fx = x0 + (int) Math.round((clamp(v) - min) / (max - min) * getWidth());
-    }
-    if (fx > x0 + 1 && fx < x1 - 1) {
-      Draw.round(g, x0, y0, fx, y1, 3, Draw.mix(ground, accent, hot ? 0.30 : 0.20), true, false);
-      Draw.round(g, fx, y0, x1, y1, 3, ground, false, true);
-    } else {
-      Draw.round(g, x0, y0, x1, y1, 3, fx >= x1 - 1 ? Draw.mix(ground, accent, hot ? 0.30 : 0.20) : ground);
-    }
-    int lx = x0 + 5;
-    if (marked.getAsBoolean()) {
-      Draw.diamond(g, x0 + 6, y0 + 8, 2, accent);
-      lx = x0 + 12;
-    }
     String text = format.apply(v);
     int tw = Draw.width(font, text);
-    Draw.label(g, font, text, x1 - 5 - tw, y0 + 4, Theme.TEXT);
+    String name = label.getString();
+    int axis = axisColor(name);
+    boolean bounded = max > min && max - min < 1e6;
+    int ty = y0 + (getHeight() - 8) / 2;
+    if (axis != 0 || !bounded) {
+      // A number box: the axis letter in its colour, or the label, then the value.
+      Draw.round(g, x0, y0, x1, y1, 3, hot ? Theme.HOVER : Theme.RAISED);
+      int lx = x0 + 5;
+      if (marked.getAsBoolean()) {
+        Draw.diamond(g, x0 + 6, y0 + 8, 2, accent);
+        lx = x0 + 12;
+      }
+      if (axis != 0) {
+        Draw.label(g, font, name, lx, ty, axis);
+        int vx = lx + Draw.width(font, name) + 4;
+        Draw.label(g, font, Draw.fit(font, text, x1 - vx - 3), vx, ty, Theme.TEXT);
+      } else {
+        Draw.label(g, font, text, x1 - 5 - tw, ty, Theme.TEXT);
+        Draw.label(
+            g,
+            font,
+            Draw.fit(font, name, x1 - lx - tw - 10),
+            lx,
+            ty,
+            active ? Theme.DIM : Theme.FAINT);
+      }
+      return;
+    }
+    // A slider row: label, a thin track with a knob, the value.
+    if (hot) {
+      Draw.round(g, x0 - 2, y0, x1 + 2, y1, 3, Theme.alpha(Theme.HOVER, 0x90));
+    }
+    int lx = x0;
+    if (marked.getAsBoolean()) {
+      Draw.diamond(g, x0 + 2, y0 + 8, 2, accent);
+      lx = x0 + 7;
+    }
+    int labelW = Math.max(24, getWidth() * 2 / 5);
     Draw.label(
         g,
         font,
-        Draw.fit(font, label.getString(), x1 - lx - tw - 10),
+        Draw.fit(font, name, x0 + labelW - lx - 3),
         lx,
-        y0 + 4,
-        active ? Theme.DIM : Theme.FAINT);
+        ty,
+        active ? (hot ? Theme.TEXT : Theme.DIM) : Theme.FAINT);
+    int valueW = Math.max(tw, 18);
+    Draw.label(g, font, text, x1 - tw, ty, Theme.TEXT);
+    int t0 = x0 + labelW + 3;
+    int t1 = x1 - valueW - 6;
+    if (t1 - t0 < 8) {
+      return;
+    }
+    int my = (y0 + y1) / 2;
+    double f = (clamp(v) - min) / (max - min);
+    int kx = t0 + (int) Math.round(f * (t1 - t0));
+    Draw.round(g, t0, my - 1, t1, my + 1, 1, Theme.LINE);
+    // Fill from zero when the range spans it (a bipolar slider), else from the start.
+    double origin = min < 0 && max > 0 ? 0 : min;
+    double rf = (origin - min) / (max - min);
+    int rx = t0 + (int) Math.round(rf * (t1 - t0));
+    if (kx != rx) {
+      Draw.round(g, Math.min(kx, rx), my - 1, Math.max(kx, rx), my + 1, 1, accent);
+    }
+    Draw.round(g, kx - 3, my - 3, kx + 3, my + 3, 3, active ? 0xFFFFFFFF : Theme.DIM);
   }
 
   @Override

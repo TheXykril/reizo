@@ -95,12 +95,53 @@ public final class Draw {
       g.fill(x0, y0, x1, y1, color);
       return;
     }
-    int px0 = x0 * s;
-    int py0 = y0 * s;
-    int px1 = x1 * s;
-    int py1 = y1 * s;
     g.pose().pushMatrix();
     g.pose().scale(1f / s, 1f / s);
+    roundPx(g, x0 * s, y0 * s, x1 * s, y1 * s, r, color, roundLeft, roundRight);
+    g.pose().popMatrix();
+  }
+
+  /**
+   * A card: a rounded rectangle with a one-window-pixel border. Both colours should be opaque (the
+   * GUI renderer may reorder overlapping translucent fills).
+   */
+  public static void card(
+      GuiGraphics g, int x0, int y0, int x1, int y1, int radius, int fill, int border) {
+    if (x1 <= x0 || y1 <= y0) {
+      return;
+    }
+    int s = guiScale();
+    if (Theme.pixel()) {
+      g.fill(x0, y0, x1, y1, border);
+      g.pose().pushMatrix();
+      g.pose().scale(1f / s, 1f / s);
+      g.fill(x0 * s + 1, y0 * s + 1, x1 * s - 1, y1 * s - 1, fill);
+      g.pose().popMatrix();
+      return;
+    }
+    int r = Math.max(1, Math.min(radius * s, Math.min((x1 - x0) * s / 2, (y1 - y0) * s / 2)));
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    roundPx(g, x0 * s, y0 * s, x1 * s, y1 * s, r, border, true, true);
+    roundPx(g, x0 * s + 1, y0 * s + 1, x1 * s - 1, y1 * s - 1, Math.max(0, r - 1), fill, true, true);
+    g.pose().popMatrix();
+  }
+
+  /** A rounded rectangle in window pixels (the pose already scaled to them). */
+  private static void roundPx(
+      GuiGraphics g,
+      int px0,
+      int py0,
+      int px1,
+      int py1,
+      int r,
+      int color,
+      boolean roundLeft,
+      boolean roundRight) {
+    if (r <= 0) {
+      g.fill(px0, py0, px1, py1, color);
+      return;
+    }
     g.fill(px0, py0 + r, px1, py1 - r, color);
     int alpha = (color >>> 24) & 0xFF;
     for (int i = 0; i < r; i++) {
@@ -126,7 +167,6 @@ public final class Draw {
         }
       }
     }
-    g.pose().popMatrix();
   }
 
   /** A one-window-pixel horizontal line at GUI y {@code y} from x0 to x1. */
