@@ -27,10 +27,11 @@ import net.minecraft.resources.Identifier;
  * Applies the replay's effects ({@link Grade}) to the rendered world, before the HUD is drawn. It
  * runs only while a replay plays and its grade at the current time is not neutral, so it costs
  * nothing otherwise. One full-screen pass: the world picture is copied to a texture and drawn back
- * through {@code reizo:post/grade}.
+ * through {@code reizo:post/grade}, which also reads the world's depth for depth of field (near
+ * plane 0.05, as in {@code GameRenderer}).
  */
 public final class EffectRenderer {
-  private static final int UBO_SIZE = 32; // two vec4
+  private static final int UBO_SIZE = 64; // four vec4
 
   private static RenderPipeline pipeline;
   private static TextureTarget copy;
@@ -48,6 +49,7 @@ public final class EffectRenderer {
                   .withVertexShader("core/screenquad")
                   .withFragmentShader(Identifier.fromNamespaceAndPath("reizo", "post/grade"))
                   .withSampler("InSampler")
+                  .withSampler("DepthSampler")
                   .withUniform("ReizoGrade", UniformType.UNIFORM_BUFFER)
                   .withoutBlend()
                   .withDepthWrite(false)
@@ -92,7 +94,9 @@ public final class EffectRenderer {
     try (GpuBuffer.MappedView view = encoder.mapBuffer(ubo.currentBuffer(), false, true)) {
       Std140Builder.intoBuffer(view.data())
           .putVec4(grade.exposure(), grade.contrast(), grade.saturation(), grade.temperature())
-          .putVec4(grade.vignette(), (float) grade.letterboxBar(w, h), w / (float) h, 0);
+          .putVec4(grade.vignette(), (float) grade.letterboxBar(w, h), w / (float) h, 0)
+          .putVec4(grade.bloom(), grade.dof(), grade.focus(), 0)
+          .putVec4(1f / w, 1f / h, 0.05f, mc.gameRenderer.getDepthFar());
     }
     try (RenderPass pass =
         encoder.createRenderPass(
@@ -103,6 +107,11 @@ public final class EffectRenderer {
       pass.bindTexture(
           "InSampler",
           copy.getColorTextureView(),
+          RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
+      // The world's depth, for depth of field. The pass writes only color, so reading it is safe.
+      pass.bindTexture(
+          "DepthSampler",
+          main.getDepthTextureView(),
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(0, 3);
     }

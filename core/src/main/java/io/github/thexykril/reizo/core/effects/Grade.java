@@ -21,7 +21,13 @@ public record Grade(
     float saturation,
     float temperature,
     float vignette,
-    float letterbox) {
+    float letterbox,
+    float bloom,
+    float dof,
+    float focus) {
+  /** Focus distance in blocks when none is set. */
+  public static final float DEFAULT_FOCUS = 8;
+
   public static final Grade NEUTRAL = new Grade(0, 1, 1, 0, 0, 0);
 
   /** Letterbox ratios offered in the editor. */
@@ -34,14 +40,39 @@ public record Grade(
     temperature = clamp(temperature, -1, 1);
     vignette = clamp(vignette, 0, 1);
     letterbox = letterbox <= 0 ? 0 : clamp(letterbox, 1, 4);
+    bloom = clamp(bloom, 0, 1);
+    dof = clamp(dof, 0, 1);
+    focus = Float.isNaN(focus) ? DEFAULT_FOCUS : clamp(focus, 0.5f, 256);
+  }
+
+  /** A grade without bloom or depth of field. */
+  public Grade(
+      float exposure,
+      float contrast,
+      float saturation,
+      float temperature,
+      float vignette,
+      float letterbox) {
+    this(exposure, contrast, saturation, temperature, vignette, letterbox, 0, 0, DEFAULT_FOCUS);
   }
 
   private static float clamp(float v, float min, float max) {
     return Float.isNaN(v) ? min : Math.max(min, Math.min(max, v));
   }
 
+  /**
+   * Whether the grade changes nothing. The focus distance alone changes nothing while depth of
+   * field is off.
+   */
   public boolean isNeutral() {
-    return equals(NEUTRAL);
+    return exposure == 0
+        && contrast == 1
+        && saturation == 1
+        && temperature == 0
+        && vignette == 0
+        && letterbox == 0
+        && bloom == 0
+        && dof == 0;
   }
 
   /**
@@ -56,31 +87,49 @@ public record Grade(
         saturation + (to.saturation - saturation) * t,
         temperature + (to.temperature - temperature) * t,
         vignette + (to.vignette - vignette) * t,
-        t >= 1 ? to.letterbox : letterbox);
+        t >= 1 ? to.letterbox : letterbox,
+        bloom + (to.bloom - bloom) * t,
+        dof + (to.dof - dof) * t,
+        focus + (to.focus - focus) * t);
   }
 
   public Grade withExposure(float v) {
-    return new Grade(v, contrast, saturation, temperature, vignette, letterbox);
+    return new Grade(v, contrast, saturation, temperature, vignette, letterbox, bloom, dof, focus);
   }
 
   public Grade withContrast(float v) {
-    return new Grade(exposure, v, saturation, temperature, vignette, letterbox);
+    return new Grade(exposure, v, saturation, temperature, vignette, letterbox, bloom, dof, focus);
   }
 
   public Grade withSaturation(float v) {
-    return new Grade(exposure, contrast, v, temperature, vignette, letterbox);
+    return new Grade(exposure, contrast, v, temperature, vignette, letterbox, bloom, dof, focus);
   }
 
   public Grade withTemperature(float v) {
-    return new Grade(exposure, contrast, saturation, v, vignette, letterbox);
+    return new Grade(exposure, contrast, saturation, v, vignette, letterbox, bloom, dof, focus);
   }
 
   public Grade withVignette(float v) {
-    return new Grade(exposure, contrast, saturation, temperature, v, letterbox);
+    return new Grade(exposure, contrast, saturation, temperature, v, letterbox, bloom, dof, focus);
   }
 
   public Grade withLetterbox(float v) {
-    return new Grade(exposure, contrast, saturation, temperature, vignette, v);
+    return new Grade(exposure, contrast, saturation, temperature, vignette, v, bloom, dof, focus);
+  }
+
+  public Grade withBloom(float v) {
+    return new Grade(
+        exposure, contrast, saturation, temperature, vignette, letterbox, v, dof, focus);
+  }
+
+  public Grade withDof(float v) {
+    return new Grade(
+        exposure, contrast, saturation, temperature, vignette, letterbox, bloom, v, focus);
+  }
+
+  public Grade withFocus(float v) {
+    return new Grade(
+        exposure, contrast, saturation, temperature, vignette, letterbox, bloom, dof, v);
   }
 
   /**

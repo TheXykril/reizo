@@ -79,6 +79,9 @@ public final class Project {
     public float temperature;
     public float vignette;
     public float letterbox;
+    public float bloom;
+    public float dof;
+    public float focus = Grade.DEFAULT_FOCUS;
   }
 
   /** JSON form of a camera keyframe (records are not Gson-friendly on all versions). */
@@ -160,7 +163,16 @@ public final class Project {
     for (Effect e : effects) {
       track.put(
           e.t,
-          new Grade(e.exposure, e.contrast, e.saturation, e.temperature, e.vignette, e.letterbox));
+          new Grade(
+              e.exposure,
+              e.contrast,
+              e.saturation,
+              e.temperature,
+              e.vignette,
+              e.letterbox,
+              e.bloom,
+              e.dof,
+              e.focus));
     }
     return track;
   }
@@ -178,6 +190,9 @@ public final class Project {
       e.temperature = g.temperature();
       e.vignette = g.vignette();
       e.letterbox = g.letterbox();
+      e.bloom = g.bloom();
+      e.dof = g.dof();
+      e.focus = g.focus();
       effects.add(e);
     }
   }

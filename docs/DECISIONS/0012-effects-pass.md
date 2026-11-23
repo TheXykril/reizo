@@ -37,3 +37,12 @@ Option 2.
 - Iris and Sodium are untested with this pass; Iris replaces the world pipeline, but the main
   target and this pass come after it, so it is expected to work. To check on real hardware.
 - Effect keyframes are part of `TimelineState`, so the timeline's undo and redo cover them.
+
+## Update (2026-11-23): depth of field and bloom
+
+The same single pass also does depth of field and bloom. Depth of field samples the main target's
+depth texture (bound as `DepthSampler`; the pass writes only color) and linearizes it with the
+game's near plane (0.05) and `GameRenderer.getDepthFar()`. Bloom samples 32 points around each pixel
+and keeps light above a soft luminance threshold. Both are single-pass approximations, chosen
+over a multi-pass blur chain to keep one pipeline and no extra targets. A higher-quality chain
+can replace them later without changing the project format.
