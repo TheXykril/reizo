@@ -59,14 +59,20 @@ Not every play packet came from the server. The recorder adds vanilla packets th
 sends to the recording player: the start snapshot (`meta.startSnapshot`) and the local player's
 equipment (`ClientboundSetEquipmentPacket` for the local player's entity id, written after that
 tick's `LOCAL_PLAYER` frame whenever a held or worn item changes, and in full after a respawn or
-dimension change). Readers treat them like any other play packet.
+dimension change), and the effects of the local player's own actions that the server only sends
+to other players: block breaking stages (`ClientboundBlockDestructionPacket` with the local
+player's entity id), level events the local player caused (`ClientboundLevelEventPacket`, such as
+block break particles and sound), sounds the client played ahead of the server or for the local
+player only (`ClientboundSoundPacket`, such as placing blocks and footsteps), and the particles
+mining knocks off a block (`ClientboundLevelParticlesPacket` with a block particle). Readers treat
+them like any other play packet.
 
 ### `LOCAL_PLAYER` layout 1
 
 ```
 layout:u8(=1) entityId:int32 x:f64 y:f64 z:f64 yRot:f32 xRot:f32 headYRot:f32 bodyYRot:f32
 pose:u8 flags:u8 swingTime:u8
-flags: 1 onGround, 2 sprinting, 4 sneaking, 8 usingItem, 16 swinging, 32 swing is off-hand
+flags: 1 onGround, 2 sprinting, 4 sneaking, 8 usingItem, 16 swinging, 32 swing is off-hand, 64 item used from the off hand (added later; older files leave it 0)
 ```
 
 `pose` is the `Pose` enum ordinal of the recording's Minecraft version. Written only on ticks where

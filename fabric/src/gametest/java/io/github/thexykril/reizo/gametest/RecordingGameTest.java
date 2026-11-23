@@ -717,6 +717,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(!cameraUuid.equals(meta.localPlayerUuid), "camera has the recorded player's UUID");
     check(cameraIsSpectator, "camera is not a spectator");
     check(recordedUuid.equals(meta.localPlayerUuid), "recorded player entity is " + recordedUuid);
+    context.runOnClient(
+        mc ->
+            checkSkinLayers(
+                (net.minecraft.world.entity.player.Player)
+                    mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId())));
     check(
         context.computeOnClient(mc -> RecorderClient.get().session()) == null,
         "the replay was being recorded");
@@ -1186,6 +1191,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
       check(session != null, "pause menu start failed");
       check(context.computeOnClient(mc -> mc.screen == null), "pause menu still open");
       registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
+      breakBlockInSurvival(context, world);
       // Equipment changes during the recording must show on the recorded player in playback.
       world
           .getServer()
@@ -1235,11 +1241,99 @@ public final class RecordingGameTest implements FabricClientGameTest {
         stats.packetNames.getOrDefault("ClientboundLoginPacket", 0) == 1,
         "prelude must contain the login packet, got " + stats.packetNames);
     check(stats.localPlayerFrames >= 10, "too few local player frames: " + stats.localPlayerFrames);
+    // The server sends breaking effects and the player's own sounds to other players only; the
+    // recorder adds them for the recorded player.
+    check(
+        stats.packetNames.getOrDefault("ClientboundBlockDestructionPacket", 0) >= 2,
+        "breaking stages not recorded: " + stats.packetNames);
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelEventPacket", 0) > 0,
+        "block break particles not recorded: " + stats.packetNames);
+    // Mining particles: a block particle packet, or from 26.3 on the level event a server sends.
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelParticlesPacket", 0) > 0
+            || stats.packetNames.getOrDefault("ClientboundLevelEventPacket", 0) > 2,
+        "mining particles not recorded: " + stats.packetNames);
+    check(
+        stats.packetNames.getOrDefault("ClientboundSoundPacket", 0) > 0,
+        "the player's own sounds not recorded: " + stats.packetNames);
     double moved = stats.lastPlayer.distanceSq(stats.firstPlayer);
     check(moved > 1.0, "player did not move in recording (dist^2=" + moved + ")");
     check(meta.durationMs > 1000, "duration too short: " + meta.durationMs);
     LOGGER.info("recordMidSessionWhileWalking OK: {} -> {}", archive.getFileName(), stats);
     playBackWalk(context, archive, stats);
+  }
+
+  /**
+   * Breaks a block at head height in survival, holding the attack key like a player, so the
+   * recording has the local player's own breaking stages, particles and sounds.
+   */
+  private static void breakBlockInSurvival(
+      ClientGameTestContext context, TestSingleplayerContext world) {
+    net.minecraft.core.BlockPos target =
+        context.computeOnClient(mc -> mc.player.blockPosition().south().above());
+    world
+        .getServer()
+        .runOnServer(
+            server -> {
+              var p = server.getPlayerList().getPlayers().get(0);
+              p.setGameMode(GameType.SURVIVAL);
+              p.level().setBlockAndUpdate(target, net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState());
+            });
+    context.runOnClient(
+        mc -> {
+          mc.player.setYRot(0f); // south
+          mc.player.setXRot(0f);
+        });
+    context.waitTicks(3);
+    context.getInput().holdKeyFor(options -> options.keyAttack, 40);
+    context.waitTicks(3);
+    check(
+        context.computeOnClient(mc -> mc.level.getBlockState(target).isAir()),
+        "the dirt block at " + target + " was not broken");
+    world
+        .getServer()
+        .runOnServer(
+            server ->
+                server.getPlayerList().getPlayers().get(0).setGameMode(GameType.CREATIVE));
+    context.waitTicks(2);
+  }
+
+  /** The recorded player must show the second skin layer (hat, jacket, sleeves, trousers). */
+  private static void checkSkinLayers(net.minecraft.world.entity.player.Player e) {
+    for (var part : net.minecraft.world.entity.player.PlayerModelPart.values()) {
+      if (part == net.minecraft.world.entity.player.PlayerModelPart.CAPE) {
+        continue; // no cape in tests
+      }
+      check(e.isModelPartShown(part), "recorded player hides skin layer " + part);
+    }
+  }
+
+  private static boolean isSwinging(net.minecraft.world.entity.player.Player p) {
+    //? if >=26.3 {
+    /*return p.getCurrentSwing() != null;
+    *///?} else {
+    return p.swinging;
+    //?}
+  }
+
+  /** Whether the replay shows block cracks from any player (read by reflection: test only). */
+  private static final class SeenCracks {
+    static boolean any(Minecraft mc) {
+      // The renderer holds them before 26.x, the level from 26.1 on.
+      for (Object owner : new Object[] {mc.levelRenderer, mc.level}) {
+        try {
+          var field = owner.getClass().getDeclaredField("destroyingBlocks");
+          field.setAccessible(true);
+          return !((java.util.Map<?, ?>) field.get(owner)).isEmpty();
+        } catch (NoSuchFieldException e) {
+          // try the next owner
+        } catch (ReflectiveOperationException e) {
+          throw new AssertionError(e);
+        }
+      }
+      throw new AssertionError("destroyingBlocks not found");
+    }
   }
 
   /**
@@ -1255,6 +1349,32 @@ public final class RecordingGameTest implements FabricClientGameTest {
             throw new AssertionError("could not start replay", e);
           }
         });
+    // Mining swings the arm and cracks the block; both must show on the recorded player.
+    var sawSwing = new java.util.concurrent.atomic.AtomicBoolean();
+    var sawCracks = new java.util.concurrent.atomic.AtomicBoolean();
+    try {
+      context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          if (replay == null || replay.view() == null || mc.level == null) {
+            return false;
+          }
+          if (mc.level.getEntity(replay.view().recordedEntityId())
+                  instanceof net.minecraft.world.entity.player.Player p
+              && isSwinging(p)) {
+            sawSwing.set(true);
+          }
+          if (SeenCracks.any(mc)) {
+            sawCracks.set(true);
+          }
+          return sawSwing.get() && sawCracks.get();
+        },
+        20 * 40);
+    } catch (AssertionError timedOut) {
+      // reported below, by what was missing
+    }
+    check(sawSwing.get(), "the recorded player's arm never swung while mining");
+    check(sawCracks.get(), "no block cracks shown while the recorded player mined");
     context.waitFor(
         mc -> {
           ReplayServer replay = ReplayPlayback.current();
@@ -1294,6 +1414,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           check(
               e.getPose() == net.minecraft.world.entity.Pose.CROUCHING,
               "recorded player is not crouching at the end: " + e.getPose());
+          checkSkinLayers(e);
         });
     checkSeeking(context, stats);
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
@@ -1607,6 +1728,19 @@ public final class RecordingGameTest implements FabricClientGameTest {
       LOGGER.warn("exportVideo SKIPPED: ffmpeg not on PATH");
       return;
     }
+    // The replay may be a walk, whose recorded footsteps would fill the silences the sound checks
+    // below measure; they are muted for the export.
+    double playersVolume =
+        context.computeOnClient(
+            mc ->
+                mc.options
+                    .getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.PLAYERS)
+                    .get());
+    context.runOnClient(
+        mc ->
+            mc.options
+                .getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.PLAYERS)
+                .set(0.0));
     // The pause menu's "Export video" opens the settings, which list what this FFmpeg can encode.
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true)));
     context.waitTicks(2);
@@ -1665,6 +1799,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.runOnClient(mc -> mc.getSoundManager().stop(passing));
     context.waitFor(mc -> result.get() != null, 20 * 240);
     ExportSession s = result.get();
+    context.runOnClient(
+        mc ->
+            mc.options
+                .getSoundSourceOptionInstance(net.minecraft.sounds.SoundSource.PLAYERS)
+                .set(playersVolume));
     check(s.state() == ExportSession.State.DONE, "export ended " + s.state() + ": " + s.error());
     check(s.soundsCaptured() >= 2, "sounds captured during the export: " + s.soundsCaptured());
     var loop =

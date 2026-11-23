@@ -38,6 +38,11 @@ public record LocalPlayerState(
   public static final int FLAG_SWINGING = 1 << 4;
   public static final int FLAG_SWING_OFFHAND = 1 << 5;
 
+  /**
+   * With {@link #FLAG_USING_ITEM}: the item is used from the off hand. Older files never set it.
+   */
+  public static final int FLAG_USING_OFFHAND = 1 << 6;
+
   private static final int SIZE = 1 + 4 + 3 * 8 + 4 * 4 + 1 + 1 + 1;
 
   public boolean has(int flag) {

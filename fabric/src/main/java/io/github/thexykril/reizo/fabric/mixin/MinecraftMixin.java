@@ -54,6 +54,17 @@ abstract class MinecraftMixin {
   }
   //?}
 
+  // Mining effects the client shows for itself only are recorded while this runs (LocalEffects).
+  @Inject(method = "continueAttack", at = @At("HEAD"))
+  private void reizo$miningStart(boolean leftClick, CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.capture.LocalEffects.setMining(true);
+  }
+
+  @Inject(method = "continueAttack", at = @At("RETURN"))
+  private void reizo$miningEnd(boolean leftClick, CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.capture.LocalEffects.setMining(false);
+  }
+
   @Inject(method = "runTick", at = @At("TAIL"))
   private void reizo$afterFrame(boolean advanceGameTime, CallbackInfo ci) {
     ExportSession.afterFrame((Minecraft) (Object) this);

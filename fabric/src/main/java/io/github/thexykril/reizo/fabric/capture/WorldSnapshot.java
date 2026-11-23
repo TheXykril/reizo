@@ -162,6 +162,12 @@ public final class WorldSnapshot {
     for (Entity e : level.entitiesForRendering()) {
       if (e == player) {
         equipment(player); // shown on the recorded player
+        // Skin layers, main hand and the like: the server sent them when the player joined, before
+        // this recording began. Playback holds them until it adds the recorded player.
+        var own = player.getEntityData().getNonDefaultValues();
+        if (own != null && !own.isEmpty()) {
+          add(new ClientboundSetEntityDataPacket(player.getId(), own));
+        }
         continue;
       }
       add(
