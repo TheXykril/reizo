@@ -162,7 +162,12 @@ without it (ADR 0010). Not affiliated with or endorsed by Polyfrost or OneClient
 - **OneConfig settings page:** **partial**, evidence — (builds against the OneConfig 1.9.1 API;
   not run in OneConfig yet, manual check needed). Page "Reizo" under Utility: Replays button,
   start/stop recording button, auto-record, indicator, save server name, start/stop modifier,
-  FFmpeg path. Values are shared with Reizo's own settings screen.
+  FFmpeg path, shadow recording on/off, length and a "Save last minutes" button. Values are
+  shared with Reizo's own settings screen.
+- **Recording indicator as a OneConfig HUD element:** **partial**, evidence — (builds against the
+  OneConfig 1.9.1 HUD API; not run yet). "Reizo recording" (Info) shows REC/PAUSED with the time,
+  or "Shadow on", and can be placed in OneConfig's HUD editor. Hidden while nothing records.
+  Registration failures are caught, so Reizo keeps working with another OneConfig version.
 - **Keybinds in OneConfig's keybind page:** **partial**, evidence — (Reizo uses vanilla key
   mappings, which OneConfig lists; not checked).
 - OneConfig notifications, editor entry in the OneClient main menu, PolyCompose styling:

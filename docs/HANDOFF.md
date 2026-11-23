@@ -70,7 +70,9 @@ screen, effects, audio, shadow recording, multi-version.
   has never run inside OneConfig. The cloud proxy blocks OneConfig's runtime dependencies
   (repo.hypixel.net, jitpack), so it needs a manual check in OneClient on Hyperion: page shows under
   Utility, buttons work, values match Reizo's settings screen, Reizo's keys appear in OneConfig's
-  keybind page, and whether OneClient's main menu hides the title screen "Replays" button.
+  keybind page, and whether OneClient's main menu hides the title screen "Replays" button. Also
+  the "Reizo recording" HUD element (`compat/OneConfigRecordingHud`, a `TextHud` registered with
+  `HudManager.register`): listed in the HUD editor, movable, hidden when not recording.
 - Timeline editor (`fabric/ui/TimelineScreen`, `core.timeline`): ruler, markers, camera keyframes,
   export region, overview; drag, box-select, copy/paste, undo/redo (`ReplayEditor` history of
   `TimelineState` snapshots). Test-input gotcha: Fabric's `TestInput` sends key events with

@@ -66,7 +66,7 @@ public final class RecordingIndicator {
     graphics.drawString(font, label, x + padding + dot + 4, y + padding - 1, TEXT, false);
   }
 
-  static String formatElapsed(long millis) {
+  public static String formatElapsed(long millis) {
     long totalSeconds = millis / 1000;
     long hours = totalSeconds / 3600;
     long minutes = (totalSeconds / 60) % 60;

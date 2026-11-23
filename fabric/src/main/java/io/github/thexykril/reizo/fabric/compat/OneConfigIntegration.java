@@ -27,6 +27,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
   @Override
   public void registerConfigs(Context context) {
     context.register(new Page());
+    OneConfigRecordingHud.register();
     context.originalScreen(
         () ->
             Minecraft.getInstance().setScreen(new SettingsScreen(Minecraft.getInstance().screen)));

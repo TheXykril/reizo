@@ -66,6 +66,12 @@ dependencies {
     // Optional OneConfig settings page (only its Minecraft-independent config API is needed).
     compileOnly("org.polyfrost.oneconfig:config:${libs.versions.oneconfig.get()}") { isTransitive = false }
     compileOnly("org.polyfrost.oneconfig:config-impl:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    // OneConfig HUD element (the recording indicator in OneConfig's HUD editor). Compile-only too:
+    // these jars and the Kotlin standard library come with OneConfig at runtime.
+    compileOnly("org.polyfrost.oneconfig:hud:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:ui:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:utils:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.2.20") { isTransitive = false }
 
     implementation(project(":core"))
     include(project(":core"))
