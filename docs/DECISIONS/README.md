@@ -19,3 +19,4 @@ in AGENTS.md needs an ADR.
 | [0011](0011-shadow-recording-buffer.md) | Shadow recording with snapshot segments in memory | Accepted |
 | [0012](0012-effects-pass.md) | Effects as one full-screen pass after the world | Accepted |
 | [0013](0013-export-sound-offline-mix.md) | Export sound mixed offline from the sounds that play | Accepted |
+| [0014](0014-keyframed-settings.md) | Keyframed game and mod settings | Accepted |

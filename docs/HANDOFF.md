@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-22 by Claude (export settings).
+Last updated: 2026-11-23 by Claude (keyframed settings).
 
 ## 1. Current project phase
 
@@ -103,6 +103,11 @@ screen, effects, audio, shadow recording, multi-version.
   and `FfmpegCommand.muxAudio` adds it to the picture (written first to `<name>.video.<ext>`).
 - Motion blur: `ExportPlan(samples, shutter)`; `ExportSession.frame` counts renders and
   `deliver` averages each frame's renders before encoding.
+- Keyframed settings (ADR 0014): `core.effects.PropertyTracks` (project field `settings`, in
+  `TimelineState`), `fabric.settings.KeyframedSettings` (sources: `VanillaSettings`,
+  `compat.OneConfigSettings`; driver applies per frame from `GameRendererMixin` render HEAD and
+  restores originals on the first frame without a replay). Panel `ui/KeyframedSettingsScreen`.
+  The OneConfig source is untested at runtime: check in OneClient on Hyperion.
 - Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 

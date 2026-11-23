@@ -6,6 +6,7 @@ package io.github.thexykril.reizo.gametest;
 
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.effects.Grade;
+import io.github.thexykril.reizo.core.effects.PropertyTracks;
 import io.github.thexykril.reizo.core.export.ExportFormat;
 import io.github.thexykril.reizo.core.format.Frame;
 import io.github.thexykril.reizo.core.format.FrameStreamReader;
@@ -303,6 +304,13 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> mc.getConnection() == null, 20 * 30);
     LOGGER.info("playBack: client connection gone");
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc ->
+                mc.options.gamma().get() == gammaBefore
+                    && mc.options.entityShadows().get() == shadowsBefore),
+        "leaving the replay did not put the keyframed settings back");
     LOGGER.info("playBack OK: {} play packets, {} chunks loaded", replay.playPacketsSent(), chunks);
   }
 
@@ -382,6 +390,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     checkTimeline(context);
     checkFreeCamera(context);
     checkEffects(context);
+    checkKeyframedSettings(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -446,6 +455,76 @@ public final class RecordingGameTest implements FabricClientGameTest {
         context.computeOnClient(mc -> EffectRenderer.lastApplied() == null),
         "effects pass still running after removing the keyframe");
     LOGGER.info("checkEffects OK");
+  }
+
+  private double gammaBefore;
+  private boolean shadowsBefore;
+
+  /**
+   * Keyframed settings: the timeline's Settings button opens the panel, which lists Minecraft's
+   * settings; keyframes drive brightness and entity shadows during the replay, undo covers them,
+   * and the player's own values come back when the replay closes (checked in playBack after
+   * leaving).
+   */
+  private void checkKeyframedSettings(ClientGameTestContext context) {
+    context.runOnClient(
+        mc -> mc.setScreen(new io.github.thexykril.reizo.fabric.ui.TimelineScreen()));
+    context.waitTicks(2);
+    context.runOnClient(mc -> pressButton(mc, "reizo.timeline.settings"));
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc -> mc.screen instanceof io.github.thexykril.reizo.fabric.ui.KeyframedSettingsScreen),
+        "Settings button did not open the settings panel");
+    check(
+        context.computeOnClient(
+            mc ->
+                io.github.thexykril.reizo.fabric.settings.KeyframedSettings.find("minecraft:gamma")
+                    != null),
+        "brightness is not listed");
+    gammaBefore = context.computeOnClient(mc -> mc.options.gamma().get());
+    shadowsBefore = context.computeOnClient(mc -> mc.options.entityShadows().get());
+    double target = gammaBefore > 0.5 ? 0.1 : 0.9;
+    context.runOnClient(
+        mc -> {
+          var tracks = ReplayEditor.settings();
+          ReplayEditor.recordUndo();
+          // One keyframe holds its value everywhere (blending is unit tested in core).
+          tracks.put("minecraft:gamma", PropertyTracks.Kind.NUMBER, 0, target);
+          tracks.put(
+              "minecraft:entity_shadows", PropertyTracks.Kind.TOGGLE, 0, shadowsBefore ? 0 : 1);
+          ReplayEditor.settingsChanged();
+        });
+    context.waitTicks(3);
+    context.takeScreenshot("reizo-settings");
+    context.runOnClient(
+        mc -> {
+          check(
+              Math.abs(mc.options.gamma().get() - target) < 1e-6,
+              "brightness not driven: " + mc.options.gamma().get() + ", expected " + target);
+          check(mc.options.entityShadows().get() != shadowsBefore, "entity shadows not switched");
+          check(ReplayEditor.project().settings.size() == 2, "settings not stored in the project");
+          check(ReplayEditor.undo(), "nothing to undo");
+          check(ReplayEditor.settings().isEmpty(), "undo kept the setting keyframes");
+        });
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc ->
+                mc.options.gamma().get() == gammaBefore
+                    && mc.options.entityShadows().get() == shadowsBefore),
+        "removing the tracks did not put the settings back");
+    // Leave a track so leaving the replay has something to put back.
+    context.runOnClient(
+        mc -> {
+          check(ReplayEditor.redo(), "nothing to redo");
+          mc.setScreen(null);
+        });
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> mc.options.entityShadows().get() != shadowsBefore),
+        "redo did not bring the settings back");
+    LOGGER.info("checkKeyframedSettings OK");
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

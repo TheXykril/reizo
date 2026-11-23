@@ -35,6 +35,8 @@ public final class ReplayEditor {
   private static CameraPath path = new CameraPath();
   private static io.github.thexykril.reizo.core.effects.EffectTrack effects =
       new io.github.thexykril.reizo.core.effects.EffectTrack();
+  private static io.github.thexykril.reizo.core.effects.PropertyTracks settings =
+      new io.github.thexykril.reizo.core.effects.PropertyTracks();
   private static boolean pathPlaying;
 
   /** Roll (degrees) and FOV of the free camera while the path does not drive it; NaN = none. */
@@ -76,6 +78,7 @@ public final class ReplayEditor {
     }
     path = project.cameraPath();
     effects = project.effects();
+    settings = project.settings();
     history.clear();
     resetFreeCamera();
   }
@@ -86,7 +89,40 @@ public final class ReplayEditor {
     project = null;
     path = new CameraPath();
     effects = new io.github.thexykril.reizo.core.effects.EffectTrack();
+    settings = new io.github.thexykril.reizo.core.effects.PropertyTracks();
+    // The settings are put back by the next frame's applySettings() on the render thread: close()
+    // can run on the replay server's thread.
     pathPlaying = false;
+  }
+
+  /**
+   * The keyframed game and mod settings of the open project. Call {@link #settingsChanged()} after
+   * a change.
+   */
+  public static io.github.thexykril.reizo.core.effects.PropertyTracks settings() {
+    return settings;
+  }
+
+  /** Stores the setting keyframes in the project and saves it. */
+  public static void settingsChanged() {
+    if (project != null) {
+      project.setSettings(settings);
+      save();
+    }
+  }
+
+  /**
+   * Drives the keyframed settings for the frame about to render, or puts the player's values back
+   * once no replay is playing. Called per frame on the render thread.
+   */
+  public static void applySettings() {
+    ReplayServer server = ReplayPlayback.current();
+    if (server == null) {
+      io.github.thexykril.reizo.fabric.settings.KeyframedSettings.restoreAll();
+      return;
+    }
+    io.github.thexykril.reizo.fabric.settings.KeyframedSettings.apply(
+        settings, server.replayTimeMs());
   }
 
   /** The effect keyframes of the open project. Call {@link #effectsChanged()} after a change. */
@@ -296,8 +332,8 @@ public final class ReplayEditor {
   /** Everything the timeline edits, as an immutable snapshot. */
   public static TimelineState state() {
     return project == null
-        ? TimelineState.of(path, effects, -1, -1)
-        : TimelineState.of(path, effects, project.inMs, project.outMs);
+        ? TimelineState.of(path, effects, settings, -1, -1)
+        : TimelineState.of(path, effects, settings, project.inMs, project.outMs);
   }
 
   /**
@@ -338,7 +374,9 @@ public final class ReplayEditor {
     }
     s.applyTo(path);
     s.applyTo(effects);
+    s.applyTo(settings);
     if (project != null) {
+      project.setSettings(settings);
       project.inMs = s.inMs();
       project.outMs = s.outMs();
       project.setEffects(effects);

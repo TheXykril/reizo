@@ -112,6 +112,10 @@ public final class TimelineScreen extends Screen {
         b -> Minecraft.getInstance().setScreen(new EffectsScreen(this)));
     button(
         row,
+        "reizo.timeline.settings",
+        b -> Minecraft.getInstance().setScreen(new KeyframedSettingsScreen(this)));
+    button(
+        row,
         "reizo.timeline.export",
         b -> Minecraft.getInstance().setScreen(new ExportSettingsScreen(this)));
     updateLabels();
@@ -220,6 +224,11 @@ public final class TimelineScreen extends Screen {
     for (var k : ReplayEditor.effects().keyframes()) {
       int ex = (int) Math.round(left + view.timeToX(k.timeMs()));
       g.fill(ex - 2, markerY + 8, ex + 2, markerY + 12, 0xFFB070FF);
+    }
+    // Setting keyframes: small teal squares along the top of the marker track.
+    for (var k : ReplayEditor.settings().keyframes()) {
+      int sx = (int) Math.round(left + view.timeToX(k.timeMs()));
+      g.fill(sx - 2, markerY, sx + 2, markerY + 4, 0xFF40D0C0);
     }
     renderKeyframes(g);
     if (drag == Drag.BOX) {

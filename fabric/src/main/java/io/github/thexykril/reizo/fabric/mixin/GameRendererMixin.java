@@ -15,7 +15,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * While a replay's camera path plays, its field of view replaces the player's. During a replay the
- * project's effects are applied to the world picture before the HUD is drawn.
+ * project's effects are applied to the world picture before the HUD is drawn, and its keyframed
+ * settings are set before each frame.
  */
 @Mixin(GameRenderer.class)
 abstract class GameRendererMixin {
@@ -26,6 +27,12 @@ abstract class GameRendererMixin {
     if (!Float.isNaN(fov) && useFovSetting) {
       cir.setReturnValue(fov);
     }
+  }
+
+  @Inject(method = "render", at = @At("HEAD"))
+  private void reizo$settings(
+      net.minecraft.client.DeltaTracker deltaTracker, boolean renderLevel, CallbackInfo ci) {
+    ReplayEditor.applySettings();
   }
 
   @Inject(

@@ -128,6 +128,12 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   180° shutter), GT (`exportRegionVp9` with 4 renders per frame still has one frame per frame).
   Export settings "Motion blur": off, 4, 8 or 16 renders averaged per frame; costs that many times
   the render time.
+- **Settings over time:** **implemented** for Minecraft's settings, evidence GT
+  (`checkKeyframedSettings`: the panel opens from the timeline, keyframes drive brightness and
+  entity shadows, undo/redo, the player's values come back after leaving the replay), UT
+  (`PropertyTracksTest`); ADR 0014. Timeline → Settings lists settings with a search box; a change
+  sets a keyframe at the playhead; numbers blend, switches flip; teal squares on the marker track.
+  OneConfig mod settings: **partial**, see OneClient integration.
 - **Planned:** depth of field, bloom, camera shake, chromatic aberration, blur,
   fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV.
 
@@ -178,6 +184,10 @@ without it (ADR 0010). Not affiliated with or endorsed by Polyfrost or OneClient
   OneConfig 1.9.1 HUD API; not run yet). "Reizo recording" (Info) shows REC/PAUSED with the time,
   or "Shadow on", and can be placed in OneConfig's HUD editor. Hidden while nothing records.
   Registration failures are caught, so Reizo keeps working with another OneConfig version.
+- **OneClient mod settings over time:** **partial**, evidence — (builds against the OneConfig
+  1.9.1 config API; not run in OneConfig yet). Every switch and bounded number of every OneConfig
+  config (OneClient's mods) is listed in timeline → Settings and can be keyframed like Rewind's
+  Lunar mod properties. Needs a manual check in OneClient (ADR 0014).
 - **Keybinds in OneConfig's keybind page:** **partial**, evidence — (Reizo uses vanilla key
   mappings, which OneConfig lists; not checked).
 - OneConfig notifications, editor entry in the OneClient main menu, PolyCompose styling:
