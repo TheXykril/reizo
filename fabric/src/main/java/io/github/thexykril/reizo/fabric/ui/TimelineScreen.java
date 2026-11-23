@@ -21,6 +21,7 @@ import io.github.thexykril.reizo.fabric.settings.KeyframedSetting;
 import io.github.thexykril.reizo.fabric.settings.KeyframedSettings;
 import io.github.thexykril.reizo.fabric.ui.kit.Draw;
 import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
+import io.github.thexykril.reizo.fabric.ui.kit.GuiScaleFit;
 import io.github.thexykril.reizo.fabric.ui.kit.DragField;
 import io.github.thexykril.reizo.fabric.ui.kit.Icons;
 import io.github.thexykril.reizo.fabric.ui.kit.PopupMenu;
@@ -1933,16 +1934,9 @@ public final class TimelineScreen extends Screen {
    * own scale comes back in {@link #removed()}.
    */
   private void fitGuiScale() {
-    var window = minecraft.getWindow();
-    int scale = window.getGuiScale();
-    int fit = scale;
-    while (fit > 1 && window.getWidth() / fit < FULL_LAYOUT_W) {
-      fit--;
-    }
-    if (fit != scale) {
-      window.setGuiScale(fit);
-      width = window.getGuiScaledWidth();
-      height = window.getGuiScaledHeight();
+    if (GuiScaleFit.fit(minecraft, FULL_LAYOUT_W)) {
+      width = minecraft.getWindow().getGuiScaledWidth();
+      height = minecraft.getWindow().getGuiScaledHeight();
       ownScale = true;
     }
   }
@@ -1952,9 +1946,7 @@ public final class TimelineScreen extends Screen {
     super.removed();
     if (ownScale) {
       ownScale = false;
-      var window = minecraft.getWindow();
-      window.setGuiScale(
-          window.calculateScale(minecraft.options.guiScale().get(), minecraft.isEnforceUnicode()));
+      GuiScaleFit.restore(minecraft);
     }
   }
 }

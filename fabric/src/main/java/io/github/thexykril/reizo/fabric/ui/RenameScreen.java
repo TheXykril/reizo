@@ -4,46 +4,49 @@
  */
 package io.github.thexykril.reizo.fabric.ui;
 
+import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
+import io.github.thexykril.reizo.fabric.ui.kit.KitField;
+import io.github.thexykril.reizo.fabric.ui.kit.KitScreen;
 import java.util.function.Consumer;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
 /** Asks for a new recording name. */
-final class RenameScreen extends Screen {
+final class RenameScreen extends KitScreen {
   private final Screen parent;
-  private final String initial;
+  private String value;
   private final Consumer<String> onDone;
-  private EditBox box;
-  private Button done;
+  private KitField box;
+  private FlatButton done;
 
   RenameScreen(Screen parent, String initial, Consumer<String> onDone) {
     super(Component.translatable("reizo.browser.rename_title"));
     this.parent = parent;
-    this.initial = initial == null ? "" : initial;
+    this.value = initial == null ? "" : initial;
     this.onDone = onDone;
   }
 
   @Override
   protected void init() {
-    box = new EditBox(font, width / 2 - 100, height / 2 - 20, 200, 20, title);
+    card(240, TITLE_H + PAD * 3 + 20 + 16);
+    int x = innerX();
+    int w = innerW();
+    box = new KitField(font, x, contentY(), w, 20, title);
     box.setMaxLength(64);
-    box.setValue(box.getValue().isEmpty() ? initial : box.getValue());
-    box.setResponder(v -> done.active = !v.isBlank());
+    box.setValue(value);
+    box.setResponder(
+        v -> {
+          value = v;
+          if (done != null) {
+            done.active = !v.isBlank();
+          }
+        });
     addRenderableWidget(box);
     setInitialFocus(box);
-    done =
-        addRenderableWidget(
-            Button.builder(Component.translatable("gui.done"), b -> finish())
-                .bounds(width / 2 - 100, height / 2 + 10, 98, 20)
-                .build());
-    addRenderableWidget(
-        Button.builder(Component.translatable("gui.cancel"), b -> onClose())
-            .bounds(width / 2 + 2, height / 2 + 10, 98, 20)
-            .build());
-    done.active = !box.getValue().isBlank();
+    int half = (w - GAP) / 2;
+    button(x, footerY(), half, Component.translatable("gui.cancel"), this::onClose);
+    done = accentButton(x + half + GAP, footerY(), w - half - GAP, Component.translatable("gui.done"), this::finish);
+    done.active = !value.isBlank();
   }
 
   private void finish() {
@@ -51,12 +54,6 @@ final class RenameScreen extends Screen {
       onDone.accept(box.getValue());
     }
     onClose();
-  }
-
-  @Override
-  public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    super.render(g, mouseX, mouseY, partialTick);
-    g.drawCenteredString(font, title, width / 2, height / 2 - 40, 0xFFFFFFFF);
   }
 
   @Override

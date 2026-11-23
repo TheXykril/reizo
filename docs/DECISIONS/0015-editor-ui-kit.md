@@ -56,8 +56,13 @@ Option 3.
   and a multi-track timeline (markers, camera, look, world, entities, settings), with the world
   visible in the middle. Side panels fold away on narrow windows (the 320×240 test window keeps
   only the top bar and the timeline) and with Tab.
-- Existing panels (effects, settings, export) stay as they are for now and open from the editor.
-  They move into the Inspector one by one in later changes, on the same kit.
+- Reizo's other screens (replay browser, settings, export, effects, settings over time, rename,
+  the delete question) extend `KitScreen`: the game dimmed behind a rounded card with a title bar
+  (or a card docked on the left for panels that keep the replay visible), switch rows, value rows
+  that cycle on click, `KitField` text fields (a vanilla `EditBox` drawn in the kit's look) and
+  `KitConfirmScreen`. Vanilla `CycleButton`, sliders and selection lists are no longer used.
+- Reizo's screens lower the GUI scale while open when the window is narrower than their layout
+  needs (`GuiScaleFit`), and put the player's scale back when they close.
 
 ## Consequences
 

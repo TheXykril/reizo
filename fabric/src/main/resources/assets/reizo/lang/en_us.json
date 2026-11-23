@@ -242,5 +242,12 @@
   "reizo.menu_bar.seek_here": "Go here",
   "reizo.menu_bar.in_here": "Export starts here",
   "reizo.menu_bar.out_here": "Export ends here",
-  "reizo.inspector.title": "Inspector"
+  "reizo.inspector.title": "Inspector",
+  "reizo.settings.section.recording": "Recording",
+  "reizo.settings.section.shadow": "Shadow recording",
+  "reizo.settings.section.replay": "Replays",
+  "reizo.effects.letterbox_row": "Letterbox",
+  "reizo.settings_track.value": "Value",
+  "reizo.export.section.video": "Video",
+  "reizo.export.section.audio": "Audio"
 }

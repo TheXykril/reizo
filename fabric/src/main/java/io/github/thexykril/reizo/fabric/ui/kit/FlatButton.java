@@ -29,12 +29,18 @@ public class FlatButton extends Button {
     /** A tab or segment: accent text and underline when selected. */
     TAB,
     /** A collapsible section header: an arrow and left-aligned text; selected means open. */
-    HEADER
+    HEADER,
+    /** A settings row: label on the left, a value or a switch on the right. */
+    ROW
   }
 
   private final Style style;
   private String icon;
   private BooleanSupplier selected = () -> false;
+  private java.util.function.Supplier<String> value;
+  private BooleanSupplier on;
+  private boolean danger;
+  private boolean left;
 
   public FlatButton(int x, int y, int w, int h, Component label, Style style, OnPress onPress) {
     super(x, y, w, h, label, onPress, DEFAULT_NARRATION);
@@ -52,6 +58,30 @@ public class FlatButton extends Button {
 
   public FlatButton selectedWhen(BooleanSupplier selected) {
     this.selected = selected;
+    return this;
+  }
+
+  /** A ROW's value, drawn on the right. */
+  public FlatButton value(java.util.function.Supplier<String> value) {
+    this.value = value;
+    return this;
+  }
+
+  /** Draws a ROW's value as an on/off switch. */
+  public FlatButton switchWhen(BooleanSupplier on) {
+    this.on = on;
+    return this;
+  }
+
+  /** Left-aligns the label (list rows). */
+  public FlatButton alignLeft() {
+    this.left = true;
+    return this;
+  }
+
+  /** An ACCENT button for a destructive action: red instead of blue. */
+  public FlatButton danger() {
+    this.danger = true;
     return this;
   }
 
@@ -88,12 +118,16 @@ public class FlatButton extends Button {
         switch (style) {
           case GHOST -> sel ? Theme.ACCENT_WASH : hot ? Theme.HOVER : 0;
           case TONAL -> sel ? Theme.ACCENT_WASH : hot ? Theme.HOVER : Theme.RAISED;
-          case ACCENT -> hot ? Theme.ACCENT_HOVER : Theme.ACCENT;
+          case ACCENT ->
+              danger
+                  ? (hot ? Draw.mix(Theme.DANGER, 0xFFFFFFFF, 0.15) : Theme.DANGER)
+                  : (hot ? Theme.ACCENT_HOVER : Theme.ACCENT);
           case TAB -> hot && !sel ? Theme.HOVER : 0;
           case HEADER -> hot ? Theme.HOVER : Draw.mix(Theme.SURFACE, Theme.RAISED, 0.6);
+          case ROW -> hot ? Theme.HOVER : Theme.RAISED;
         };
     if (fill != 0) {
-      Draw.round(g, x0, y0, x1, y1, 2, fill);
+      Draw.round(g, x0, y0, x1, y1, style == Style.ROW ? 4 : 2, fill);
     }
     if (style == Style.TAB && sel) {
       g.fill(x0 + 2, y1 - 1, x1 - 2, y1, Theme.ACCENT);
@@ -114,8 +148,35 @@ public class FlatButton extends Button {
           g, font, Draw.fit(font, getMessage().getString(), getWidth() - 16), x0 + 13, y0 + (getHeight() - 8) / 2, Theme.TEXT);
       return;
     }
+    if (style == Style.ROW) {
+      int ty = y0 + (getHeight() - 8) / 2;
+      int right = x1 - 6;
+      if (on != null) {
+        boolean v = on.getAsBoolean();
+        int sw = 16;
+        int sh = 8;
+        int sy = (y0 + y1 - sh) / 2;
+        Draw.round(g, right - sw, sy, right, sy + sh, 4, v ? Theme.ACCENT : Theme.TRACK_BG);
+        int kx = v ? right - sh + 1 : right - sw + 1;
+        Draw.round(g, kx, sy + 1, kx + sh - 2, sy + sh - 1, 3, active ? 0xFFFFFFFF : Theme.DIM);
+        right -= sw + 6;
+      } else if (value != null) {
+        String v = value.get();
+        int vw = Draw.width(font, v);
+        Draw.label(g, font, v, right - vw, ty, active ? Theme.ACCENT_HOVER : Theme.FAINT);
+        right -= vw + 8;
+      }
+      Draw.label(
+          g, font, Draw.fit(font, getMessage().getString(), right - x0 - 8), x0 + 7, ty, color);
+      return;
+    }
     if (icon != null && Icons.has(icon)) {
       Icons.draw(g, icon, (x0 + x1) / 2, (y0 + y1) / 2, color);
+      return;
+    }
+    if (left && icon == null) {
+      Draw.label(
+          g, font, Draw.fit(font, getMessage().getString(), getWidth() - 12), x0 + 6, y0 + (getHeight() - 8) / 2, color);
       return;
     }
     String s = icon != null ? icon : Draw.fit(font, getMessage().getString(), getWidth() - 6);

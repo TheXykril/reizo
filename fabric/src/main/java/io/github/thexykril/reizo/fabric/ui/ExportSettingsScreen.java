@@ -21,8 +21,11 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
+import io.github.thexykril.reizo.fabric.ui.kit.Draw;
+import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
+import io.github.thexykril.reizo.fabric.ui.kit.KitField;
+import io.github.thexykril.reizo.fabric.ui.kit.KitScreen;
+import io.github.thexykril.reizo.fabric.ui.kit.Theme;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
@@ -33,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * format (only those the installed FFmpeg can encode), file name, and the range set in the
  * timeline. "Export" starts the frame-by-frame export.
  */
-public final class ExportSettingsScreen extends Screen {
+public final class ExportSettingsScreen extends KitScreen {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Export");
 
   /** Output sizes; 0x0 keeps the window size. */
@@ -68,7 +71,11 @@ public final class ExportSettingsScreen extends Screen {
   private final Screen parent;
   private List<ExportFormat> formats = List.of();
   private String problem;
-  private EditBox fileName;
+  private KitField fileName;
+  private int videoY;
+  private int audioY;
+  private int fileY;
+  private int infoY;
 
   public ExportSettingsScreen(Screen parent) {
     super(Component.translatable("reizo.export.title"));
@@ -91,124 +98,80 @@ public final class ExportSettingsScreen extends Screen {
             ? "reizo.export.no_ffmpeg"
             : formats.isEmpty() ? "reizo.export.no_formats" : null;
 
-    int x = width / 2 - 155;
-    int y = 34;
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(Resolution::label, closest(r.width, r.height))
-            .withValues(RESOLUTIONS)
-            .create(
-                x,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.export.resolution"),
-                (b, v) -> {
-                  r.width = v.width();
-                  r.height = v.height();
-                  ReplayEditor.changed();
-                }));
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
-                (Integer v) -> Component.literal(v + " fps"),
-                FRAME_RATES.contains(r.fps) ? r.fps : 60)
-            .withValues(FRAME_RATES)
-            .create(
-                x + 160,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.export.fps"),
-                (b, v) -> {
-                  r.fps = v;
-                  ReplayEditor.changed();
-                }));
-    y += 24;
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::qualityLabel, closestQuality(r.crf))
-            .withValues(QUALITIES)
-            .create(
-                x,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.export.quality"),
-                (b, v) -> {
-                  r.crf = v;
-                  ReplayEditor.changed();
-                }));
+    card(360, height - 24);
+    int x = innerX();
+    int w = innerW();
+    int half = (w - GAP) / 2;
+    int y = contentY();
+    videoY = y;
+    y += 12;
+    cycle(x, y, half, Component.translatable("reizo.export.resolution"), RESOLUTIONS,
+        () -> closest(r.width, r.height), Resolution::label,
+        v -> {
+          r.width = v.width();
+          r.height = v.height();
+          ReplayEditor.changed();
+        });
+    cycle(x + half + GAP, y, w - half - GAP, Component.translatable("reizo.export.fps"), FRAME_RATES,
+        () -> FRAME_RATES.contains(r.fps) ? r.fps : 60, (Integer v) -> Component.literal(v + " fps"),
+        v -> {
+          r.fps = v;
+          ReplayEditor.changed();
+        });
+    y += ROW_H;
+    cycle(x, y, half, Component.translatable("reizo.export.quality"), QUALITIES,
+        () -> closestQuality(r.crf), ExportSettingsScreen::qualityLabel,
+        v -> {
+          r.crf = v;
+          ReplayEditor.changed();
+        });
     if (!formats.isEmpty()) {
-      ExportFormat current = ExportFormat.forEncoder(r.codec);
-      if (!formats.contains(current)) {
-        current = formats.get(0);
-        r.codec = current.encoder();
+      if (!formats.contains(ExportFormat.forEncoder(r.codec))) {
+        r.codec = formats.get(0).encoder();
       }
-      addRenderableWidget(
-          io.github.thexykril.reizo.fabric.compat.Compat.cycle((ExportFormat f) -> Component.literal(f.label()), current)
-              .withValues(formats)
-              .create(
-                  x + 160,
-                  y,
-                  150,
-                  20,
-                  Component.translatable("reizo.export.format"),
-                  (b, v) -> {
-                    r.codec = v.encoder();
-                    ReplayEditor.changed();
-                  }));
+      cycle(x + half + GAP, y, w - half - GAP, Component.translatable("reizo.export.format"), formats,
+          () -> ExportFormat.forEncoder(r.codec), (ExportFormat f) -> Component.literal(f.label()),
+          v -> {
+            r.codec = v.encoder();
+            ReplayEditor.changed();
+          });
     }
-    y += 24;
+    y += ROW_H;
+    cycle(x, y, w, Component.translatable("reizo.export.motion_blur"), MOTION_BLUR,
+        () -> MOTION_BLUR.contains(r.motionBlur) ? r.motionBlur : 1,
+        (Integer v) ->
+            v <= 1
+                ? Component.translatable("options.off")
+                : Component.translatable("reizo.export.blur_samples", v),
+        v -> {
+          r.motionBlur = v;
+          ReplayEditor.changed();
+        });
+    y += ROW_H + GAP;
+    audioY = y;
+    y += 12;
     // Sound and music levels; "Off" for sound leaves the sound track out entirely.
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::volumeLabel, r.audio ? volume(r.soundVolume) : 0)
-            .withValues(VOLUMES)
-            .create(
-                x,
-                y,
-                102,
-                20,
-                Component.translatable("reizo.export.audio"),
-                (b, v) -> {
-                  r.audio = v > 0;
-                  if (v > 0) {
-                    r.soundVolume = v;
-                  }
-                  ReplayEditor.changed();
-                }));
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(ExportSettingsScreen::volumeLabel, volume(r.musicVolume))
-            .withValues(VOLUMES)
-            .create(
-                x + 104,
-                y,
-                102,
-                20,
-                Component.translatable("reizo.export.music"),
-                (b, v) -> {
-                  r.musicVolume = v;
-                  ReplayEditor.changed();
-                }));
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
-                (Integer v) ->
-                    v <= 1
-                        ? Component.translatable("options.off")
-                        : Component.translatable("reizo.export.blur_samples", v),
-                MOTION_BLUR.contains(r.motionBlur) ? r.motionBlur : 1)
-            .withValues(MOTION_BLUR)
-            .create(
-                x + 208,
-                y,
-                102,
-                20,
-                Component.translatable("reizo.export.motion_blur"),
-                (b, v) -> {
-                  r.motionBlur = v;
-                  ReplayEditor.changed();
-                }));
-    y += 34;
-    fileName = new EditBox(font, x, y, 310, 20, Component.translatable("reizo.export.file"));
+    cycle(x, y, half, Component.translatable("reizo.export.audio"), VOLUMES,
+        () -> r.audio ? volume(r.soundVolume) : 0, ExportSettingsScreen::volumeLabel,
+        v -> {
+          r.audio = v > 0;
+          if (v > 0) {
+            r.soundVolume = v;
+          }
+          ReplayEditor.changed();
+        });
+    cycle(x + half + GAP, y, w - half - GAP, Component.translatable("reizo.export.music"), VOLUMES,
+        () -> volume(r.musicVolume), ExportSettingsScreen::volumeLabel,
+        v -> {
+          r.musicVolume = v;
+          ReplayEditor.changed();
+        });
+    y += ROW_H + GAP;
+    fileY = y;
+    y += 12;
+    fileName = new KitField(font, x, y, w, 18, Component.translatable("reizo.export.file"));
+    fileName.placeholder(Component.translatable("reizo.export.file_hint"));
     fileName.setMaxLength(120);
-    fileName.setHint(Component.translatable("reizo.export.file_hint"));
     fileName.setValue(r.output == null ? "" : r.output);
     fileName.setResponder(
         v -> {
@@ -216,29 +179,20 @@ public final class ExportSettingsScreen extends Screen {
           ReplayEditor.changed();
         });
     addRenderableWidget(fileName);
-    y += 34;
+    y += 18 + GAP * 2;
+    infoY = y;
     if (ReplayEditor.inMs() >= 0 || ReplayEditor.outMs() >= 0) {
-      addRenderableWidget(
-          Button.builder(
-                  Component.translatable("reizo.export.clear_range"),
-                  b -> {
-                    ReplayEditor.setRegion(true, -1);
-                    ReplayEditor.setRegion(false, -1);
-                    rebuildWidgets();
-                  })
-              .bounds(x + 210, y - 4, 100, 20)
-              .build());
+      button(x + w - 100, y - 2, 100, Component.translatable("reizo.export.clear_range"),
+          () -> {
+            ReplayEditor.setRegion(true, -1);
+            ReplayEditor.setRegion(false, -1);
+            rebuildWidgets();
+          });
     }
-    Button export =
-        addRenderableWidget(
-            Button.builder(Component.translatable("reizo.export.start"), b -> startExport())
-                .bounds(width / 2 - 155, height - 28, 150, 20)
-                .build());
+    button(x, footerY(), half, Component.translatable("gui.back"), this::onClose);
+    FlatButton export =
+        accentButton(x + half + GAP, footerY(), w - half - GAP, Component.translatable("reizo.export.start"), this::startExport);
     export.active = problem == null;
-    addRenderableWidget(
-        Button.builder(Component.translatable("gui.back"), b -> onClose())
-            .bounds(width / 2 + 5, height - 28, 150, 20)
-            .build());
   }
 
   private static final List<Integer> VOLUMES = List.of(0, 25, 50, 75, 100);
@@ -264,45 +218,52 @@ public final class ExportSettingsScreen extends Screen {
   }
 
   @Override
-  public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    super.render(g, mouseX, mouseY, partialTick);
-    g.drawCenteredString(font, title, width / 2, 15, 0xFFFFFFFF);
-    int x = width / 2 - 155;
-    g.drawString(font, Component.translatable("reizo.export.file"), x, 106, 0xFFA0A0A0);
+  protected void renderCard(GuiGraphics g, int mouseX, int mouseY) {
+    sectionLabel(g, Component.translatable("reizo.export.section.video").getString(), videoY);
+    sectionLabel(g, Component.translatable("reizo.export.section.audio").getString(), audioY);
+    sectionLabel(g, Component.translatable("reizo.export.file").getString(), fileY);
+    int x = innerX();
+    int w = innerW();
+    int y = infoY;
+    g.enableScissor(x, infoY - 2, x + w, footerY() - 4);
+    renderInfo(g, x, y, w);
+    g.disableScissor();
+  }
+
+  private void renderInfo(GuiGraphics g, int x, int y, int w) {
     var server = ReplayPlayback.current();
     if (server != null) {
       long duration = server.script().durationMs();
       long in = Math.max(0, ReplayEditor.inMs());
       long out = ReplayEditor.outMs() < 0 ? duration : Math.min(ReplayEditor.outMs(), duration);
       boolean whole = ReplayEditor.inMs() < 0 && ReplayEditor.outMs() < 0;
-      // Narrower when the "Whole replay" button sits to the right.
-      wrapped(
-          g,
-          Component.translatable(
-              whole ? "reizo.export.range_all" : "reizo.export.range",
-              ReplayHud.time(in),
-              ReplayHud.time(out)),
-          x,
-          140,
-          whole ? 310 : 205,
-          0xFFFFFFFF);
+      y =
+          wrapped(
+                  g,
+                  Component.translatable(
+                      whole ? "reizo.export.range_all" : "reizo.export.range",
+                      ReplayHud.time(in),
+                      ReplayHud.time(out)),
+                  x,
+                  y,
+                  whole ? w : w - 106,
+                  Theme.TEXT)
+              + 6;
     }
-    int y = 164;
     if (problem != null) {
-      wrapped(g, Component.translatable(problem), x, y, 310, 0xFFFF6060);
+      wrapped(g, Component.translatable(problem), x, y, w, Theme.DANGER);
     } else {
-      y = wrapped(g, Component.translatable("reizo.export.note"), x, y, 310, 0xFFA0A0A0);
+      y = wrapped(g, Component.translatable("reizo.export.note"), x, y, w, Theme.DIM);
       ExportFormat f = ExportFormat.forEncoder(ReplayEditor.project().render.codec);
       if (f.hardware()) {
-        wrapped(g, Component.translatable("reizo.export.hardware_note"), x, y + 2, 310, 0xFFE0C060);
+        wrapped(g, Component.translatable("reizo.export.hardware_note"), x, y + 2, w, Theme.WARN);
       }
     }
   }
 
   /** Draws wrapped text and returns the y below it. */
   private int wrapped(GuiGraphics g, Component text, int x, int y, int w, int color) {
-    g.drawWordWrap(font, text, x, y, w, color);
-    return y + font.split(text, w).size() * font.lineHeight;
+    return y + Draw.wrap(g, font, text, x, y, w, color);
   }
 
   @Override
