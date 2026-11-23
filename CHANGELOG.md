@@ -16,6 +16,9 @@ compatibility.
 
 ### Added
 
+- The recorded player's HUD in player view (POV): hotbar with the selected slot and offhand,
+  health, hunger, armor, experience and air, as they were while recording. It can be turned off in
+  the settings or keyframed in the editor, and shows in exports.
 - Minecraft 26.3 support (a separate jar, built from the same sources with Stonecutter). Not
   yet tested by hand. Recordings play only on the version that made them.
 

@@ -66,6 +66,12 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
     public static boolean showIndicator = true;
 
     @Switch(
+        title = "Recorded player's HUD in POV",
+        description = "In player view, show the hotbar, health, hunger and XP as they were recorded.",
+        category = "Replays")
+    public static boolean showPlayerHud = true;
+
+    @Switch(
         title = "Save server or world name",
         description = "Turn off to keep the server address out of recordings you share.",
         category = "Recording")
@@ -129,6 +135,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
           new String[] {
             "autoRecordOnJoin",
             "showIndicator",
+            "showPlayerHud",
             "storeServerName",
             "toggleModifier",
             "ffmpegPath",
@@ -146,6 +153,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
     private static void pull(ClientConfig c) {
       autoRecordOnJoin = c.autoRecordOnJoin;
       showIndicator = c.showIndicator;
+      showPlayerHud = c.showPlayerHud;
       storeServerName = c.storeServerName;
       toggleModifier = modifierIndex(c.toggleModifier);
       ffmpegPath = c.ffmpegPath == null ? "" : c.ffmpegPath;
@@ -161,6 +169,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       ClientConfig c = client.config();
       c.autoRecordOnJoin = autoRecordOnJoin;
       c.showIndicator = showIndicator;
+      c.showPlayerHud = showPlayerHud;
       c.storeServerName = storeServerName;
       c.toggleModifier = MODIFIERS[Math.max(0, Math.min(MODIFIERS.length - 1, toggleModifier))];
       c.ffmpegPath = ffmpegPath == null ? "" : ffmpegPath.strip();

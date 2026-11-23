@@ -32,6 +32,9 @@ public final class ClientConfig {
   /** Show the recording indicator on the HUD. */
   public boolean showIndicator = true;
 
+  /** In POV replays, draw the recorded player's hotbar, health, food, armor and experience. */
+  public boolean showPlayerHud = true;
+
   /**
    * Modifier that must be held with the start/stop key: "none", "shift", "control" or "alt". The
    * key itself is set in Controls (default R, so Shift+R like Lunar).

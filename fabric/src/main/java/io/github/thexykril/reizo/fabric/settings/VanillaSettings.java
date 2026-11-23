@@ -32,7 +32,53 @@ final class VanillaSettings {
         toggle(
             "view_bobbing",
             "options.viewBobbing",
-            () -> Minecraft.getInstance().options.bobView()));
+            () -> Minecraft.getInstance().options.bobView()),
+        playerHud());
+  }
+
+  /** Reizo's own toggle for the recorded player's HUD in POV, so a shot can show or hide it. */
+  private static KeyframedSetting playerHud() {
+    return new KeyframedSetting() {
+      @Override
+      public String id() {
+        return "reizo:player_hud";
+      }
+
+      @Override
+      public String group() {
+        return "Reizo";
+      }
+
+      @Override
+      public String label() {
+        return Component.translatable("reizo.settings.player_hud").getString();
+      }
+
+      @Override
+      public PropertyTracks.Kind kind() {
+        return PropertyTracks.Kind.TOGGLE;
+      }
+
+      @Override
+      public double min() {
+        return 0;
+      }
+
+      @Override
+      public double max() {
+        return 1;
+      }
+
+      @Override
+      public double get() {
+        return io.github.thexykril.reizo.fabric.RecorderClient.get().config().showPlayerHud ? 1 : 0;
+      }
+
+      @Override
+      public void set(double value) {
+        io.github.thexykril.reizo.fabric.RecorderClient.get().config().showPlayerHud = value != 0;
+      }
+    };
   }
 
   private static KeyframedSetting number(

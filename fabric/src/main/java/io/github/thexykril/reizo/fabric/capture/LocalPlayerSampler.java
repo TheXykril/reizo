@@ -31,8 +31,8 @@ public final class LocalPlayerSampler {
     /*var swing = player.getCurrentSwing();
     boolean swinging = swing != null;
     boolean offHand = swinging && swing.hand() == InteractionHand.OFF_HAND;
-    // 26.x keeps the swing tick count private; its progress (0 to 1) restarts the same way.
-    int swingTime = Math.round(player.getSwingAnimation(1f) * 1000);
+    // 26.x keeps the swing tick count private; its progress (0 to 1) restarts the same way, scaled to fit the byte the format stores.
+    int swingTime = Math.round(player.getSwingAnimation(1f) * 250);
     *///?} else {
     boolean swinging = player.swinging;
     boolean offHand = player.swingingArm == InteractionHand.OFF_HAND;

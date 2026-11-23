@@ -51,6 +51,16 @@ public final class SettingsScreen extends Screen {
                 (b, v) -> config.showIndicator = v));
     y += 24;
     addRenderableWidget(
+        CycleButton.onOffBuilder(config.showPlayerHud)
+            .create(
+                x,
+                y,
+                310,
+                20,
+                Component.translatable("reizo.settings.player_hud"),
+                (b, v) -> config.showPlayerHud = v));
+    y += 24;
+    addRenderableWidget(
         CycleButton.onOffBuilder(config.storeServerName)
             .create(
                 x,

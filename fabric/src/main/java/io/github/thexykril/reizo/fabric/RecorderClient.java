@@ -52,6 +52,10 @@ public final class RecorderClient implements ClientModInitializer {
   private RecordingStorage storage;
   private CaptureController capture;
   private final LocalPlayerSampler sampler = new LocalPlayerSampler();
+  private final io.github.thexykril.reizo.fabric.capture.HudSampler hud =
+      new io.github.thexykril.reizo.fabric.capture.HudSampler();
+  private final io.github.thexykril.reizo.fabric.capture.HudSampler shadowHud =
+      new io.github.thexykril.reizo.fabric.capture.HudSampler();
   private final LocalPlayerSampler shadowSampler = new LocalPlayerSampler();
   private final io.github.thexykril.reizo.fabric.capture.EquipmentTracker equipment =
       new io.github.thexykril.reizo.fabric.capture.EquipmentTracker();
@@ -83,6 +87,7 @@ public final class RecorderClient implements ClientModInitializer {
     io.github.thexykril.reizo.fabric.ui.MenuButtons.register();
     RecordingIndicator.register(this);
     io.github.thexykril.reizo.fabric.ui.ReplayHud.register();
+    io.github.thexykril.reizo.fabric.ui.PlayerHudOverlay.register();
     io.github.thexykril.reizo.fabric.playback.PathVisualizer.register();
     DebugCommands.register(this);
 
@@ -223,6 +228,7 @@ public final class RecorderClient implements ClientModInitializer {
       capture.start(meta, () -> WorldSnapshot.capture(mc));
       sampler.reset();
       equipment.reset();
+      hud.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
       toast(
           "reizo.toast.started",
@@ -306,6 +312,10 @@ public final class RecorderClient implements ClientModInitializer {
       if (held != null) {
         s.submitPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
       }
+      byte[] hudBytes = hud.sample(mc, mc.player, mc.getConnection().registryAccess());
+      if (hudBytes != null) {
+        s.submit(FrameType.PLAYER_HUD, hudBytes);
+      }
     }
     io.github.thexykril.reizo.fabric.capture.RecorderStats.tick(System.nanoTime() - start);
   }
@@ -325,6 +335,7 @@ public final class RecorderClient implements ClientModInitializer {
       buffer.startSegment(WorldSnapshot.capture(mc));
       shadowSampler.reset();
       shadowEquipment.reset();
+      shadowHud.reset();
       LOGGER.debug(
           "Shadow segment started in {} ms, buffer {} MB",
           (System.nanoTime() - start) / 1_000_000,
@@ -338,6 +349,10 @@ public final class RecorderClient implements ClientModInitializer {
       byte[] held = shadowEquipment.sample(mc.player, mc.getConnection().registryAccess());
       if (held != null) {
         buffer.onPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
+      }
+      byte[] hudBytes = shadowHud.sample(mc, mc.player, mc.getConnection().registryAccess());
+      if (hudBytes != null) {
+        buffer.onFrame(FrameType.PLAYER_HUD, hudBytes);
       }
     }
     return true;

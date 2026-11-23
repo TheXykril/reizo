@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (Stonecutter and the 26.3 port, branch `feat/multi-version`).
+Last updated: 2026-11-23 by Claude (recorded player's HUD in POV, branch `feat/player-hud`).
 
 ## 1. Current project phase
 
@@ -14,8 +14,14 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
-- **Multi-version (ADR 0007 step 2), branch `feat/multi-version`, PR for owner review, not merged
-  by agents.** Stonecutter 0.10, Loom 1.19.4, Gradle 9.8.0 (needs a JDK 25 to run Gradle).
+- **Recorded player's HUD in POV, branch `feat/player-hud`.** New frame type `PLAYER_HUD` (5,
+  docs/FORMAT.md) sampled by `capture/HudSampler` each tick it changes (session and shadow buffer).
+  `ReplayServer` keeps the latest as `hud()` (not packets); `ui/PlayerHudOverlay` draws it after the
+  vanilla sleep layer so it also shows in exports. Setting `showPlayerHud` and keyframed setting
+  `reizo:player_hud`. Next slice: inventory/container screens. Also: 26.3 swing progress is now
+  scaled by 250 so it fits the byte the format stores.
+- **Multi-version merged as PR #57** (with the owner's approval).
+- **Multi-version (ADR 0007 step 2), PR #57, merged.** Stonecutter 0.10, Loom 1.19.4, Gradle 9.8.0 (needs a JDK 25 to run Gradle).
   Projects `:fabric:1.21.11` (active) and `:fabric:26.3` share `fabric/src`. Renames are regex
   rules in `fabric/build.gradle.kts`, accessors in `fabric/compat/Compat.java`, the rest `//?`
   blocks (see docs/DEVELOPMENT.md). Gametests: 20/20 OK on both versions (2026-11-23, cloud box).

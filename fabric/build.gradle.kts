@@ -150,6 +150,13 @@ rename(
 rename("\\.drawString\\(", ".text(", "\\.text\\(", ".drawString(")
 rename("\\.drawCenteredString\\(", ".centeredText(", "\\.centeredText\\(", ".drawCenteredString(")
 rename("\\.drawWordWrap\\(", ".textWithWordWrap(", "\\.textWithWordWrap\\(", ".drawWordWrap(")
+rename("\\bg\\.renderItem\\(", "g.item(", "\\bg\\.item\\(", "g.renderItem(")
+rename(
+    "\\bg\\.renderItemDecorations\\(",
+    "g.itemDecorations(",
+    "\\bg\\.itemDecorations\\(",
+    "g.renderItemDecorations(",
+)
 // Screens moved to Minecraft.gui.
 rename(
     "(?<!\\.)\\b(mc|minecraft|client|Minecraft\\.getInstance\\(\\))\\.screen\\b(?!\\()",
