@@ -39,6 +39,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestDedicatedServerContext;
+import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerConnection;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.GraphicsPreset;
@@ -72,6 +74,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     useCheapRendering(context);
     Path archive = recordFromJoin(context);
     playBack(context, archive);
+    recordOnDedicatedServer(context);
     recordMidSessionWhileWalking(context);
     saveShadowAfterWalking(context);
     browseAndPlay(context);
@@ -205,6 +208,88 @@ public final class RecordingGameTest implements FabricClientGameTest {
           options.biomeBlendRadius().set(0);
           options.particles().set(ParticleStatus.MINIMAL);
         });
+  }
+
+  /**
+   * Multiplayer (#4): auto-record on joining a real dedicated server over the network (with its
+   * packet compression), see an entity the server spawns during the recording, and play it back.
+   */
+  private void recordOnDedicatedServer(ClientGameTestContext context) {
+    context.runOnClient(mc -> RecorderClient.get().config().autoRecordOnJoin = true);
+    RecordingSession session;
+    RegistryAccess registries;
+    try (TestDedicatedServerContext server = context.worldBuilder().createServer();
+        TestServerConnection connection = server.connect()) {
+      connection.getClientWorld().waitForChunksDownload();
+      context.waitTicks(10);
+      session = context.computeOnClient(mc -> RecorderClient.get().session());
+      check(session != null, "auto-record did not start on a dedicated server");
+      registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
+      server.runOnServer(
+          s -> {
+            var player = s.getPlayerList().getPlayers().get(0);
+            var pig =
+                net.minecraft.world.entity.EntityType.PIG.create(
+                    player.level(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            pig.setPos(player.getX() + 2, player.getY(), player.getZ());
+            pig.setNoAi(true);
+            pig.setCustomName(net.minecraft.network.chat.Component.literal("reizo-pig"));
+            player.level().addFreshEntity(pig);
+          });
+      context.waitFor(mc -> findPig(mc) != null, 20 * 10);
+      context.waitTicks(20);
+    } finally {
+      context.runOnClient(mc -> RecorderClient.get().config().autoRecordOnJoin = false);
+    }
+    Path archive = await(context, session);
+    Stats stats = verifyArchive(archive, registries);
+    RecordingMetadata meta = metadata(archive);
+    check("multiplayer".equals(meta.serverType), "server type " + meta.serverType);
+    check(meta.completeFromJoin, "server join recording should be complete");
+    check(
+        stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
+        "no chunks recorded from the server");
+    check(
+        stats.packetNames.getOrDefault("ClientboundAddEntityPacket", 0) > 0,
+        "no entities recorded from the server: " + stats.packetNames.keySet());
+    check(stats.localPlayerFrames > 0, "no local player frames on the server");
+
+    context.runOnClient(
+        mc -> {
+          try {
+            ReplayPlayback.start(mc, archive);
+          } catch (java.io.IOException e) {
+            throw new AssertionError("could not start replay", e);
+          }
+        });
+    context.waitFor(
+        mc -> {
+          ReplayServer replay = ReplayPlayback.current();
+          return replay != null
+              && replay.script().finished()
+              && mc.level != null
+              && mc.screen == null
+              && findPig(mc) != null;
+        },
+        20 * 60);
+    context.runOnClient(Minecraft::disconnectWithProgressScreen);
+    context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
+    LOGGER.info("recordOnDedicatedServer OK: {} -> {}", archive.getFileName(), stats);
+  }
+
+  private static net.minecraft.world.entity.Entity findPig(Minecraft mc) {
+    if (mc.level == null) {
+      return null;
+    }
+    for (var e : mc.level.entitiesForRendering()) {
+      if (e.getType() == net.minecraft.world.entity.EntityType.PIG
+          && e.getCustomName() != null
+          && "reizo-pig".equals(e.getCustomName().getString())) {
+        return e;
+      }
+    }
+    return null;
   }
 
   /** Auto-record on join: the recording must hold the complete connection, including chunks. */
