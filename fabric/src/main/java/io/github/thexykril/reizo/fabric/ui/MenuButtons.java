@@ -148,7 +148,7 @@ public final class MenuButtons {
       buttons.add(
           Button.builder(
                   Component.translatable("reizo.menu.export"),
-                  b -> client.setScreen(new ExportSettingsScreen(screen)))
+                  b -> client.setScreen(ExportSettingsScreen.create(screen)))
               .bounds(4, y, 120, 20)
               .build());
       y += 24;

@@ -368,7 +368,7 @@ public final class TimelineScreen extends Screen {
             14,
             export,
             FlatButton.Style.ACCENT,
-            b -> Minecraft.getInstance().setScreen(new ExportSettingsScreen(this))));
+            b -> Minecraft.getInstance().setScreen(ExportSettingsScreen.create(this))));
     rx -= 20;
     icon(rx, 2, 16, "reizo.timeline.redo", "redo", b -> redo());
     rx -= 17;
@@ -1638,7 +1638,7 @@ public final class TimelineScreen extends Screen {
     PopupMenu m = new PopupMenu();
     switch (name) {
       case "file" -> m.add(t("reizo.menu.replays"), "", () -> mc.setScreen(new ReplayBrowserScreen(this)))
-          .add(t("reizo.timeline.export"), "", () -> mc.setScreen(new ExportSettingsScreen(this)))
+          .add(t("reizo.timeline.export"), "", () -> mc.setScreen(ExportSettingsScreen.create(this)))
           .separator()
           .add(t("reizo.menu_bar.close"), "Esc", this::onClose);
       case "edit" -> m.add(t("reizo.menu_bar.undo"), "Ctrl+Z", this::undo, ReplayEditor::canUndo)
