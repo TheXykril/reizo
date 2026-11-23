@@ -56,6 +56,10 @@ public final class RecorderClient implements ClientModInitializer {
       new io.github.thexykril.reizo.fabric.capture.HudSampler();
   private final io.github.thexykril.reizo.fabric.capture.HudSampler shadowHud =
       new io.github.thexykril.reizo.fabric.capture.HudSampler();
+  private final io.github.thexykril.reizo.fabric.capture.ScreenSampler screens =
+      new io.github.thexykril.reizo.fabric.capture.ScreenSampler();
+  private final io.github.thexykril.reizo.fabric.capture.ScreenSampler shadowScreens =
+      new io.github.thexykril.reizo.fabric.capture.ScreenSampler();
   private final LocalPlayerSampler shadowSampler = new LocalPlayerSampler();
   private final io.github.thexykril.reizo.fabric.capture.EquipmentTracker equipment =
       new io.github.thexykril.reizo.fabric.capture.EquipmentTracker();
@@ -88,6 +92,7 @@ public final class RecorderClient implements ClientModInitializer {
     RecordingIndicator.register(this);
     io.github.thexykril.reizo.fabric.ui.ReplayHud.register();
     io.github.thexykril.reizo.fabric.ui.PlayerHudOverlay.register();
+    io.github.thexykril.reizo.fabric.ui.PlayerScreenOverlay.register();
     io.github.thexykril.reizo.fabric.playback.PathVisualizer.register();
     DebugCommands.register(this);
 
@@ -229,6 +234,7 @@ public final class RecorderClient implements ClientModInitializer {
       sampler.reset();
       equipment.reset();
       hud.reset();
+      screens.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
       toast(
           "reizo.toast.started",
@@ -316,6 +322,10 @@ public final class RecorderClient implements ClientModInitializer {
       if (hudBytes != null) {
         s.submit(FrameType.PLAYER_HUD, hudBytes);
       }
+      byte[] screenBytes = screens.sample(mc, mc.getConnection().registryAccess());
+      if (screenBytes != null) {
+        s.submit(FrameType.PLAYER_SCREEN, screenBytes);
+      }
     }
     io.github.thexykril.reizo.fabric.capture.RecorderStats.tick(System.nanoTime() - start);
   }
@@ -336,6 +346,7 @@ public final class RecorderClient implements ClientModInitializer {
       shadowSampler.reset();
       shadowEquipment.reset();
       shadowHud.reset();
+      shadowScreens.reset();
       LOGGER.debug(
           "Shadow segment started in {} ms, buffer {} MB",
           (System.nanoTime() - start) / 1_000_000,
@@ -353,6 +364,10 @@ public final class RecorderClient implements ClientModInitializer {
       byte[] hudBytes = shadowHud.sample(mc, mc.player, mc.getConnection().registryAccess());
       if (hudBytes != null) {
         buffer.onFrame(FrameType.PLAYER_HUD, hudBytes);
+      }
+      byte[] screenBytes = shadowScreens.sample(mc, mc.getConnection().registryAccess());
+      if (screenBytes != null) {
+        buffer.onFrame(FrameType.PLAYER_SCREEN, screenBytes);
       }
     }
     return true;

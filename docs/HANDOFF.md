@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (recorded player's HUD in POV, branch `feat/player-hud`).
+Last updated: 2026-11-23 by Claude (recorded player's screens in POV, branch `feat/player-screens`).
 
 ## 1. Current project phase
 
@@ -14,7 +14,13 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
-- **Recorded player's HUD in POV, branch `feat/player-hud`.** New frame type `PLAYER_HUD` (5,
+- **Recorded player's screens in POV, branch `feat/player-screens`.** Frame type `PLAYER_SCREEN`
+  (6) from `capture/ScreenSampler`; `ReplayServer.screen()` keeps the latest (slots carried over
+  when a frame says unchanged). `ui/PlayerScreenOverlay` builds the vanilla screen
+  (`MenuScreensAccessor` for container constructors, `InventoryScreenMixin` to show the recorded
+  player's model) and draws it from a HUD layer without opening it. `PlayTransformer` now drops
+  screen and container packets for the camera.
+- **Recorded player's HUD in POV, PR #60, merged.** New frame type `PLAYER_HUD` (5,
   docs/FORMAT.md) sampled by `capture/HudSampler` each tick it changes (session and shadow buffer).
   `ReplayServer` keeps the latest as `hud()` (not packets); `ui/PlayerHudOverlay` draws it after the
   vanilla sleep layer so it also shows in exports. Setting `showPlayerHud` and keyframed setting
