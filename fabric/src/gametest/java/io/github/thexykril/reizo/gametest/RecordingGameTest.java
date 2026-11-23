@@ -838,6 +838,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     checkEffects(context);
     checkKeyframedSettings(context);
     checkTimeAndWeather(context);
+    checkHideEntity(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -1100,6 +1101,73 @@ public final class RecordingGameTest implements FabricClientGameTest {
               "thunder override left behind");
         });
     LOGGER.info("checkTimeAndWeather OK: recorded time {}", Math.round(recordedTime));
+  }
+
+  /** An entity hidden in the editor is not drawn, is listed in the settings, and undo shows it. */
+  private void checkHideEntity(ClientGameTestContext context) {
+    String name =
+        context.computeOnClient(
+            mc -> {
+              net.minecraft.world.entity.Entity target = null;
+              for (var e : mc.level.entitiesForRendering()) {
+                if (e != mc.getCameraEntity() && e != mc.player) {
+                  target = e;
+                  break;
+                }
+              }
+              check(target != null, "no entity in the replay to hide");
+              var server = ReplayPlayback.current();
+              long now = Math.min(server.replayTimeMs(), server.script().durationMs());
+              check(
+                  io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.toggle(target, now),
+                  "toggle did not hide " + target);
+              return target.getUUID().toString();
+            });
+    context.waitTicks(2);
+    context.runOnClient(
+        mc -> {
+          var target = entityByUuid(mc, name);
+          check(
+              io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.isHidden(target),
+              "entity not hidden");
+          check(
+              !mc.getEntityRenderDispatcher()
+                  .shouldRender(
+                      target,
+                      new net.minecraft.client.renderer.culling.Frustum(
+                          new org.joml.Matrix4f(), new org.joml.Matrix4f()),
+                      0,
+                      0,
+                      0
+                      //? if >=26.3 {
+                      /*, 1f
+                      *///?}
+                      ),
+              "a hidden entity would still be drawn");
+          check(
+              io.github.thexykril.reizo.fabric.settings.KeyframedSettings.all().stream()
+                  .anyMatch(s -> s.id().endsWith(name)),
+              "the hidden entity is not listed in the settings");
+          check(ReplayEditor.undo(), "nothing to undo");
+        });
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc ->
+                !io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.isHidden(
+                    entityByUuid(mc, name))),
+        "undo did not show the entity again");
+    LOGGER.info("checkHideEntity OK: {}", name);
+  }
+
+  private static net.minecraft.world.entity.Entity entityByUuid(
+      net.minecraft.client.Minecraft mc, String uuid) {
+    for (var e : mc.level.entitiesForRendering()) {
+      if (e.getUUID().toString().equals(uuid)) {
+        return e;
+      }
+    }
+    throw new AssertionError("entity " + uuid + " left the replay");
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

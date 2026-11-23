@@ -35,6 +35,15 @@ public final class KeyframedSettings {
    */
   public static List<KeyframedSetting> all() {
     List<KeyframedSetting> out = new ArrayList<>(VanillaSettings.all());
+    // Hidden entities, one switch each, listed while the open project has them.
+    if (io.github.thexykril.reizo.fabric.playback.ReplayEditor.project() != null) {
+      for (String id : io.github.thexykril.reizo.fabric.playback.ReplayEditor.settings().properties()) {
+        KeyframedSetting hide = io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.setting(id);
+        if (hide != null) {
+          out.add(hide);
+        }
+      }
+    }
     if (!oneConfigFailed && FabricLoader.getInstance().isModLoaded("oneconfig")) {
       try {
         out.addAll(io.github.thexykril.reizo.fabric.compat.OneConfigSettings.all());
@@ -53,6 +62,10 @@ public final class KeyframedSettings {
 
   /** The setting with this id, or null when it is not installed. */
   public static KeyframedSetting find(String id) {
+    KeyframedSetting hide = io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.setting(id);
+    if (hide != null) {
+      return hide;
+    }
     KeyframedSetting s = byId.get(id);
     if (s == null && byId.isEmpty()) {
       all();
