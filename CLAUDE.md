@@ -10,6 +10,6 @@ Claude-specific notes and must not duplicate it.
   for. Names are Mojang mappings (26.x is unobfuscated).
 - Gradle needs JDK 25. In cloud sessions set `JAVA_HOME` to a JDK 25 first.
 - In cloud sessions without a display, run in-game tests per version with
-  `xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest` (and `:fabric:26.3:`).
+  `xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest` (and `:fabric:1.21.10:`, `:fabric:26.2:`, `:fabric:26.3:`).
 - When unsure whether something is an architectural change, treat it as one: write an ADR and open
   a pull request for the owner.

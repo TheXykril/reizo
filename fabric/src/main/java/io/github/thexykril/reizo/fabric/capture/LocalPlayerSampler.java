@@ -27,7 +27,7 @@ public final class LocalPlayerSampler {
     if (player.isUsingItem()) {
       flags |= LocalPlayerState.FLAG_USING_ITEM;
     }
-    //? if >=26.1 {
+    //? if >=26.3 {
     /*var swing = player.getCurrentSwing();
     boolean swinging = swing != null;
     boolean offHand = swinging && swing.hand() == InteractionHand.OFF_HAND;

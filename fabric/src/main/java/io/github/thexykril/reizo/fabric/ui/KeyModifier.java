@@ -33,7 +33,7 @@ public enum KeyModifier {
   }
 
   private static boolean isKeyDown(Window window, int key) {
-    //? if >=26.1 {
+    //? if >=26.3 {
     /*return InputConstants.isKeyDown(key);
     *///?} else {
     return InputConstants.isKeyDown(window, key);

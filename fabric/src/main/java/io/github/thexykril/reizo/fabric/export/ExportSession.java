@@ -74,6 +74,11 @@ public final class ExportSession {
   private boolean readyThisFrame;
   private boolean hideGuiBefore;
   private long lastTimerMs = -1;
+
+  /** Set while a recorded server switch loads its world; the game clock then runs in real time. */
+  private boolean waitingForWorld;
+
+  private long lastRealMs = -1;
   private boolean pathBefore;
   private String error;
 
@@ -280,6 +285,12 @@ public final class ExportSession {
     if (s.virtualBaseMs < 0) {
       s.virtualBaseMs = realMillis;
     }
+    if (s.waitingForWorld && s.lastRealMs >= 0) {
+      // The loading screen closes only after client ticks, and ticks follow this clock: let it run
+      // in real time while nothing is captured, so the new world can finish loading.
+      s.virtualBaseMs += Math.max(0, realMillis - s.lastRealMs);
+    }
+    s.lastRealMs = realMillis;
     // The world advances only once the frame's packets are applied (see frameReady). Decided
     // here, before the frame's ticks, so the capture after it matches what was rendered.
     s.readyThisFrame = s.frameReady() && s.encoder.hasRoom();
@@ -367,8 +378,10 @@ public final class ExportSession {
             || mc.screen
                 instanceof net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen) {
           // A recorded server switch: wait for the new world, nothing is captured meanwhile.
+          waitingForWorld = true;
           return;
         }
+        waitingForWorld = false;
         if (mc.screen != null) {
           // A menu would be captured into the video; Esc cancels the export instead.
           end(State.CANCELLED, null);

@@ -113,18 +113,42 @@ tasks.processResources {
 // Anything that is not a plain rename lives in //? blocks or in fabric/compat.
 val sc = extensions.getByType<dev.kikugie.stonecutter.build.StonecutterBuildExtension>()
 val is26 = sc.eval(sc.current.version, ">=26.1")
+val is263 = sc.eval(sc.current.version, ">=26.3")
 
 fun rename(
     from: String,
     to: String,
     reverseFrom: String,
     reverseTo: String,
-) = sc.replacements.regex(is26) { replace(from, to, reverseFrom, reverseTo) }
+    active: Boolean = is26,
+) = sc.replacements.regex(active) { replace(from, to, reverseFrom, reverseTo) }
 
 fun word(
     from: String,
     to: String,
-) = rename("\\b$from\\b", to, "\\b$to\\b", from)
+    active: Boolean = is26,
+) = rename("\\b$from\\b", to, "\\b$to\\b", from, active)
+
+// Before 1.21.11 (1.21.10): older names of what 1.21.11 renamed.
+val before12111 = sc.eval(sc.current.version, "<1.21.11")
+// Not the "Identifier" in "SPDX-License-Identifier" headers.
+rename("(?<!-)\\bIdentifier\\b", "ResourceLocation", "\\bResourceLocation\\b", "Identifier", before12111)
+rename(
+    "\\bimport net\\.minecraft\\.util\\.Util;",
+    "import net.minecraft.Util;",
+    "\\bimport net\\.minecraft\\.Util;",
+    "import net.minecraft.util.Util;",
+    before12111,
+)
+word("CLIENTBOUND_MOUNT_SCREEN_OPEN", "CLIENTBOUND_HORSE_SCREEN_OPEN", before12111)
+// Screen.init took the Minecraft instance until 1.21.11.
+rename(
+    "\\bscreen\\.init\\(width, height\\)",
+    "screen.init(mc, width, height)",
+    "\\bscreen\\.init\\(mc, width, height\\)",
+    "screen.init(width, height)",
+    before12111,
+)
 
 // 26.1 renamed GuiGraphics and the render methods to "extract" its render state.
 word("GuiGraphics", "GuiGraphicsExtractor")
@@ -177,8 +201,8 @@ rename("\\.client\\.keybinding\\.v1\\.", ".client.keymapping.v1.", "\\.client\\.
 word("KeyBindingHelper", "KeyMappingHelper")
 word("registerKeyBinding", "registerKeyMapping")
 word("ClientCommandManager", "ClientCommands")
-// 26.1 moved input from GLFW to SDL: key codes are scancodes, read through InputConstants.
-rename("\\bType\\.KEYSYM\\b", "Type.KEYBOARD", "\\bType\\.KEYBOARD\\b", "Type.KEYSYM")
+// 26.3 moved input from GLFW to SDL: key codes are scancodes, read through InputConstants.
+rename("\\bType\\.KEYSYM\\b", "Type.KEYBOARD", "\\bType\\.KEYBOARD\\b", "Type.KEYSYM", is263)
 // Accessors that moved in 26.1.
 rename(
     "\\b(mc|minecraft|client)\\.getToastManager\\(\\)",
@@ -197,6 +221,7 @@ rename(
     "com.mojang.blaze3d.Blaze3D.openPath(",
     "\\bcom\\.mojang\\.blaze3d\\.Blaze3D\\.openPath\\(",
     "Util.getPlatform().openPath(",
+    is263,
 )
 rename(
     "\\b(mc|minecraft|client)\\.getMainRenderTarget\\(\\)",
@@ -215,6 +240,7 @@ rename(
     ".getOrResolve($1.getSoundManager())",
     "\\.getOrResolve\\((\\w+)\\.getSoundManager\\(\\)\\)",
     ".resolve($1.getSoundManager())",
+    is263,
 )
 rename(
     "(?<![\\w.])EntityType\\.([A-Z_]+)\\b",
