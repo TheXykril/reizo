@@ -37,6 +37,15 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 - Editor screen: tracks, clips, trim/split, zoom/scroll, keyframe lanes, undo/redo, shortcuts
 - Deterministic frame-by-frame renderer (fixed timestep, no wall-clock dependence)
 - FFmpeg export (system FFmpeg first; bundled/downloaded later), H.264 software + hardware, progress, cancel
+- Auto highlights: while recording, detect kills, deaths, big falls, clutches (a save just before
+  fall damage or the void) and PvP combos, and add them as typed markers on the timeline. Jump
+  between them in the replay, and export a montage of the chosen ones in one click (a few seconds
+  before and after each, with an optional fade). Detection runs on the client from packets the
+  recording already has (death messages, health, combat events), so old recordings can be scanned
+  too.
+- Vertical 9:16 export for Shorts, Reels and TikTok: a crop or a second camera that reframes
+  automatically to keep the recorded player in frame, with smoothing so it doesn't jitter, and
+  keyframes to override it. Presets for 1080x1920.
 
 ## M5 — Effects, overlays, shadow recording
 
@@ -58,6 +67,19 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 ## M7 — OneClient integration and polish
 
 - OneConfig settings, keybinds and notifications; main menu entry point; style alignment
+- OneClient's own HUD elements showing the recorded player in replays (spike first; dropped if
+  the spike fails, with no Reizo-drawn replacement). OneClient's HUD elements come from Polyfrost's
+  EvergreenHUD (GPL-3.0, OneConfig HUD API). During a replay they measure the person watching:
+  CPS and Keystrokes count OneConfig's mouse and key events; Reach, Combo, Armor, Position and the
+  like read `mc.player`, which is the replay camera, not the recorded player.
+  1. Record the recorded player's attack, use and movement key presses as Reizo frames.
+  2. In POV, post them as OneConfig `MouseInputEvent` / `KeyInputEvent` through its event bus so
+     CPS and Keystrokes count them, without moving the camera or firing keybinds.
+  3. Point the elements that read `mc.player` at the recorded player while in POV (a mixin on
+     EvergreenHUD, so it depends on its internals and may need updating with its releases). Its
+     Reach and Combo check that the attacker is `mc.player` and not a spectator.
+  4. Keyframeable show/hide per element in the editor; they draw in exports like the rest of the
+     HUD.
 - Distant terrain (LOD) in replays and exports with Distant Horizons and Voxy (optional, needs a
   spike first). During a replay the client is connected to Reizo's local replay server, so both
   mods see an unknown server with no LOD data and show nothing past the render distance.
