@@ -22,7 +22,7 @@ import com.mojang.renderpearl.api.pipeline.UniformType;
 import com.mojang.renderpearl.api.textures.FilterMode;
 import java.util.Optional;
 import java.util.OptionalDouble;
-*///?} else if >=26.1 {
+*///?} else if >=26.2 {
 /*import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.PrimitiveTopology;
 import com.mojang.blaze3d.buffers.GpuBuffer;
@@ -96,7 +96,7 @@ public final class EffectRenderer {
                   .withColorTargetState(ColorTargetState.DEFAULT)
                   .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
                   .build());
-      *///?} else if >=26.1 {
+      *///?} else if >=26.2 {
       /*pipeline =
           RenderPipelines.register(
               RenderPipeline.builder()
@@ -111,6 +111,19 @@ public final class EffectRenderer {
                           .build())
                   .withColorTargetState(ColorTargetState.DEFAULT)
                   .withPrimitiveTopology(PrimitiveTopology.TRIANGLES)
+                  .build());
+      *///?} else if >=26.1 {
+      /*// 26.1 sets blending and depth through target states; the defaults are none.
+      pipeline =
+          RenderPipelines.register(
+              RenderPipeline.builder()
+                  .withLocation(Identifier.fromNamespaceAndPath("reizo", "pipeline/grade"))
+                  .withVertexShader("core/screenquad")
+                  .withFragmentShader(Identifier.fromNamespaceAndPath("reizo", "post/grade"))
+                  .withSampler("InSampler")
+                  .withSampler("DepthSampler")
+                  .withUniform("ReizoGrade", UniformType.UNIFORM_BUFFER)
+                  .withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
                   .build());
       *///?} else {
       pipeline =
@@ -152,7 +165,7 @@ public final class EffectRenderer {
       if (copy == null) {
         //? if >=26.3 {
         /*copy = new TextureTarget("Reizo effects", w, h, GpuFormat.RGBA8_UNORM, null);
-        *///?} else if >=26.1 {
+        *///?} else if >=26.2 {
         /*copy = new TextureTarget("Reizo effects", w, h, false, GpuFormat.RGBA8_UNORM);
         *///?} else {
         copy = new TextureTarget("Reizo effects", w, h, false);
@@ -169,11 +182,15 @@ public final class EffectRenderer {
     CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
     encoder.copyTextureToTexture(
         main.getColorTexture(), copy.getColorTexture(), 0, 0, 0, 0, 0, w, h);
-    //? if >=26.1 {
-    /*// 26.x renders with reversed depth: depth 0 is the far plane and depth 1 the near one.
+    //? if >=26.2 {
+    /*// 26.2+ renders with reversed depth: depth 0 is the far plane and depth 1 the near one.
     float depth0 = mc.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.depthFar;
     float depth1 = 0.05f;
     try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
+    *///?} else if >=26.1 {
+    /*float depth0 = 0.05f;
+    float depth1 = mc.gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.depthFar;
+    try (GpuBuffer.MappedView view = encoder.mapBuffer(ubo.currentBuffer(), false, true)) {
     *///?} else {
     float depth0 = 0.05f;
     float depth1 = mc.gameRenderer.getDepthFar();
@@ -205,7 +222,7 @@ public final class EffectRenderer {
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(3, 1, 0, 0);
     }
-    *///?} else if >=26.1 {
+    *///?} else if >=26.2 {
     /*try (RenderPass pass =
         encoder.createRenderPass(
             () -> "Reizo effects",

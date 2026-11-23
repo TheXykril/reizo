@@ -727,7 +727,7 @@ public final class ReplayServer implements AutoCloseable {
   }
 
   private static ClientboundLoginFinishedPacket loginFinished(GameProfile profile) {
-    //? if >=26.1 {
+    //? if >=26.2 {
     /*// The session id only feeds telemetry.
     return new ClientboundLoginFinishedPacket(profile, java.util.UUID.randomUUID());
     *///?} else {

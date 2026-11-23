@@ -148,3 +148,12 @@ Step 2 of the order above. Recorded here because it fixes how every later versio
   nothing is captured.
 - **CI:** pull requests run the gametests for 1.21.11 and 26.3 (newest of each family); pushes to
   main run all four.
+
+## Implementation notes: 26.1.2 (2026-11-23)
+
+- 26.1.2 has 26.x's render-state GUI names, Fabric API's key mapping and command renames and
+  world clocks, but keeps screens, the toast manager, `getMainRenderTarget`, `getMainCamera`,
+  `EntityType` and `options.hideGui` where 1.21.11 has them, uses the 1.21.11 GPU API (with
+  target states instead of blend/depth calls) and normal depth. New predicates: `is262` (renames
+  that arrived in 26.2) and `is261` (26.1's gametest API calls the client side a level).
+- 1.21.1 is deferred: see the roadmap.

@@ -84,7 +84,7 @@ public final class PathVisualizer {
     }
     // Add to the level renderer's own frame collection explicitly: frames rendered outside the
     // normal game loop (test screenshots, for one) have no collection open.
-    //? if >=26.1 {
+    //? if >=26.2 {
     /*var collection = mc.levelExtractor.collectPerFrameMainThreadGizmos();
     *///?} else if >=1.21.11 {
     var collection = mc.levelRenderer.collectPerFrameGizmos();

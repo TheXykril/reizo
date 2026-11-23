@@ -84,6 +84,9 @@ final class SoundCapture {
       return;
     }
     SoundCue.Point p = point(mc, sound, resolved, videoTimeMs);
+    if (p.gain() <= 0 && !(sound instanceof TickableSoundInstance)) {
+      return; // silent for its whole length: nothing to mix
+    }
     boolean positional =
         !sound.isRelative() && sound.getAttenuation() != SoundInstance.Attenuation.NONE;
     cues.add(

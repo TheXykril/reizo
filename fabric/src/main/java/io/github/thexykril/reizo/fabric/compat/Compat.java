@@ -28,7 +28,7 @@ public final class Compat {
 
   /** Whether the HUD is hidden (F1). */
   public static boolean hudHidden(Minecraft mc) {
-    //? if >=26.1 {
+    //? if >=26.2 {
     /*return mc.gui.hud.isHidden();
     *///?} else {
     return mc.options.hideGui;
@@ -36,7 +36,7 @@ public final class Compat {
   }
 
   public static void setHudHidden(Minecraft mc, boolean hidden) {
-    //? if >=26.1 {
+    //? if >=26.2 {
     /*if (mc.gui.hud.isHidden() != hidden) {
       mc.gui.hud.toggle();
     }
@@ -65,7 +65,7 @@ public final class Compat {
         .getDeviceInfo()
         .limits()
         .maxTextureSizeForFormat(com.mojang.renderpearl.api.GpuFormat.RGBA8_UNORM);
-    *///?} else if >=26.1 {
+    *///?} else if >=26.2 {
     /*return RenderSystem.getDevice().getDeviceInfo().limits().maxTextureSize();
     *///?} else {
     return RenderSystem.getDevice().getMaxTextureSize();
