@@ -46,7 +46,8 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 
 ## M6 — Audio
 
-- Sound event re-synthesis for game audio, microphone capture, track mixing, fades, export mixdown
+- ✓ (first slice, ADR 0013) Sound event re-synthesis for game audio, export mixdown
+- Microphone capture, track mixing, fades, export mixdown
 - Simple Voice Chat integration where permitted; privacy documentation
 
 ## M7 — OneClient integration and polish

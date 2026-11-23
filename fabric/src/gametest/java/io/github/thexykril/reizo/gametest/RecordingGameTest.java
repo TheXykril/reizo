@@ -880,9 +880,70 @@ public final class RecordingGameTest implements FabricClientGameTest {
           render.output = "gametest-export.mp4";
           check(ExportControls.exportCurrent(mc, result::set), "export did not start");
         });
+    // A sound in the middle of the export ends up in its sound track.
+    context.waitFor(
+        mc -> ExportSession.current() != null && ExportSession.current().framesCaptured() > 20,
+        20 * 120);
+    context.runOnClient(
+        mc ->
+            mc.getSoundManager()
+                .play(
+                    net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                        net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1f)));
     context.waitFor(mc -> result.get() != null, 20 * 240);
     ExportSession s = result.get();
     check(s.state() == ExportSession.State.DONE, "export ended " + s.state() + ": " + s.error());
+    check(s.soundsCaptured() >= 1, "no sound captured during the export");
+    String streams =
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "stream=codec_name",
+            "-of",
+            "csv=p=0",
+            s.output().toString());
+    check(streams.strip().equals("h264\naac"), "export streams: " + streams.strip());
+    String volume =
+        run(
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            s.output().toString(),
+            "-map",
+            "0:a",
+            "-af",
+            "volumedetect",
+            "-f",
+            "null",
+            "-");
+    var max = java.util.regex.Pattern.compile("max_volume: (-?[0-9.]+) dB").matcher(volume);
+    check(
+        max.find() && Double.parseDouble(max.group(1)) > -40, "export sound is silent: " + volume);
+    // In sync: the sound starts within one frame (50 ms at 20 fps) of the frame it played on.
+    String silence =
+        run(
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            s.output().toString(),
+            "-map",
+            "0:a",
+            "-af",
+            "silencedetect=n=-60dB:d=0.01",
+            "-f",
+            "null",
+            "-");
+    var end = java.util.regex.Pattern.compile("silence_end: ([0-9.]+)").matcher(silence);
+    check(end.find(), "no sound onset found: " + silence);
+    double onsetMs = Double.parseDouble(end.group(1)) * 1000;
+    check(
+        Math.abs(onsetMs - s.firstSoundMs()) <= 50,
+        "sound at " + onsetMs + " ms, expected " + s.firstSoundMs() + " ms");
+    check(
+        !java.nio.file.Files.exists(s.output().resolveSibling("gametest-export.video.mp4")),
+        "temporary video left behind");
     int expected =
         new io.github.thexykril.reizo.core.export.ExportPlan(0, duration, 20).frameCount();
     check(s.framesCaptured() == expected, "captured " + s.framesCaptured() + " of " + expected);
@@ -948,7 +1009,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
             "csv=p=0",
             s.output().toString());
     check(
-        probe.strip().equals("vp9,640,360," + expected),
+        probe.strip().startsWith("vp9,640,360," + expected),
         "VP9 export probe: " + probe.strip() + ", expected vp9,640,360," + expected);
     // Rendered, not blank: the mean brightness of the middle frame (scaled to one gray pixel).
     byte[] mean =

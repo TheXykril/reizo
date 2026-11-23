@@ -97,7 +97,11 @@ screen, effects, audio, shadow recording, multi-version.
   `EffectRenderer.afterWorld` runs from `GameRendererMixin` after `doEntityOutline`: copies the
   main color texture and draws it back through `reizo:pipeline/grade` (shader
   `assets/reizo/shaders/post/grade.fsh`, UBO `ReizoGrade`). Panel: `ui/EffectsScreen`.
-- Next: more effects (bloom, DoF, motion blur), audio (#17), effects (#15), recorded
+- Export sound (ADR 0013): `SoundManagerMixin` passes every `SoundManager.play` to
+  `ExportSession.onSound`; `SoundCapture` stores a `core.audio.SoundCue` with the camera pose at the
+  frame being prepared, decodes clips with `JOrbisAudioStream`, `AudioMixer` mixes 48 kHz stereo,
+  and `FfmpegCommand.muxAudio` adds it to the picture (written first to `<name>.video.<ext>`).
+- Next: more effects (bloom, DoF, motion blur), music/looping sounds and microphone (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected

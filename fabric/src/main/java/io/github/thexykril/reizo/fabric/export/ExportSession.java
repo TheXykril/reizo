@@ -57,6 +57,9 @@ public final class ExportSession {
   private final FfmpegCommand.Settings settings;
   private final String ffmpeg;
   private final Consumer<ExportSession> onEnd;
+  private final boolean audio;
+  private final SoundCapture sounds = new SoundCapture();
+  private java.util.concurrent.CompletableFuture<Void> mux;
   private State state = State.PREPARING;
   private FrameEncoder encoder;
   private int width;
@@ -75,7 +78,9 @@ public final class ExportSession {
       Path output,
       FfmpegCommand.Settings settings,
       String ffmpeg,
+      boolean audio,
       Consumer<ExportSession> onEnd) {
+    this.audio = audio;
     this.plan = plan;
     this.output = output;
     this.settings = settings;
@@ -107,6 +112,7 @@ public final class ExportSession {
       Path output,
       FfmpegCommand.Settings settings,
       String ffmpeg,
+      boolean audio,
       Consumer<ExportSession> onEnd) {
     ReplayServer server = ReplayPlayback.current();
     if (server == null || mc.level == null) {
@@ -115,7 +121,7 @@ public final class ExportSession {
     if (current != null) {
       throw new IllegalStateException("An export is already running");
     }
-    ExportSession s = new ExportSession(plan, output, settings, ffmpeg, onEnd);
+    ExportSession s = new ExportSession(plan, output, settings, ffmpeg, audio, onEnd);
     s.hideGuiBefore = mc.options.hideGui;
     s.pathBefore = ReplayEditor.isPathPlaying();
     current = s;
@@ -143,6 +149,82 @@ public final class ExportSession {
 
   public String error() {
     return error;
+  }
+
+  /** Sounds that started during the export so far (for tests). */
+  public int soundsCaptured() {
+    return sounds.cues().size();
+  }
+
+  /** Video time of the first captured sound in ms, or -1 (for tests). */
+  public double firstSoundMs() {
+    return sounds.cues().isEmpty() ? -1 : sounds.cues().get(0).timeMs();
+  }
+
+  /** Called for every sound the client starts; recorded while frames are being captured. */
+  public static void onSound(net.minecraft.client.resources.sounds.SoundInstance sound) {
+    ExportSession s = current;
+    if (s != null && s.audio && s.state == State.RUNNING) {
+      // The frame being prepared now is the one these sounds belong to.
+      s.sounds.onPlay(Minecraft.getInstance(), sound, s.frame * 1000.0 / s.plan.fps());
+    }
+  }
+
+  /**
+   * Where FFmpeg writes the picture: the output itself, or a temporary file when sound is added.
+   */
+  private Path videoFile() {
+    if (!audio) {
+      return output;
+    }
+    String name = output.getFileName().toString();
+    int dot = name.lastIndexOf('.');
+    return output.resolveSibling(
+        (dot < 0 ? name : name.substring(0, dot))
+            + ".video"
+            + (dot < 0 ? "" : name.substring(dot)));
+  }
+
+  /** Mixes the captured sounds and adds them to the video, off the game thread. */
+  private void startMux(Minecraft mc) {
+    Path video = videoFile();
+    var cues = java.util.List.copyOf(sounds.cues());
+    var clips = sounds.decodeClips(mc);
+    double durationMs = plan.frameCount() * 1000.0 / plan.fps();
+    mux =
+        java.util.concurrent.CompletableFuture.runAsync(
+            () -> {
+              Path wav = output.resolveSibling(output.getFileName() + ".wav");
+              try {
+                float[] mix =
+                    io.github.thexykril.reizo.core.audio.AudioMixer.mix(
+                        cues, clips::get, durationMs);
+                io.github.thexykril.reizo.core.audio.WavWriter.write(
+                    wav, mix, 2, io.github.thexykril.reizo.core.audio.AudioMixer.SAMPLE_RATE);
+                Process p =
+                    new ProcessBuilder(FfmpegCommand.muxAudio(ffmpeg, video, wav, output))
+                        .redirectErrorStream(true)
+                        .start();
+                p.getOutputStream().close();
+                String log = new String(p.getInputStream().readAllBytes());
+                if (p.waitFor() != 0) {
+                  throw new IOException("adding the sound failed: " + log.strip());
+                }
+                java.nio.file.Files.deleteIfExists(video);
+              } catch (IOException e) {
+                throw new java.io.UncheckedIOException(e);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted", e);
+              } finally {
+                try {
+                  java.nio.file.Files.deleteIfExists(wav);
+                } catch (IOException ignored) {
+                  // a leftover temporary file
+                }
+              }
+            });
+    LOGGER.info("Adding {} sounds to {}", cues.size(), output);
   }
 
   public void cancel() {
@@ -220,7 +302,8 @@ public final class ExportSession {
         try {
           encoder =
               new FrameEncoder(
-                  FfmpegCommand.build(ffmpeg, width, height, plan.fps(), settings, output), output);
+                  FfmpegCommand.build(ffmpeg, width, height, plan.fps(), settings, videoFile()),
+                  videoFile());
         } catch (IOException e) {
           end(State.FAILED, "could not start FFmpeg: " + e.getMessage());
           return;
@@ -262,10 +345,26 @@ public final class ExportSession {
         }
       }
       case FINISHING -> {
+        if (mux != null) {
+          if (mux.isDone()) {
+            try {
+              mux.join();
+              end(State.DONE, null);
+            } catch (RuntimeException e) {
+              Throwable cause = e.getCause() != null ? e.getCause() : e;
+              end(State.FAILED, String.valueOf(cause.getMessage()));
+            }
+          }
+          return;
+        }
         if (captured >= plan.frameCount()) {
           try {
             encoder.finish();
-            end(State.DONE, null);
+            if (audio) {
+              startMux(mc);
+            } else {
+              end(State.DONE, null);
+            }
           } catch (IOException e) {
             end(State.FAILED, e.getMessage());
           } catch (InterruptedException e) {
@@ -313,6 +412,13 @@ public final class ExportSession {
     error = message;
     if (encoder != null && result != State.DONE) {
       encoder.close();
+      if (audio) {
+        try {
+          java.nio.file.Files.deleteIfExists(videoFile());
+        } catch (IOException ignored) {
+          // a leftover temporary file
+        }
+      }
     }
     Minecraft mc = Minecraft.getInstance();
     mc.options.hideGui = hideGuiBefore;

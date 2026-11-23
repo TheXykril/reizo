@@ -72,6 +72,7 @@ public final class ExportControls {
         output,
         settings,
         ffmpeg.get(),
+        r.audio,
         session -> {
           switch (session.state()) {
             case DONE ->

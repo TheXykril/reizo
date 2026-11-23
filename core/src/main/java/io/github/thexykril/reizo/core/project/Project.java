@@ -87,6 +87,9 @@ public final class Project {
 
     public String codec = "libx264";
 
+    /** Include the game's sounds (rendered offline from the sounds that play). */
+    public boolean audio = true;
+
     /** Output file name; relative to the exports folder unless absolute. */
     public String output;
   }
