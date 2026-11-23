@@ -8,6 +8,7 @@ import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -17,7 +18,9 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Adds Reizo's buttons to vanilla menus: "Replays" on the title screen, and recording controls plus
- * "Replays" in the top-left corner of the pause menu (where Lunar shows its recording controls).
+ * "Replays" in the top-left corner of the pause menu (where Lunar shows its recording controls). A
+ * main menu that replaces the title screen (OneClient's) gets "Replays" in its top-left corner, and
+ * the "Open replays" key works on every main menu.
  */
 public final class MenuButtons {
   private MenuButtons() {}
@@ -25,6 +28,26 @@ public final class MenuButtons {
   public static void register() {
     ScreenEvents.AFTER_INIT.register(
         (client, screen, width, height) -> {
+          if (isMainMenu(client, screen)) {
+            ScreenKeyboardEvents.afterKeyPress(screen)
+                .register(
+                    (s, key) -> {
+                      if (RecorderKeys.openReplays() != null
+                          && RecorderKeys.openReplays().matches(key)
+                          && client.screen == s) {
+                        client.setScreen(new ReplayBrowserScreen(s));
+                      }
+                    });
+          }
+          if (!(screen instanceof TitleScreen) && isReplacementMainMenu(client, screen)) {
+            Screens.getButtons(screen)
+                .add(
+                    Button.builder(
+                            Component.translatable("reizo.menu.replays"),
+                            b -> client.setScreen(new ReplayBrowserScreen(screen)))
+                        .bounds(4, 4, 70, 20)
+                        .build());
+          }
           if (screen instanceof TitleScreen) {
             // Left of the Multiplayer row, clear of the centered vanilla buttons.
             Screens.getButtons(screen)
@@ -38,6 +61,29 @@ public final class MenuButtons {
             addPauseButtons(screen);
           }
         });
+  }
+
+  /** The title screen, or a main menu that replaces it. */
+  static boolean isMainMenu(net.minecraft.client.Minecraft client, Screen screen) {
+    return screen instanceof TitleScreen || isReplacementMainMenu(client, screen);
+  }
+
+  /**
+   * A main menu from another mod that replaces the title screen: OneClient's, recognized by its
+   * class name since it has no API for menu entries (docs/RESEARCH.md). Only outside a world.
+   */
+  static boolean isReplacementMainMenu(net.minecraft.client.Minecraft client, Screen screen) {
+    if (client.level != null || screen instanceof TitleScreen) {
+      return false;
+    }
+    return isReplacementMainMenuClass(screen.getClass().getName());
+  }
+
+  /** Whether a screen class name looks like OneClient's main menu. */
+  public static boolean isReplacementMainMenuClass(String className) {
+    String name = className.toLowerCase(java.util.Locale.ROOT);
+    // org.polyfrost.oneclient.gui.OneClientMenuScreen as of 2026-11; kept loose for renames.
+    return name.contains("oneclient") && (name.contains("menu") || name.contains("title"));
   }
 
   private static void addPauseButtons(Screen screen) {

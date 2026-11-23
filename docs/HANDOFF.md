@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (server switches in replays).
+Last updated: 2026-11-23 by Claude (OneClient main menu entry).
 
 ## 1. Current project phase
 
@@ -66,6 +66,11 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 4. Active implementation work
 
+- Main menu entry (`ui/MenuButtons`): OneClient replaces the title screen with
+  `org.polyfrost.oneclient.gui.OneClientMenuScreen` (found by GitHub code search; OneClient's
+  README lists 26.3 only, so on 1.21.11 the vanilla title screen and its "Replays" button stay).
+  Screens with "oneclient" and "menu"/"title" in the class name, outside a world, get "Replays"
+  top-left; the "Open replays" key works there too. Check inside OneClient on Hyperion.
 - Server switches (`ReplayScript.Kind.RECONFIGURE`, `ReplayServer.switchServer`): a later
   configuration phase in a recording becomes a timeline entry; the replay sends the client to
   configuration, plays the recorded phase and then the new login right away. Done-detection for
@@ -168,6 +173,10 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-23, cloud box, main menu entry (branch `feat/main-menu-entry`):
+- `./gradlew build`: pass. Gametests: all pass (20 OK lines), adding `checkMainMenuEntries`;
+  screenshot `reizo-replacement-main-menu` checked: "Replays" sits in the top-left corner.
 
 2026-11-23, cloud box, server switches (branch `feat/server-switch`):
 - `./gradlew build`: pass (`PlaybackTest.serverSwitchBecomesAReconfigureEntry`). Gametests: 19

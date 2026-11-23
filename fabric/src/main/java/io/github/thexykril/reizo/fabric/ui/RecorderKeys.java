@@ -44,6 +44,7 @@ public final class RecorderKeys {
   private static KeyMapping fovOut;
   private static KeyMapping cameraReset;
   private static KeyMapping pathDisplay;
+  private static KeyMapping openReplays;
 
   /** Degrees per tick while a roll or FOV key is held. */
   static final float ROLL_STEP = 2f;
@@ -83,6 +84,16 @@ public final class RecorderKeys {
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping(
                 "key.reizo.save_shadow",
+                InputConstants.Type.KEYSYM,
+                InputConstants.UNKNOWN.getValue(),
+                category));
+
+    // Opens the replay browser in game and on main menus (also one that replaces the title screen,
+    // see MenuButtons). Unbound by default.
+    openReplays =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping(
+                "key.reizo.open_replays",
                 InputConstants.Type.KEYSYM,
                 InputConstants.UNKNOWN.getValue(),
                 category));
@@ -154,6 +165,11 @@ public final class RecorderKeys {
             new KeyMapping("key.reizo.path_display", GLFW.GLFW_KEY_G, replay));
   }
 
+  /** The key that opens the replay browser (unbound by default). */
+  public static KeyMapping openReplays() {
+    return openReplays;
+  }
+
   /** Called once per client tick. */
   public static void handle(RecorderClient client) {
     Minecraft mc = Minecraft.getInstance();
@@ -171,6 +187,11 @@ public final class RecorderKeys {
     }
     while (saveShadow.consumeClick()) {
       client.saveShadow();
+    }
+    while (openReplays.consumeClick()) {
+      if (mc.screen == null && !ReplayPlayback.isActive()) {
+        mc.setScreen(new ReplayBrowserScreen(null));
+      }
     }
     handleReplay(mc);
   }

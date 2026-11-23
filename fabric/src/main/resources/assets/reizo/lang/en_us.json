@@ -4,6 +4,7 @@
   "key.reizo.pause": "Pause / resume recording",
   "key.reizo.marker": "Add marker",
   "key.reizo.save_shadow": "Save last minutes (shadow)",
+  "key.reizo.open_replays": "Open replays",
   "key.category.reizo.replay": "Replay",
   "key.reizo.replay_camera": "Switch camera",
   "key.reizo.replay_pause": "Pause / resume replay",
