@@ -20,6 +20,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(GameRenderer.class)
 abstract class GameRendererMixin {
+  //? if >=26.1 {
+  /*@Inject(method = "extract", at = @At("HEAD"))
+  private void reizo$settings(
+      net.minecraft.client.DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
+    ReplayEditor.applySettings();
+  }
+
+  @Inject(
+      method = "render()V",
+      at =
+          @At(
+              value = "INVOKE",
+              target = "Lnet/minecraft/client/renderer/LevelRenderer;blitEntityOutline()V",
+              shift = At.Shift.AFTER))
+  private void reizo$effects(CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.playback.EffectRenderer.afterWorld(
+        net.minecraft.client.Minecraft.getInstance());
+  }
+  *///?} else {
   @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
   private void reizo$pathFov(
       Camera camera, float partialTick, boolean useFovSetting, CallbackInfoReturnable<Float> cir) {
@@ -47,4 +66,5 @@ abstract class GameRendererMixin {
     io.github.thexykril.reizo.fabric.playback.EffectRenderer.afterWorld(
         net.minecraft.client.Minecraft.getInstance());
   }
+  //?}
 }

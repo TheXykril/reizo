@@ -72,8 +72,8 @@ Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). File format:
 ./gradlew build                          # everything CI runs except gametests
 ./gradlew :core:test                     # fast unit tests
 ./gradlew spotlessApply                  # fix formatting
-xvfb-run -a ./gradlew :fabric:runClientGameTest   # real Minecraft client tests (needs a display or Xvfb)
-./gradlew :fabric:runClient              # manual testing
+xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest   # real Minecraft client tests (needs a display or Xvfb)
+./gradlew :fabric:1.21.11:runClient              # manual testing
 ```
 
 ## Git workflow

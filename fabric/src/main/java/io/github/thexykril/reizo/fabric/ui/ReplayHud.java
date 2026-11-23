@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.ui;
 
+import io.github.thexykril.reizo.fabric.compat.Compat;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
@@ -40,7 +41,7 @@ public final class ReplayHud {
   private static void render(GuiGraphics g) {
     ReplayServer server = ReplayPlayback.current();
     Minecraft mc = Minecraft.getInstance();
-    if (server == null || mc.options.hideGui || mc.screen instanceof TimelineScreen) {
+    if (server == null || Compat.hudHidden(mc) || mc.screen instanceof TimelineScreen) {
       return;
     }
     long duration = Math.max(1, server.script().durationMs());

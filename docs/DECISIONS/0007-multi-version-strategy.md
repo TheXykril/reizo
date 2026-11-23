@@ -101,3 +101,31 @@ ADR, if there is demand.
 
 These are guesses from the scope, not measurements. Re-estimate after the Stonecutter step and the
 1.8.9 spike.
+
+## Implementation notes: Stonecutter and 26.3 (2026-11-23)
+
+Step 2 of the order above. Recorded here because it fixes how every later version is added.
+
+- **Build.** Stonecutter 0.10 (Gradle plugin portal) in `settings.gradle.kts`, versions
+  `1.21.11` (active, the version the sources are written for) and `26.3`. Each version is a project
+  `:fabric:<version>` with its own `gradle.properties`. Loom 1.19.4 needs Gradle 9.8 and a JDK 25 to
+  run Gradle; 1.21.11 still compiles with a Java 21 toolchain. 1.21.x uses the remapping Loom plugin
+  (`fabric-loom-remap`, Mojang mappings); 26.x is unobfuscated and uses `fabric-loom` without
+  mappings.
+- **Where differences go**, cheapest first:
+  1. Plain renames: regex rules with a reverse, at the end of `fabric/build.gradle.kts` (for
+     example `GuiGraphics` to `GuiGraphicsExtractor`, `mc.screen` to `mc.gui.screen()`).
+  2. Small accessors: `fabric/compat/Compat.java`, one version block per method.
+  3. Everything else: `//? if >=26.1` blocks where the code differs. The biggest is
+     `EffectRenderer`, because 26.x replaced Blaze3D's GPU API with "renderpearl" (bind group
+     layouts, SPIR-V shaders, reversed depth).
+- **Version-neutral code where possible.** Key codes use `InputConstants.KEY_*` (26.x moved from
+  GLFW to SDL scancodes), chunk coordinates use `SectionPos`. The effects shader body is shared
+  (`shaders/include/grade_body.glsl`) with a header per version.
+- **Mixins** are not checked at compile time. Each mixin's targets were checked against the 26.3
+  sources; four needed new targets (camera placement and field of view, frame hooks, the export
+  clock). The gametests on each version are what proves them.
+- **Recordings stay per version**, as decided above: a 1.21.11 recording does not play on 26.3.
+- **CI** builds every version and runs the gametests for both 1.21.11 and 26.3. With only two
+  modern versions that is still within the "newest of each family" budget; revisit when 1.21.1 and
+  the other OneClient versions are added.

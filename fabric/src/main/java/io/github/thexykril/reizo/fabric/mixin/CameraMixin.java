@@ -28,6 +28,10 @@ abstract class CameraMixin {
   @Shadow
   protected abstract void setRotation(float yRot, float xRot);
 
+  //? if >=26.1 {
+  /*@Inject(method = "alignWithEntity", at = @At("TAIL"))
+  private void reizo$applyCameraPath(float partialTicks, CallbackInfo ci) {
+  *///?} else {
   @Inject(method = "setup", at = @At("TAIL"))
   private void reizo$applyCameraPath(
       Level level,
@@ -36,12 +40,26 @@ abstract class CameraMixin {
       boolean mirrored,
       float partialTick,
       CallbackInfo ci) {
+    //?}
     CameraKeyframe k = ReplayEditor.cameraNow();
     if (k != null) {
       setRotation(k.yaw(), k.pitch());
       setPosition(k.x(), k.y(), k.z());
     }
   }
+
+  //? if >=26.1 {
+  /*// 26.x computes the field of view in the camera (1.21.x does it in GameRendererMixin).
+  @Inject(method = "calculateFov", at = @At("RETURN"), cancellable = true)
+  private void reizo$pathFov(
+      float partialTicks,
+      org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Float> cir) {
+    float fov = ReplayEditor.fovNow();
+    if (!Float.isNaN(fov)) {
+      cir.setReturnValue(fov);
+    }
+  }
+  *///?}
 
   @ModifyArg(
       method = "setRotation",

@@ -105,7 +105,11 @@ public final class WorldSnapshot {
                 level.dimension(),
                 0L,
                 mc.gameMode.getPlayerMode(),
+                //? if >=26.1 {
+                /*java.util.Optional.ofNullable(mc.gameMode.getPreviousPlayerMode()),
+                *///?} else {
                 mc.gameMode.getPreviousPlayerMode(),
+                //?}
                 level.isDebug(),
                 false,
                 player.getLastDeathLocation(),
@@ -114,8 +118,8 @@ public final class WorldSnapshot {
             ClientboundRespawnPacket.KEEP_ALL_DATA));
 
     int radius = Math.max(2, mc.options.getEffectiveRenderDistance());
-    int cx = player.chunkPosition().x;
-    int cz = player.chunkPosition().z;
+    int cx = net.minecraft.core.SectionPos.blockToSectionCoord(player.getBlockX());
+    int cz = net.minecraft.core.SectionPos.blockToSectionCoord(player.getBlockZ());
     add(new ClientboundSetChunkCacheRadiusPacket(radius));
     add(new ClientboundSetChunkCacheCenterPacket(cx, cz));
     add(new ClientboundPlayerPositionPacket(0, PositionMoveRotation.of(player), Set.of()));
@@ -135,16 +139,16 @@ public final class WorldSnapshot {
     }
     chunks.sort(
         java.util.Comparator.comparingInt(
-            c -> Math.max(Math.abs(c.getPos().x - cx), Math.abs(c.getPos().z - cz))));
+            c -> Math.max(Math.abs((c.getPos().getMinBlockX() >> 4) - cx), Math.abs((c.getPos().getMinBlockZ() >> 4) - cz))));
     for (LevelChunk chunk : chunks) {
       add(new ClientboundLevelChunkWithLightPacket(chunk, level.getLightEngine(), null, null));
     }
     // Like a server after the first chunks: lets the client close its loading screen.
     add(new ClientboundGameEventPacket(ClientboundGameEventPacket.LEVEL_CHUNKS_LOAD_START, 0));
 
-    add(new ClientboundSetTimePacket(level.getGameTime(), level.getDayTime(), true));
+    add(timePacket(level));
     add(new ClientboundInitializeBorderPacket(level.getWorldBorder()));
-    if (level.getLevelData().isRaining()) {
+    if (level.isRaining()) {
       add(new ClientboundGameEventPacket(ClientboundGameEventPacket.START_RAINING, 0));
       add(
           new ClientboundGameEventPacket(
@@ -250,5 +254,30 @@ public final class WorldSnapshot {
     } finally {
       buf.release();
     }
+  }
+
+  private static ClientboundSetTimePacket timePacket(ClientLevel level) {
+    //? if >=26.1 {
+    /*// 26.x replaced the day time with world clocks. Every registered clock is sent as it stands.
+    java.util.Map<
+            net.minecraft.core.Holder<net.minecraft.world.clock.WorldClock>,
+            net.minecraft.world.clock.ClockNetworkState>
+        clocks = new java.util.HashMap<>();
+    level
+        .registryAccess()
+        .lookupOrThrow(net.minecraft.core.registries.Registries.WORLD_CLOCK)
+        .listElements()
+        .forEach(
+            clock -> {
+              var instance = level.clockManager().getInstance(clock);
+              clocks.put(
+                  clock,
+                  new net.minecraft.world.clock.ClockNetworkState(
+                      instance.totalTicks(), instance.partialTick(), instance.rate()));
+            });
+    return new ClientboundSetTimePacket(level.getGameTime(), clocks);
+    *///?} else {
+    return new ClientboundSetTimePacket(level.getGameTime(), level.getDayTime(), true);
+    //?}
   }
 }

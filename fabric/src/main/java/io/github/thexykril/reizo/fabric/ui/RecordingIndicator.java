@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.ui;
 
+import io.github.thexykril.reizo.fabric.compat.Compat;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import java.util.Locale;
@@ -37,7 +38,7 @@ public final class RecordingIndicator {
       return;
     }
     Minecraft mc = Minecraft.getInstance();
-    if (mc.options.hideGui) {
+    if (Compat.hudHidden(mc)) {
       return;
     }
     RecordingSession.State state = session.state();

@@ -22,7 +22,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * The replay timeline editor: a panel at the bottom of the screen over the playing replay, with a
@@ -341,7 +341,7 @@ public final class TimelineScreen extends Screen {
     }
     double mx = event.x();
     double my = event.y();
-    if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT || mx < left || mx > right) {
+    if (event.button() != InputConstants.MOUSE_BUTTON_LEFT || mx < left || mx > right) {
       return false;
     }
     long t = view.xToTime(mx - left);
@@ -514,7 +514,7 @@ public final class TimelineScreen extends Screen {
     boolean shift = event.hasShiftDown() || mc.hasShiftDown();
     if (ctrl) {
       switch (key) {
-        case GLFW.GLFW_KEY_Z -> {
+        case InputConstants.KEY_Z -> {
           if (shift) {
             redo();
           } else {
@@ -522,19 +522,19 @@ public final class TimelineScreen extends Screen {
           }
           return true;
         }
-        case GLFW.GLFW_KEY_Y -> {
+        case InputConstants.KEY_Y -> {
           redo();
           return true;
         }
-        case GLFW.GLFW_KEY_C -> {
+        case InputConstants.KEY_C -> {
           clipboard = KeyframeEdits.copy(ReplayEditor.path(), selection);
           return true;
         }
-        case GLFW.GLFW_KEY_V -> {
+        case InputConstants.KEY_V -> {
           paste();
           return true;
         }
-        case GLFW.GLFW_KEY_A -> {
+        case InputConstants.KEY_A -> {
           selectAll();
           return true;
         }
@@ -542,14 +542,14 @@ public final class TimelineScreen extends Screen {
       }
     }
     switch (key) {
-      case GLFW.GLFW_KEY_SPACE -> togglePlay();
-      case GLFW.GLFW_KEY_N -> addKeyframe();
-      case GLFW.GLFW_KEY_DELETE, GLFW.GLFW_KEY_BACKSPACE -> deleteSelection();
-      case GLFW.GLFW_KEY_I -> ReplayEditor.setRegion(true, shift ? -1 : playhead());
-      case GLFW.GLFW_KEY_O -> ReplayEditor.setRegion(false, shift ? -1 : playhead());
-      case GLFW.GLFW_KEY_F -> view.showAll();
-      case GLFW.GLFW_KEY_LEFT -> ReplayPlayback.seekBy(shift ? -5000 : -1000);
-      case GLFW.GLFW_KEY_RIGHT -> ReplayPlayback.seekBy(shift ? 5000 : 1000);
+      case InputConstants.KEY_SPACE -> togglePlay();
+      case InputConstants.KEY_N -> addKeyframe();
+      case InputConstants.KEY_DELETE, InputConstants.KEY_BACKSPACE -> deleteSelection();
+      case InputConstants.KEY_I -> ReplayEditor.setRegion(true, shift ? -1 : playhead());
+      case InputConstants.KEY_O -> ReplayEditor.setRegion(false, shift ? -1 : playhead());
+      case InputConstants.KEY_F -> view.showAll();
+      case InputConstants.KEY_LEFT -> ReplayPlayback.seekBy(shift ? -5000 : -1000);
+      case InputConstants.KEY_RIGHT -> ReplayPlayback.seekBy(shift ? 5000 : 1000);
       default -> {
         return super.keyPressed(event);
       }

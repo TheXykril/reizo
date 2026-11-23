@@ -7,7 +7,7 @@
 <!-- Commands run and results. Separate automated tests from manual or untested visual behavior. -->
 
 - [ ] `./gradlew build`
-- [ ] `xvfb-run -a ./gradlew :fabric:runClientGameTest` (if `fabric/` changed)
+- [ ] `xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest` (if `fabric/` changed)
 - Manual checks:
 
 ## Checklist
