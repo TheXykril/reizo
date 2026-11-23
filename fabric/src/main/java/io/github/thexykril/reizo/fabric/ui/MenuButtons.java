@@ -35,7 +35,7 @@ public final class MenuButtons {
                       if (RecorderKeys.openReplays() != null
                           && RecorderKeys.openReplays().matches(key)
                           && client.screen == s) {
-                        client.setScreen(new ReplayBrowserScreen(s));
+                        client.setScreen(ReplayBrowserScreen.create(s));
                       }
                     });
           }
@@ -44,7 +44,7 @@ public final class MenuButtons {
                 .add(
                     Button.builder(
                             Component.translatable("reizo.menu.replays"),
-                            b -> client.setScreen(new ReplayBrowserScreen(screen)))
+                            b -> client.setScreen(ReplayBrowserScreen.create(screen)))
                         .bounds(4, 4, 70, 20)
                         .build());
           }
@@ -54,7 +54,7 @@ public final class MenuButtons {
                 .add(
                     Button.builder(
                             Component.translatable("reizo.menu.replays"),
-                            b -> client.setScreen(new ReplayBrowserScreen(screen)))
+                            b -> client.setScreen(ReplayBrowserScreen.create(screen)))
                         .bounds(width / 2 - 100 - 4 - 70, height / 4 + 48 + 24, 70, 20)
                         .build());
           } else if (screen instanceof PauseScreen pause && pause.showsPauseMenu()) {
@@ -156,7 +156,7 @@ public final class MenuButtons {
     buttons.add(
         Button.builder(
                 Component.translatable("reizo.menu.replays"),
-                b -> client.setScreen(new ReplayBrowserScreen(screen)))
+                b -> client.setScreen(ReplayBrowserScreen.create(screen)))
             .bounds(4, y, 120, 20)
             .build());
   }

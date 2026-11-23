@@ -16,4 +16,8 @@ final class ComposeScreens {
   static Screen export(Screen parent) {
     return new ComposeExportScreen(parent);
   }
+
+  static Screen browser(Screen parent) {
+    return new ComposeBrowserScreen(parent);
+  }
 }

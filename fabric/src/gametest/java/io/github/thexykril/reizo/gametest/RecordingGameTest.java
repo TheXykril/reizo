@@ -28,7 +28,7 @@ import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.github.thexykril.reizo.fabric.ui.ExportSettingsView;
-import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
+import io.github.thexykril.reizo.fabric.ui.ReplayBrowserView;
 import io.github.thexykril.reizo.fabric.ui.TimelineScreen;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -324,14 +324,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
         mc -> {
           pressButton(mc, "reizo.menu.replays");
         });
-    context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+    context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     context.waitTicks(2);
     context.takeScreenshot("reizo-replay-browser");
-    int listed = context.computeOnClient(mc -> ((ReplayBrowserScreen) mc.screen).entries().size());
+    int listed = context.computeOnClient(mc -> ((ReplayBrowserView) mc.screen).entries().size());
     check(listed >= 2, "browser lists " + listed + " recordings, expected at least 2");
     context.runOnClient(
         mc -> {
-          ReplayBrowserScreen browser = (ReplayBrowserScreen) mc.screen;
+          ReplayBrowserView browser = (ReplayBrowserView) mc.screen;
           browser.select(0);
           browser.pressPlay();
         });
@@ -370,16 +370,16 @@ public final class RecordingGameTest implements FabricClientGameTest {
         });
     try {
       context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_F7);
-      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
       context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
       context.waitTicks(2);
       context.takeScreenshot("reizo-replacement-main-menu");
       context.runOnClient(mc -> pressButton(mc, "reizo.menu.replays"));
-      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
       context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
       context.waitTicks(2);
       context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_F7);
-      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     } finally {
       context.runOnClient(
           mc -> {

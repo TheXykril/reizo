@@ -199,7 +199,7 @@ public final class RecorderKeys {
     }
     while (openReplays.consumeClick()) {
       if (mc.screen == null && !ReplayPlayback.isActive()) {
-        mc.setScreen(new ReplayBrowserScreen(null));
+        mc.setScreen(ReplayBrowserScreen.create(null));
       }
     }
     handleReplay(mc);

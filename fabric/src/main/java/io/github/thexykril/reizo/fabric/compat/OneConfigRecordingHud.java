@@ -30,6 +30,7 @@ final class OneConfigRecordingHud extends TextHud {
   static void register() {
     try {
       HudManager.register(new OneConfigRecordingHud());
+      RecordingIndicator.useOneConfigHud();
     } catch (Throwable t) { // LinkageError from a different OneConfig version, too
       LOGGER.warn("OneConfig HUD element not available: {}", t.toString());
     }

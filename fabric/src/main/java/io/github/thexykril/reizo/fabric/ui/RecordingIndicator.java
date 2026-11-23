@@ -24,7 +24,20 @@ public final class RecordingIndicator {
   private static final int TEXT = 0xFFFFFFFF;
   private static final int BACKGROUND = 0x80000000;
 
+  /** True when OneConfig's HUD element shows the recording state instead (it can be moved and turned off). */
+  private static volatile boolean shownByOneConfig;
+
   private RecordingIndicator() {}
+
+  /** Hands the indicator over to OneConfig's HUD element, so only one is drawn. */
+  public static void useOneConfigHud() {
+    shownByOneConfig = true;
+  }
+
+  /** Whether Reizo draws its own indicator. */
+  public static boolean drawnByReizo() {
+    return !shownByOneConfig;
+  }
 
   public static void register(RecorderClient client) {
     HudElementRegistry.addLast(
@@ -34,7 +47,7 @@ public final class RecordingIndicator {
 
   private static void render(RecorderClient client, GuiGraphics graphics) {
     RecordingSession session = client.session();
-    if (session == null || !client.config().showIndicator) {
+    if (session == null || !client.config().showIndicator || shownByOneConfig) {
       return;
     }
     Minecraft mc = Minecraft.getInstance();
