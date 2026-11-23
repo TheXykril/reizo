@@ -71,7 +71,7 @@ public final class SettingsScreen extends Screen {
                 (b, v) -> config.storeServerName = v));
     y += 24;
     addRenderableWidget(
-        CycleButton.builder(KeyModifier::label, KeyModifier.parse(config.toggleModifier))
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(KeyModifier::label, KeyModifier.parse(config.toggleModifier))
             .withValues(KeyModifier.values())
             .create(
                 x,
@@ -94,7 +94,7 @@ public final class SettingsScreen extends Screen {
                   RecorderClient.get().applyShadowSettings();
                 }));
     addRenderableWidget(
-        CycleButton.builder(
+        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
                 (Integer v) -> Component.literal(ReplayHud.time(v * 1000L)),
                 RecorderClient.SHADOW_LENGTHS.contains(config.shadowSeconds)
                     ? config.shadowSeconds

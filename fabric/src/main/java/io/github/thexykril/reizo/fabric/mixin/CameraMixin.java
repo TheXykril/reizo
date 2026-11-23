@@ -34,7 +34,11 @@ abstract class CameraMixin {
   *///?} else {
   @Inject(method = "setup", at = @At("TAIL"))
   private void reizo$applyCameraPath(
+      //? if >=1.21.11 {
       Level level,
+      //?} else {
+      /*net.minecraft.world.level.BlockGetter level,
+      *///?}
       Entity entity,
       boolean detached,
       boolean mirrored,
