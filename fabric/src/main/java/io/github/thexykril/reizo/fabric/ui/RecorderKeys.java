@@ -37,6 +37,11 @@ public final class RecorderKeys {
   private static KeyMapping pathToggle;
   private static KeyMapping pathSmoothing;
   private static KeyMapping timeline;
+
+  /** The key that opens the editor, as the player bound it (for hints). */
+  public static String timelineKeyName() {
+    return timeline == null ? "Y" : timeline.getTranslatedKeyMessage().getString();
+  }
   private static KeyMapping rollLeft;
   private static KeyMapping rollRight;
   private static KeyMapping fovIn;

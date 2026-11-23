@@ -198,6 +198,7 @@ public final class TimelineScreen extends Screen {
 
   @Override
   protected void init() {
+    fitGuiScale();
     ReplayServer server = ReplayPlayback.current();
     long duration = server == null ? 1 : server.script().durationMs();
     if (view == null || view.durationMs() != Math.max(1, duration)) {
@@ -1919,5 +1920,41 @@ public final class TimelineScreen extends Screen {
   private static String smoothingName() {
     return ReplayEditor.path().interpolation().name().toLowerCase(Locale.ROOT).replace('_', '-')
         + (ReplayEditor.path().easing().name().startsWith("EASE") ? " + ease" : "");
+  }
+
+  /** The GUI width the full layout (side panels and menu bar) needs. */
+  private static final int FULL_LAYOUT_W = 640;
+
+  private boolean ownScale;
+
+  /**
+   * Lowers the GUI scale while the editor is open when the player's scale would leave too little
+   * room for the full layout, so the editor looks the same at any GUI scale setting. The player's
+   * own scale comes back in {@link #removed()}.
+   */
+  private void fitGuiScale() {
+    var window = minecraft.getWindow();
+    int scale = window.getGuiScale();
+    int fit = scale;
+    while (fit > 1 && window.getWidth() / fit < FULL_LAYOUT_W) {
+      fit--;
+    }
+    if (fit != scale) {
+      window.setGuiScale(fit);
+      width = window.getGuiScaledWidth();
+      height = window.getGuiScaledHeight();
+      ownScale = true;
+    }
+  }
+
+  @Override
+  public void removed() {
+    super.removed();
+    if (ownScale) {
+      ownScale = false;
+      var window = minecraft.getWindow();
+      window.setGuiScale(
+          window.calculateScale(minecraft.options.guiScale().get(), minecraft.isEnforceUnicode()));
+    }
   }
 }
