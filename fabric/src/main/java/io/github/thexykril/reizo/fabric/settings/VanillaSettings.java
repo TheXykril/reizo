@@ -33,15 +33,28 @@ final class VanillaSettings {
             "view_bobbing",
             "options.viewBobbing",
             () -> Minecraft.getInstance().options.bobView()),
-        playerHud());
+        reizoToggle(
+            "player_hud",
+            "reizo.settings.player_hud",
+            c -> c.showPlayerHud,
+            (c, v) -> c.showPlayerHud = v),
+        reizoToggle(
+            "player_screens",
+            "reizo.settings.player_screens",
+            c -> c.showPlayerScreens,
+            (c, v) -> c.showPlayerScreens = v));
   }
 
-  /** Reizo's own toggle for the recorded player's HUD in POV, so a shot can show or hide it. */
-  private static KeyframedSetting playerHud() {
+  /** Reizo's own toggles for the recorded player's HUD and screens in POV, so a shot can hide them. */
+  private static KeyframedSetting reizoToggle(
+      String id,
+      String key,
+      java.util.function.Function<io.github.thexykril.reizo.fabric.ClientConfig, Boolean> get,
+      java.util.function.BiConsumer<io.github.thexykril.reizo.fabric.ClientConfig, Boolean> set) {
     return new KeyframedSetting() {
       @Override
       public String id() {
-        return "reizo:player_hud";
+        return "reizo:" + id;
       }
 
       @Override
@@ -51,7 +64,7 @@ final class VanillaSettings {
 
       @Override
       public String label() {
-        return Component.translatable("reizo.settings.player_hud").getString();
+        return Component.translatable(key).getString();
       }
 
       @Override
@@ -71,12 +84,12 @@ final class VanillaSettings {
 
       @Override
       public double get() {
-        return io.github.thexykril.reizo.fabric.RecorderClient.get().config().showPlayerHud ? 1 : 0;
+        return get.apply(io.github.thexykril.reizo.fabric.RecorderClient.get().config()) ? 1 : 0;
       }
 
       @Override
       public void set(double value) {
-        io.github.thexykril.reizo.fabric.RecorderClient.get().config().showPlayerHud = value != 0;
+        set.accept(io.github.thexykril.reizo.fabric.RecorderClient.get().config(), value != 0);
       }
     };
   }
