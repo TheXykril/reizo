@@ -21,14 +21,14 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Pause / resume recording | ✓ | ✓ | ? | ✓ | implemented | UT | Clock freeze; packets keep flowing (see FORMAT.md). Key unbound by default |
 | Markers | ✓ | ✓ | ✓ | ✓ | implemented | UT, GT | Key unbound by default; label "Marker" |
 | Auto-record on join | ✓ | ✓ | ✓ | ✓ | implemented | GT | `autoRecordOnJoin` in config/reizo.json |
-| Continuous across world/server switch | ✓ | ? | ? | ✗ | planned | — | Currently stops on disconnect |
+| Continuous across world/server switch | ✓ | ? | ? | ✗ | partial | GT | Server switches behind a proxy (the server sends the client back to configuration) stay in one recording and replay as a switch, with seeking and export across it (`recordOnDedicatedServer`, switch made with the server's own reconfiguration, `exportAcrossServerSwitch`). Not tested on a real Velocity/BungeeCord proxy. Leaving and joining another server or world still starts a new recording |
 | Crash backup / recovery | ✓ | ? | ? | partial | implemented | UT, GT | Max ~1 s loss. GT `recoverAfterCrash`: a mid-recording copy of the working directory (no lock owner, torn tail) is recovered at startup, marked RECOVERED, keeps its marker and plays back. A real process kill is not tested |
 | Shadow (rolling buffer) recording | ✓ 30 s–10 min | ? | ✓ 2 min | ✓ 30 s–10 min | implemented | UT, GT | Off by default; ADR 0011. Pause menu "Save last" or a key (unbound). Snapshot hitch not yet measured on real hardware |
 | World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; basic playback (GT) |
 | Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; replayed on the recorded player |
 | Inventory / equipment | ✓ | ✓ | ✓ | ✓ | partial | GT | Inventory in recorded packets; own held items and armor recorded as equipment packets and shown on playback |
 | Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | — | Server-sent ones are in packets; client-only effects not captured |
-| Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | GT | `recordOnDedicatedServer`: auto-record on joining a dedicated server over the network (compressed), server-spawned entity recorded and shown in playback. Not tested: proxies, server switches, real public servers |
+| Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | GT | `recordOnDedicatedServer`: auto-record on joining a dedicated server over the network (compressed), server-spawned entity recorded and shown in playback; a server switch in the middle carries on and replays. Not tested: real proxies, real public servers |
 | Start mid-session with full world | ✓ | ✓ | ? | ✗ | partial | GT | Config + login prelude only; loaded chunks missing until world snapshots (M2) |
 | Replay metadata (version, server, player, markers) | ? | ✓ | ✓ | ✓ | implemented | UT, GT | |
 | Configurable storage location | ? | ✓ | ? | ✓ | implemented | — | `recordingsDirectory` setting |

@@ -125,6 +125,39 @@ class PlaybackTest {
   }
 
   @Test
+  void serverSwitchBecomesAReconfigureEntry() {
+    List<Frame> frames =
+        List.of(
+            Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}),
+            Frame.packet(0, ProtocolPhase.PLAY, new byte[] {10}),
+            Frame.packet(40, ProtocolPhase.PLAY, new byte[] {11}),
+            Frame.packet(50, ProtocolPhase.CONFIGURATION, new byte[] {3}),
+            Frame.of(55, FrameType.LOCAL_PLAYER, new byte[] {7}),
+            Frame.packet(60, ProtocolPhase.CONFIGURATION, new byte[] {4}),
+            Frame.packet(70, ProtocolPhase.PLAY, new byte[] {12}),
+            Frame.packet(90, ProtocolPhase.CONFIGURATION, new byte[] {5}));
+    ReplayScript script = ReplayScript.of(frames);
+    assertEquals(2, script.due(45).size());
+    assertEquals(ReplayScript.Kind.RECONFIGURE, script.due(50).get(0).kind());
+    List<ReplayScript.Entry> login = script.throughNextPlayPacket();
+    assertEquals(1, login.size());
+    assertArrayEquals(new byte[] {12}, login.get(0).bytes(), "the new world's first packet");
+    assertTrue(script.finished());
+    script.rewind();
+    assertEquals(1, script.configuration().size(), "only the first phase is sent up front");
+    assertEquals(1, script.reconfigureCount());
+    assertEquals(3, script.playPacketCount());
+    List<ReplayScript.Entry> all = script.due(1_000);
+    // The sample while configuring (no world) and the trailing phase without a world are left out.
+    assertEquals(4, all.size());
+    assertEquals(ReplayScript.Kind.RECONFIGURE, all.get(2).kind());
+    assertEquals(50, all.get(2).timeMs());
+    assertEquals(2, all.get(2).configuration().size());
+    assertArrayEquals(new byte[] {4}, all.get(2).configuration().get(1));
+    assertArrayEquals(new byte[] {12}, all.get(3).bytes());
+  }
+
+  @Test
   void scriptRejectsRecordingsWithoutPlayPackets() {
     List<Frame> frames = List.of(Frame.packet(0, ProtocolPhase.CONFIGURATION, new byte[] {1}));
     assertThrows(IllegalArgumentException.class, () -> ReplayScript.of(frames));

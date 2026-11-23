@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (followed sounds and music in exports).
+Last updated: 2026-11-23 by Claude (server switches in replays).
 
 ## 1. Current project phase
 
@@ -66,6 +66,13 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 4. Active implementation work
 
+- Server switches (`ReplayScript.Kind.RECONFIGURE`, `ReplayServer.switchServer`): a later
+  configuration phase in a recording becomes a timeline entry; the replay sends the client to
+  configuration, plays the recorded phase and then the new login right away. Done-detection for
+  restarts and switches is `ReplayServer.oldWorldGone()` (the client answers the switch only after
+  dropping its world), because during an export the client does not tick while it waits. The
+  login also brings a chunks-start event so the loading screen never waits on a paused replay.
+  Untested on a real proxy (Velocity) on Hyperion.
 - Export sound (`fabric/export/SoundCapture`, `core.audio`): every sound is followed while it
   plays (`SoundEngine.stop` hook in `SoundEngineMixin`, per-frame samples for positional and
   tickable sounds, one-shots for at most 30 s). Loops repeat until stopped; music is included and
@@ -161,6 +168,13 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-23, cloud box, server switches (branch `feat/server-switch`):
+- `./gradlew build`: pass (`PlaybackTest.serverSwitchBecomesAReconfigureEntry`). Gametests: 19
+  OK lines, all pass. `recordOnDedicatedServer` now switches the player to configuration and back
+  (`switchToConfig` and `returnToWorld`, what `/debugconfig` does), checks the recording carried
+  on, plays back into the second world (second pig), seeks back before the switch, and
+  `exportAcrossServerSwitch` exports the whole replay at 10 fps: 65 of 65 frames.
 
 2026-11-23, cloud box, followed sounds (branch `feat/followed-sounds`):
 - `./gradlew build`: pass (`AudioTest` adds looping, stopping, moving and pitch changes).

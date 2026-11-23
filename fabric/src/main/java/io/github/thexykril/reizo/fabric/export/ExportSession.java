@@ -343,6 +343,14 @@ public final class ExportSession {
         }
       }
       case RUNNING -> {
+        // Not isReconfiguring(): that ends on a client tick, and ticks follow the frames.
+        if (mc.level == null
+            || mc.screen instanceof net.minecraft.client.gui.screens.LevelLoadingScreen
+            || mc.screen
+                instanceof net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen) {
+          // A recorded server switch: wait for the new world, nothing is captured meanwhile.
+          return;
+        }
         if (mc.screen != null) {
           // A menu would be captured into the video; Esc cancels the export instead.
           end(State.CANCELLED, null);

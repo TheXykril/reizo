@@ -93,6 +93,7 @@ final class PlayTransformer {
   private final int gameEventId;
   private final int respawnId;
   private final int tickingStateId;
+  private final int startConfigurationId;
   private volatile float recordedTickRate = 20f;
   private volatile boolean recordedFrozen;
   private final java.util.concurrent.atomic.AtomicBoolean recordedTickStateChanged =
@@ -125,6 +126,8 @@ final class PlayTransformer {
     this.abilitiesId = idOf(new ClientboundPlayerAbilitiesPacket(new Abilities()));
     this.playerInfoId = peekId(playerInfo(new UUID(0, 0), "x", GameType.SURVIVAL, false));
     this.tickingStateId = idOf(new ClientboundTickingStatePacket(20f, false));
+    this.startConfigurationId =
+        idOf(net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket.INSTANCE);
     this.gameEventId =
         idOf(new ClientboundGameEventPacket(ClientboundGameEventPacket.CHANGE_GAME_MODE, 0));
     Holder<net.minecraft.world.level.dimension.DimensionType> overworld =
@@ -175,7 +178,15 @@ final class PlayTransformer {
     if (!loginSeen) {
       loginSeen = true;
       // Like a server's own entry for the joining player: the camera needs one to be a spectator.
-      return List.of(rewriteLogin(bytes), cameraPlayerInfo());
+      // The client's loading screen waits for the chunks-start event, which a server sends only
+      // after the first chunks; a replay paused at its first packet would wait forever, so it
+      // comes right away (a spectator does not wait for its own chunk).
+      return List.of(
+          rewriteLogin(bytes),
+          cameraPlayerInfo(),
+          encode(
+              new ClientboundGameEventPacket(
+                  ClientboundGameEventPacket.LEVEL_CHUNKS_LOAD_START, 0)));
     }
     int id = peekId(bytes);
     if (id == playerPositionId) {
@@ -184,6 +195,10 @@ final class PlayTransformer {
       }
       cameraPlaced = true;
       return List.of(bytes);
+    }
+    if (id == startConfigurationId) {
+      // The replay server plays a recorded server switch itself (ReplayScript.Kind.RECONFIGURE).
+      return List.of();
     }
     if (id == playerRotationId || id == setHealthId || id == combatKillId || id == abilitiesId) {
       return List.of();
