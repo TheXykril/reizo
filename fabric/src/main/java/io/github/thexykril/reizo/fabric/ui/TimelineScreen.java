@@ -6,6 +6,7 @@ package io.github.thexykril.reizo.fabric.ui;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.thexykril.reizo.core.camera.CameraKeyframe;
+import io.github.thexykril.reizo.core.effects.Grade;
 import io.github.thexykril.reizo.core.effects.PropertyTracks;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits;
@@ -74,6 +75,9 @@ public final class TimelineScreen extends Screen {
 
   private static Tab tab = Tab.KEYFRAME;
 
+  /** Look tab page: 0 colour, 1 lens. */
+  private static int lookPage;
+
   private enum Drag {
     NONE,
     SEEK,
@@ -129,6 +133,7 @@ public final class TimelineScreen extends Screen {
 
   private FlatButton playButton;
   private FlatButton speedButton;
+  private FlatButton letterboxButton;
   private final List<FlatSlider> sliders = new ArrayList<>();
   private String builtInspector = "";
 
@@ -188,7 +193,7 @@ public final class TimelineScreen extends Screen {
     int x = 22;
     showTitle = width >= 520;
     if (showTitle) {
-      x += font.width("Reizo") + 10;
+      x += Draw.width(font, "Reizo") + 10;
     }
     String[][] transport = {
       {"reizo.editor.prev_marker", "⏮"},
@@ -205,7 +210,7 @@ public final class TimelineScreen extends Screen {
       x += 17;
     }
     timeTextX = x + 4;
-    x = timeTextX + font.width("00:00 / 00:00") + 6;
+    x = timeTextX + Draw.width(font, "00:00 / 00:00") + 6;
     speedButton =
         addRenderableWidget(
             new FlatButton(
@@ -359,21 +364,54 @@ public final class TimelineScreen extends Screen {
                 b -> ReplayEditor.cycleSmoothing()));
       }
       case LOOK -> {
-        y += 26;
-        addRenderableWidget(
-            new FlatButton(
-                x0,
-                y,
-                w,
-                16,
-                Component.translatable("reizo.inspector.open_effects"),
-                FlatButton.Style.ACCENT,
-                b -> Minecraft.getInstance().setScreen(new EffectsScreen(this))));
+        int half = w / 2;
+        for (int p = 0; p < 2; p++) {
+          int page = p;
+          addRenderableWidget(
+                  new FlatButton(
+                      x0 + p * half,
+                      y,
+                      half,
+                      14,
+                      Component.translatable(p == 0 ? "reizo.look.color" : "reizo.look.lens"),
+                      FlatButton.Style.TONAL,
+                      b -> {
+                        lookPage = page;
+                        builtInspector = "";
+                      }))
+              .selectedWhen(() -> lookPage == page);
+        }
+        y += 20;
+        if (lookPage == 0) {
+          y = gradeSlider(x0, y, w, "exposure", -3, 3, Grade::exposure, Grade::withExposure);
+          y = gradeSlider(x0, y, w, "contrast", 0, 2, Grade::contrast, Grade::withContrast);
+          y = gradeSlider(x0, y, w, "saturation", 0, 2, Grade::saturation, Grade::withSaturation);
+          y =
+              gradeSlider(
+                  x0, y, w, "temperature", -1, 1, Grade::temperature, Grade::withTemperature);
+        } else {
+          y = gradeSlider(x0, y, w, "vignette", 0, 1, Grade::vignette, Grade::withVignette);
+          y = gradeSlider(x0, y, w, "bloom", 0, 1, Grade::bloom, Grade::withBloom);
+          y = gradeSlider(x0, y, w, "dof", 0, 1, Grade::dof, Grade::withDof);
+          y = gradeSlider(x0, y, w, "focus", 0.5f, 64, Grade::focus, Grade::withFocus);
+        }
+        letterboxButton =
+            addRenderableWidget(
+                new FlatButton(
+                    x0,
+                    y,
+                    w,
+                    16,
+                    Component.translatable("reizo.look.letterbox"),
+                    FlatButton.Style.TONAL,
+                    b -> EffectEdits.cycleLetterbox()));
         y += 18;
+        int half2 = (w - 2) / 2;
+        tonal(x0, y, half2, "reizo.look.remove", b -> EffectEdits.removeHere());
         tonal(
-            x0,
+            x0 + half2 + 2,
             y,
-            w,
+            half2,
             "reizo.inspector.open_settings",
             b -> Minecraft.getInstance().setScreen(new KeyframedSettingsScreen(this)));
       }
@@ -396,7 +434,7 @@ public final class TimelineScreen extends Screen {
                   () -> SettingEdits.shownValue(s),
                   v -> SettingEdits.edit(s, v, true),
                   s::format);
-          slider.accent(colors[i++ % colors.length]);
+          slider.accent(colors[i++ % colors.length]).markedWhen(() -> SettingEdits.atKeyframe(s));
           sliders.add(addRenderableWidget(slider));
           y += 24;
         }
@@ -404,6 +442,31 @@ public final class TimelineScreen extends Screen {
         tonal(x0, y, w, "reizo.inspector.hide_looked", b -> hideLookedAt());
       }
     }
+  }
+
+  private int gradeSlider(
+      int x,
+      int y,
+      int w,
+      String name,
+      float min,
+      float max,
+      java.util.function.Function<Grade, Float> get,
+      java.util.function.BiFunction<Grade, Float, Grade> set) {
+    FlatSlider slider =
+        new FlatSlider(
+            x,
+            y,
+            w,
+            Component.translatable("reizo.look." + name),
+            min,
+            max,
+            () -> get.apply(ReplayEditor.gradeNow()),
+            v -> EffectEdits.edit(g -> set.apply(g, (float) v)),
+            v -> String.format(Locale.ROOT, "%.2f", v).replace("-0.00", "0.00"));
+    slider.accent(Theme.TRACK_LOOK).markedWhen(EffectEdits::atKeyframe);
+    sliders.add(addRenderableWidget(slider));
+    return y + 22;
   }
 
   private FlatButton icon(
@@ -426,7 +489,7 @@ public final class TimelineScreen extends Screen {
     }
     return switch (tab) {
       case KEYFRAME -> "keyframe:" + Math.min(selection.size(), 2);
-      case LOOK -> "look";
+      case LOOK -> "look:" + lookPage;
       case WORLD -> "world";
     };
   }
@@ -548,10 +611,6 @@ public final class TimelineScreen extends Screen {
       view.ensureVisible(playhead());
     }
     layoutLanes();
-    for (FlatSlider s : sliders) {
-      KeyframedSetting setting = settingOf(s);
-      s.setMarked(setting != null && SettingEdits.atKeyframe(setting));
-    }
 
     renderFrames(g);
     if (showLeft) {
@@ -565,32 +624,22 @@ public final class TimelineScreen extends Screen {
     super.render(g, mouseX, mouseY, partialTick);
   }
 
-  private KeyframedSetting settingOf(FlatSlider s) {
-    for (String id : WORLD_IDS) {
-      KeyframedSetting k = KeyframedSettings.find(id);
-      if (k != null && s.label().equals(Component.translatable(k.label()))) {
-        return k;
-      }
-    }
-    return null;
-  }
-
   /** Panel grounds and the hairlines between them. */
   private void renderFrames(GuiGraphics g) {
     g.fill(0, 0, width, TOP_H, Theme.GROUND);
-    g.fill(0, TOP_H - 1, width, TOP_H, Theme.LINE);
+    Draw.hline(g, 0, width, TOP_H - 1, Theme.LINE);
     g.fill(0, TOP_H, RAIL_W, timelineY, Theme.GROUND);
-    g.fill(RAIL_W - 1, TOP_H, RAIL_W, timelineY, Theme.LINE);
+    Draw.vline(g, RAIL_W - 1, TOP_H, timelineY, Theme.LINE);
     if (showLeft) {
       g.fill(RAIL_W, TOP_H, RAIL_W + OUTLINER_W, timelineY, Theme.SURFACE);
-      g.fill(RAIL_W + OUTLINER_W - 1, TOP_H, RAIL_W + OUTLINER_W, timelineY, Theme.LINE);
+      Draw.vline(g, RAIL_W + OUTLINER_W - 1, TOP_H, timelineY, Theme.LINE);
     }
     if (showRight) {
       g.fill(width - INSPECTOR_W, TOP_H, width, timelineY, Theme.SURFACE);
-      g.fill(width - INSPECTOR_W, TOP_H, width - INSPECTOR_W + 1, timelineY, Theme.LINE);
+      Draw.vline(g, width - INSPECTOR_W, TOP_H, timelineY, Theme.LINE);
     }
     g.fill(0, timelineY, width, height, Theme.GROUND);
-    g.fill(0, timelineY, width, timelineY + 1, Theme.LINE);
+    Draw.hline(g, 0, width, timelineY, Theme.LINE);
   }
 
   private void renderTopBar(GuiGraphics g, ReplayServer server) {
@@ -612,7 +661,7 @@ public final class TimelineScreen extends Screen {
     Draw.label(g, font, Component.translatable("reizo.scene.title").getString(), x0 + 6, TOP_H + 6, Theme.TEXT);
     collectScene();
     String count = Integer.toString(sceneRows.size());
-    Draw.label(g, font, count, x1 - 6 - font.width(count), TOP_H + 6, Theme.FAINT);
+    Draw.label(g, font, count, x1 - 6 - Draw.width(font, count), TOP_H + 6, Theme.FAINT);
     int top = TOP_H + 18;
     int rows = Math.max(0, (timelineY - 4 - top) / ROW_H);
     sceneScroll = Math.max(0, Math.min(sceneScroll, Math.max(0, sceneRows.size() - rows)));
@@ -704,11 +753,12 @@ public final class TimelineScreen extends Screen {
           for (String[] r : rows) {
             String label = r[0].length() == 1 ? r[0] : Component.translatable(r[0]).getString();
             Draw.label(g, font, label, x0, y, Theme.DIM);
-            Draw.label(g, font, r[1], x1 - font.width(r[1]), y, Theme.TEXT);
+            Draw.label(g, font, r[1], x1 - Draw.width(font, r[1]), y, Theme.TEXT);
             y += 10;
           }
         } else if (chosen.isEmpty()) {
-          g.drawWordWrap(
+          Draw.wrap(
+              g,
               font,
               Component.translatable("reizo.inspector.no_selection"),
               x0,
@@ -730,13 +780,15 @@ public final class TimelineScreen extends Screen {
         Draw.label(g, font, Draw.fit(font, mode, x1 - x0), x0, timelineY - 12, Theme.FAINT);
       }
       case LOOK -> {
-        g.drawWordWrap(
-            font,
-            Component.translatable("reizo.inspector.look_info", ReplayEditor.effects().size()),
-            x0,
-            y,
-            x1 - x0,
-            Theme.DIM);
+        if (letterboxButton != null) {
+          float lb = ReplayEditor.gradeNow().letterbox();
+          letterboxButton.setMessage(
+              Component.translatable(
+                  "reizo.effects.letterbox",
+                  lb <= 0
+                      ? Component.translatable("options.off")
+                      : Component.literal(String.format(Locale.ROOT, "%.2f:1", lb))));
+        }
       }
       case WORLD -> {
         String hidden =
@@ -771,10 +823,10 @@ public final class TimelineScreen extends Screen {
     Draw.label(g, font, t, 6, headerY + 3, Theme.TEXT);
 
     // Ruler and lanes.
-    g.fill(left, rulerY, right, rulerY + RULER_H, Theme.SURFACE);
+    Draw.round(g, left, rulerY, right, rulerY + RULER_H, 3, Theme.SURFACE);
     for (Lane l : lanes) {
-      g.fill(4, l.y, LABEL_W, l.y + LANE_H - 1, Theme.SURFACE);
-      g.fill(4, l.y, 6, l.y + LANE_H - 1, l.track.color);
+      Draw.round(g, 4, l.y, LABEL_W, l.y + LANE_H - 1, 3, Theme.SURFACE);
+      Draw.round(g, 4, l.y + 2, 6, l.y + LANE_H - 3, 1, l.track.color);
       Draw.label(
           g,
           font,
@@ -782,7 +834,7 @@ public final class TimelineScreen extends Screen {
           9,
           l.y + 2,
           Theme.DIM);
-      g.fill(left, l.y, right, l.y + LANE_H - 1, Theme.RAISED);
+      Draw.round(g, left, l.y, right, l.y + LANE_H - 1, 3, Theme.RAISED);
     }
     int bottom = lanesBottom();
 
@@ -806,7 +858,7 @@ public final class TimelineScreen extends Screen {
   }
 
   private void renderRuler(GuiGraphics g) {
-    long step = view.tickStepMs(font.width("00:00") + 10);
+    long step = view.tickStepMs(Draw.width(font, "00:00") + 10);
     long first = (view.startMs() / step) * step;
     for (long t = first; t <= view.endMs(); t += step) {
       int x = (int) Math.round(left + view.timeToX(t));

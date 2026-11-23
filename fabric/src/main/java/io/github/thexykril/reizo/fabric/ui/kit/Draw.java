@@ -4,76 +4,172 @@
  */
 package io.github.thexykril.reizo.fabric.ui.kit;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FontDescription;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.Identifier;
 
 /**
- * Drawing helpers for the editor kit. Only {@code fill} and {@code drawString} are used, so they
- * work the same on every Minecraft version Reizo builds for.
+ * Drawing helpers for the editor kit. Text uses Reizo's UI font (Inter, falling back to
+ * Minecraft's font for symbols). Rounded shapes and hairlines are drawn at the window's real pixel
+ * size, with anti-aliased corners, so they stay smooth at any GUI scale. Only {@code fill}, {@code
+ * drawString} and the pose stack are used, which every supported version has.
  */
 public final class Draw {
+  /** The editor's text style: Inter through the {@code reizo:ui} font. */
+  public static final Style UI =
+      Style.EMPTY.withFont(
+          new FontDescription.Resource(Identifier.fromNamespaceAndPath("reizo", "ui")));
+
   private Draw() {}
 
-  /** A filled rectangle with corners cut by {@code radius} pixel steps (0 to 3). */
+  /** {@code s} in the UI font. */
+  public static MutableComponent ui(String s) {
+    return Component.literal(s).withStyle(UI);
+  }
+
+  /** {@code c} in the UI font. */
+  public static MutableComponent ui(Component c) {
+    return c.copy().withStyle(UI);
+  }
+
+  /** Width of {@code s} in the UI font. */
+  public static int width(Font font, String s) {
+    return font.width(ui(s));
+  }
+
+  public static int width(Font font, Component c) {
+    return font.width(ui(c));
+  }
+
+  private static int guiScale() {
+    return Math.max(1, Minecraft.getInstance().getWindow().getGuiScale());
+  }
+
+  /**
+   * A filled rectangle with rounded corners of {@code radius} GUI pixels, anti-aliased at the
+   * window's pixel size.
+   */
   public static void round(GuiGraphics g, int x0, int y0, int x1, int y1, int radius, int color) {
     if (x1 <= x0 || y1 <= y0) {
       return;
     }
-    int r = Math.max(0, Math.min(radius, Math.min((x1 - x0) / 2, (y1 - y0) / 2)));
+    int s = guiScale();
+    int r = Math.max(0, Math.min(radius * s, Math.min((x1 - x0) * s / 2, (y1 - y0) * s / 2)));
     if (r == 0) {
       g.fill(x0, y0, x1, y1, color);
       return;
     }
-    g.fill(x0, y0 + r, x1, y1 - r, color);
+    int px0 = x0 * s;
+    int py0 = y0 * s;
+    int px1 = x1 * s;
+    int py1 = y1 * s;
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    g.fill(px0, py0 + r, px1, py1 - r, color);
+    int alpha = (color >>> 24) & 0xFF;
     for (int i = 0; i < r; i++) {
-      // Row i from the top and bottom: inset shrinks towards the middle (a stepped curve).
-      int inset = r - i - (i > 0 && r == 3 ? 1 : 0);
-      inset = Math.max(1, Math.min(r, inset));
-      g.fill(x0 + inset, y0 + i, x1 - inset, y0 + i + 1, color);
-      g.fill(x0 + inset, y1 - i - 1, x1 - inset, y1 - i, color);
+      double dy = r - (i + 0.5);
+      double dx = r - Math.sqrt(Math.max(0, (double) r * r - dy * dy));
+      int solid = (int) Math.ceil(dx);
+      double cover = solid - dx; // coverage of the edge pixel
+      int top = py0 + i;
+      int bottom = py1 - 1 - i;
+      g.fill(px0 + solid, top, px1 - solid, top + 1, color);
+      g.fill(px0 + solid, bottom, px1 - solid, bottom + 1, color);
+      if (solid > 0 && cover > 0.02) {
+        int edge = Theme.alpha(color, (int) Math.round(alpha * cover));
+        g.fill(px0 + solid - 1, top, px0 + solid, top + 1, edge);
+        g.fill(px1 - solid, top, px1 - solid + 1, top + 1, edge);
+        g.fill(px0 + solid - 1, bottom, px0 + solid, bottom + 1, edge);
+        g.fill(px1 - solid, bottom, px1 - solid + 1, bottom + 1, edge);
+      }
     }
+    g.pose().popMatrix();
+  }
+
+  /** A one-window-pixel horizontal line at GUI y {@code y} from x0 to x1. */
+  public static void hline(GuiGraphics g, int x0, int x1, int y, int color) {
+    int s = guiScale();
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    g.fill(x0 * s, y * s, x1 * s, y * s + 1, color);
+    g.pose().popMatrix();
+  }
+
+  /** A one-window-pixel vertical line at GUI x {@code x} from y0 to y1. */
+  public static void vline(GuiGraphics g, int x, int y0, int y1, int color) {
+    int s = guiScale();
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    g.fill(x * s, y0 * s, x * s + 1, y1 * s, color);
+    g.pose().popMatrix();
   }
 
   /** A one-pixel outline inside the rectangle. */
   public static void outline(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
-    g.fill(x0, y0, x1, y0 + 1, color);
-    g.fill(x0, y1 - 1, x1, y1, color);
-    g.fill(x0, y0 + 1, x0 + 1, y1 - 1, color);
-    g.fill(x1 - 1, y0 + 1, x1, y1 - 1, color);
+    hline(g, x0, x1, y0, color);
+    vline(g, x0, y0, y1, color);
+    int s = guiScale();
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    g.fill(x0 * s, y1 * s - 1, x1 * s, y1 * s, color);
+    g.fill(x1 * s - 1, y0 * s, x1 * s, y1 * s, color);
+    g.pose().popMatrix();
   }
 
-  /** A diamond of half-size {@code r} centred on (cx, cy). */
+  /** A diamond of half-size {@code r} GUI pixels centred on (cx, cy), drawn at window pixels. */
   public static void diamond(GuiGraphics g, int cx, int cy, int r, int color) {
-    for (int i = -r; i <= r; i++) {
-      int w = r - Math.abs(i);
-      g.fill(cx - w, cy + i, cx + w + 1, cy + i + 1, color);
+    int s = guiScale();
+    int pr = r * s;
+    int pcx = cx * s + s / 2;
+    int pcy = cy * s + s / 2;
+    g.pose().pushMatrix();
+    g.pose().scale(1f / s, 1f / s);
+    for (int i = -pr; i <= pr; i++) {
+      int w = pr - Math.abs(i);
+      g.fill(pcx - w, pcy + i, pcx + w + 1, pcy + i + 1, color);
     }
+    g.pose().popMatrix();
   }
 
-  /** A small filled circle-ish dot. */
+  /** A small round dot centred on (cx, cy). */
   public static void dot(GuiGraphics g, int cx, int cy, int color) {
-    g.fill(cx - 1, cy - 2, cx + 2, cy + 3, color);
-    g.fill(cx - 2, cy - 1, cx + 3, cy + 2, color);
+    round(g, cx - 2, cy - 2, cx + 3, cy + 3, 3, color);
   }
 
-  /** Text without a shadow. */
+  /** Text in the UI font, without a shadow. */
   public static void label(GuiGraphics g, Font font, String s, int x, int y, int color) {
-    g.drawString(font, s, x, y, color, false);
+    g.drawString(font, ui(s), x, y, color, false);
   }
 
-  /** Text centred on {@code cx}, without a shadow. */
+  /** Text in the UI font centred on {@code cx}, without a shadow. */
   public static void centered(GuiGraphics g, Font font, String s, int cx, int y, int color) {
-    g.drawString(font, s, cx - font.width(s) / 2, y, color, false);
+    g.drawString(font, ui(s), cx - width(font, s) / 2, y, color, false);
   }
 
-  /** Text cut to {@code width} pixels with an ellipsis. */
+  /** Wrapped text in the UI font. Returns the height used. */
+  public static int wrap(GuiGraphics g, Font font, Component c, int x, int y, int width, int color) {
+    var lines = font.split(ui(c), width);
+    for (int i = 0; i < lines.size(); i++) {
+      g.drawString(font, lines.get(i), x, y + i * 10, color, false);
+    }
+    return lines.size() * 10;
+  }
+
+  /** Text cut to {@code width} pixels with an ellipsis, measured in the UI font. */
   public static String fit(Font font, String s, int width) {
     if (width <= 0) {
       return "";
     }
-    if (font.width(s) <= width) {
+    if (width(font, s) <= width) {
       return s;
     }
-    return font.plainSubstrByWidth(s, Math.max(0, width - font.width("…"))) + "…";
+    String cut = font.substrByWidth(ui(s), Math.max(0, width - width(font, "…"))).getString();
+    return cut + "…";
   }
 }

@@ -59,7 +59,7 @@ public class FlatButton extends Button {
 
   /** Width that fits the label (or the icon) with padding. */
   public static int fitWidth(Font font, Component label, int padding) {
-    return font.width(label) + padding * 2;
+    return Draw.width(font, label) + padding * 2;
   }
 
   //? if >=1.21.11 {

@@ -31,8 +31,13 @@ Option 3.
 
 - `fabric.ui.kit.Theme` holds the palette: OneClient-like dark surfaces, blue accent, one colour per
   track kind. No art or code from OneClient, Axiom or Flashback.
-- `fabric.ui.kit.Draw` draws rounded panels, outlines, diamonds and fitted text with
-  `GuiGraphics.fill` and `drawString` only, so it needs no shaders, textures or per-version GPU code.
+- `fabric.ui.kit.Draw` draws rounded panels, hairlines, diamonds and fitted text with
+  `GuiGraphics.fill`, `drawString` and the pose stack only, so it needs no shaders, textures or
+  per-version GPU code. Shapes are drawn at the window's real pixel size (the pose is scaled by
+  1/GUI scale) with anti-aliased corners, so they do not look blocky.
+- Text uses a bundled font, Inter Medium (SIL OFL 1.1, owner asked to drop the Minecraft look on
+  2026-11-23), through a `reizo:ui` TTF font with Minecraft's font as the fallback for symbols.
+  The licence ships in the jar (`licenses/Inter-OFL.txt`) and the README lists it.
 - `fabric.ui.kit.FlatButton` (extends `Button`) and `FlatSlider` (extends `AbstractSliderButton`)
   draw themselves. Their one per-version difference, the render hook's name, is a Stonecutter
   rename plus one version block for 1.21.10.
@@ -50,6 +55,6 @@ Option 3.
   get tracks and inspector tabs instead of new full screens.
 - More drawing code is Reizo's to maintain; it only uses `fill`, `drawString` and scissors, which
   every supported version has.
-- Rounded corners are pixel steps, not anti-aliased curves. Fine at GUI scale 2 and up; at GUI
-  scale 1 they look square.
+- A third-party asset under its own licence (OFL) ships in the jar; it must stay unmodified or be
+  renamed if modified (OFL reserved-name rule).
 - Screens not yet moved to the kit still look vanilla until they are moved.

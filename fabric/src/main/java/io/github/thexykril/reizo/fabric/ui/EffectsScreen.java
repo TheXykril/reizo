@@ -26,7 +26,7 @@ import net.minecraft.network.chat.Component;
  */
 public final class EffectsScreen extends Screen {
   /** Keyframes this close to the playhead are edited instead of adding another. */
-  static final long TOLERANCE_MS = 100;
+  static final long TOLERANCE_MS = EffectEdits.TOLERANCE_MS;
 
   private static final int PANEL_WIDTH = 150;
 
@@ -87,7 +87,6 @@ public final class EffectsScreen extends Screen {
   }
 
   private final java.util.List<ValueSlider> sliders = new java.util.ArrayList<>();
-  private long lastEditMs;
   private int rowHeight = 20;
   private int infoY;
 
@@ -158,46 +157,19 @@ public final class EffectsScreen extends Screen {
     return server == null ? 0 : Math.min(server.replayTimeMs(), server.script().durationMs());
   }
 
-  /** The keyframe time edited now: one near the playhead, or the playhead. */
-  private long editTime() {
-    long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
-    return near >= 0 ? near : playhead();
-  }
-
   /** Sets the keyframe at the edit time to {@code change} applied to the grade shown now. */
   void edit(java.util.function.UnaryOperator<Grade> change) {
-    // One undo step per slider drag: changes less than a moment apart belong together.
-    long now = System.currentTimeMillis();
-    if (now - lastEditMs > 700) {
-      ReplayEditor.recordUndo();
-    }
-    lastEditMs = now;
-    EffectTrack track = ReplayEditor.effects();
-    long t = editTime();
-    track.put(t, change.apply(track.at(t)));
-    ReplayEditor.effectsChanged();
+    EffectEdits.edit(change);
     refreshButtons();
   }
 
   private void cycleLetterbox() {
-    float now = ReplayEditor.gradeNow().letterbox();
-    float[] all = Grade.LETTERBOXES;
-    int i = 0;
-    while (i < all.length && Math.abs(all[i] - now) > 0.01f) {
-      i++;
-    }
-    float next = all[(i + 1) % all.length];
-    lastEditMs = 0;
-    edit(g -> g.withLetterbox(next));
+    EffectEdits.cycleLetterbox();
+    refreshButtons();
   }
 
   private void removeHere() {
-    long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
-    if (near >= 0) {
-      ReplayEditor.recordUndo();
-      lastEditMs = 0;
-      ReplayEditor.effects().remove(near);
-      ReplayEditor.effectsChanged();
+    if (EffectEdits.removeHere()) {
       refresh();
     }
   }

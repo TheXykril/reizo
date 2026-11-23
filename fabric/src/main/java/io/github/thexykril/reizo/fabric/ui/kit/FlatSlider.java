@@ -26,7 +26,7 @@ public final class FlatSlider extends AbstractSliderButton {
   private final DoubleConsumer sink;
   private final DoubleFunction<String> format;
   private int accent = Theme.ACCENT;
-  private boolean marked;
+  private java.util.function.BooleanSupplier marked = () -> false;
 
   public FlatSlider(
       int x,
@@ -53,9 +53,10 @@ public final class FlatSlider extends AbstractSliderButton {
     return this;
   }
 
-  /** Shows a keyframe diamond next to the label (a keyframe sits at the playhead). */
-  public void setMarked(boolean marked) {
+  /** Shows a keyframe diamond next to the label while {@code marked} holds. */
+  public FlatSlider markedWhen(java.util.function.BooleanSupplier marked) {
     this.marked = marked;
+    return this;
   }
 
   public Component label() {
@@ -91,16 +92,16 @@ public final class FlatSlider extends AbstractSliderButton {
     int x1 = x0 + getWidth();
     boolean hot = active && isHoveredOrFocused();
     int lx = x0 + 2;
-    if (marked) {
+    if (marked.getAsBoolean()) {
       Draw.diamond(g, x0 + 4, y0 + 4, 3, accent);
       lx = x0 + 10;
     }
     String v = format.apply(current());
-    Draw.label(g, font, v, x1 - 2 - font.width(v), y0 + 1, hot ? Theme.TEXT : Theme.DIM);
+    Draw.label(g, font, v, x1 - 2 - Draw.width(font, v), y0 + 1, hot ? Theme.TEXT : Theme.DIM);
     Draw.label(
         g,
         font,
-        Draw.fit(font, label.getString(), x1 - lx - font.width(v) - 8),
+        Draw.fit(font, label.getString(), x1 - lx - Draw.width(font, v) - 8),
         lx,
         y0 + 1,
         active ? Theme.TEXT : Theme.FAINT);
