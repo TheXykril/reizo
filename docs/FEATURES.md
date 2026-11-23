@@ -153,6 +153,11 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   (`PropertyTracksTest`); ADR 0014. Timeline → Settings lists settings with a search box; a change
   sets a keyframe at the playhead; numbers blend, switches flip; teal squares on the marker track.
   OneConfig mod settings: **partial**, see OneClient integration.
+- **Time of day and weather:** **implemented**, evidence GT (`checkTimeAndWeather` on 1.21.11 and
+  26.3: keyframes for midnight, rain and thunder make the replay's level report them, screenshot
+  `reizo-replay-night-storm` shows a rainy night while paused; removing them goes back to the
+  recording). Timeline → Settings → Reizo: "Time of day (replay)" (shown as a clock time), "Rain"
+  and "Thunder", blended between keyframes and shown in exports. The recording is unchanged.
 - **Depth of field and bloom:** **implemented**, evidence GT (`checkEffects`: depth of field
   focused at 0.5 blocks halves the frame's fine detail; bloom brightens 8% of the frame around the
   bright spots). Effects panel: "Bloom", "Depth of field" (strength) and "Focus (blocks)", keyframed

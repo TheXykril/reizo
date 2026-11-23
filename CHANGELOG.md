@@ -21,6 +21,8 @@ compatibility.
 
 ### Added
 
+- Time of day, rain and thunder can be keyframed in a replay (Timeline → Settings), for night shots,
+  storms or timelapses. They show in exports; the recording itself is unchanged.
 - Minecraft 1.21.10 and 26.2 support (separate jars), so every OneClient version from 1.21.10 up
   is covered. Only tested by the automated in-game tests so far.
 - Recordings made in OneClient note it (and its version) in their metadata.

@@ -5,6 +5,7 @@
 package io.github.thexykril.reizo.fabric.settings;
 
 import io.github.thexykril.reizo.core.effects.PropertyTracks;
+import io.github.thexykril.reizo.fabric.playback.ReplayWorldLook;
 import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
@@ -33,6 +34,39 @@ final class VanillaSettings {
             "view_bobbing",
             "options.viewBobbing",
             () -> Minecraft.getInstance().options.bobView()),
+        worldLook(
+            "time_of_day",
+            "reizo.settings.time_of_day",
+            ReplayWorldLook.DAY,
+            mc -> {
+              //? if >=26.1 {
+              /*long t = mc.level.getDefaultClockTime();
+              *///?} else {
+              long t = mc.level.getDayTime();
+              //?}
+              return Math.floorMod(t, ReplayWorldLook.DAY);
+            },
+            ReplayWorldLook::setTimeOfDay,
+            ReplayWorldLook::clock),
+        worldLook(
+            "rain",
+            "reizo.settings.rain",
+            1,
+            mc -> mc.level.getRainLevel(1f),
+            ReplayWorldLook::setRain,
+            v -> Math.round(v * 100) + "%"),
+        worldLook(
+            "thunder",
+            "reizo.settings.thunder",
+            1,
+            mc ->
+                ReplayWorldLook.thunderOverridden()
+                    ? ReplayWorldLook.thunder()
+                    : mc.level.getRainLevel(1f) > 0
+                        ? mc.level.getThunderLevel(1f) / mc.level.getRainLevel(1f)
+                        : 0,
+            ReplayWorldLook::setThunder,
+            v -> Math.round(v * 100) + "%"),
         reizoToggle(
             "player_hud",
             "reizo.settings.player_hud",
@@ -90,6 +124,71 @@ final class VanillaSettings {
       @Override
       public void set(double value) {
         set.accept(io.github.thexykril.reizo.fabric.RecorderClient.get().config(), value != 0);
+      }
+    };
+  }
+
+  /**
+   * A replay's time of day or weather. Setting it overrides the recorded value; once its track goes
+   * away the replay follows the recording again.
+   */
+  private static KeyframedSetting worldLook(
+      String id,
+      String key,
+      double max,
+      java.util.function.ToDoubleFunction<Minecraft> get,
+      java.util.function.DoubleConsumer set,
+      java.util.function.DoubleFunction<String> format) {
+    return new KeyframedSetting() {
+      @Override
+      public String id() {
+        return "reizo:" + id;
+      }
+
+      @Override
+      public String group() {
+        return "Reizo";
+      }
+
+      @Override
+      public String label() {
+        return Component.translatable(key).getString();
+      }
+
+      @Override
+      public PropertyTracks.Kind kind() {
+        return PropertyTracks.Kind.NUMBER;
+      }
+
+      @Override
+      public double min() {
+        return 0;
+      }
+
+      @Override
+      public double max() {
+        return max;
+      }
+
+      @Override
+      public double get() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.level == null ? 0 : get.applyAsDouble(mc);
+      }
+
+      @Override
+      public void set(double value) {
+        set.accept(value);
+      }
+
+      @Override
+      public void restore(double original) {
+        set.accept(Double.NaN);
+      }
+
+      @Override
+      public String format(double value) {
+        return format.apply(value);
       }
     };
   }
