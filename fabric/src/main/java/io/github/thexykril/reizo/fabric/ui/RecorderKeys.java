@@ -382,6 +382,10 @@ public final class RecorderKeys {
   }
 
   private static void status(Minecraft mc, Component message) {
-    mc.gui.setOverlayMessage(message, false);
+    if (ReplayPlayback.isActive()) {
+      ReplayHud.status(message);
+    } else {
+      mc.gui.setOverlayMessage(message, false);
+    }
   }
 }
