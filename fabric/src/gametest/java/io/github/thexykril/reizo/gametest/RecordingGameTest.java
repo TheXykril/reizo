@@ -314,6 +314,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
   private void browseAndPlay(ClientGameTestContext context) {
     context.waitFor(
         mc -> mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen, 20 * 10);
+    checkMainMenuEntries(context);
     context.runOnClient(
         mc -> {
           pressButton(mc, "reizo.menu.replays");
@@ -343,6 +344,56 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
     LOGGER.info("browseAndPlay OK: {} recordings listed", listed);
+  }
+
+  /**
+   * The "Open replays" key on the title screen, and the "Replays" button and key on a main menu
+   * that replaces the title screen (OneClient's, matched by class name).
+   */
+  private void checkMainMenuEntries(ClientGameTestContext context) {
+    check(
+        io.github.thexykril.reizo.fabric.ui.MenuButtons.isReplacementMainMenuClass(
+            "org.polyfrost.oneclient.gui.OneClientMenuScreen"),
+        "OneClient's menu screen is not recognized");
+    context.runOnClient(
+        mc -> {
+          var key = io.github.thexykril.reizo.fabric.ui.RecorderKeys.openReplays();
+          key.setKey(
+              com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM.getOrCreate(
+                  org.lwjgl.glfw.GLFW.GLFW_KEY_F7));
+          net.minecraft.client.KeyMapping.resetMapping();
+        });
+    try {
+      context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_F7);
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+      context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
+      context.waitTicks(2);
+      context.takeScreenshot("reizo-replacement-main-menu");
+      context.runOnClient(mc -> pressButton(mc, "reizo.menu.replays"));
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+      context.runOnClient(mc -> mc.setScreen(new OneclientMenuStub()));
+      context.waitTicks(2);
+      context.getInput().pressKey(org.lwjgl.glfw.GLFW.GLFW_KEY_F7);
+      context.waitFor(mc -> mc.screen instanceof ReplayBrowserScreen, 20 * 5);
+    } finally {
+      context.runOnClient(
+          mc -> {
+            io.github.thexykril.reizo.fabric.ui.RecorderKeys.openReplays()
+                .setKey(com.mojang.blaze3d.platform.InputConstants.UNKNOWN);
+            net.minecraft.client.KeyMapping.resetMapping();
+            mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen());
+          });
+    }
+    context.waitFor(
+        mc -> mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen, 20 * 10);
+    LOGGER.info("checkMainMenuEntries OK");
+  }
+
+  /** Stands in for a main menu that replaces the title screen; matched by its class name. */
+  private static final class OneclientMenuStub extends net.minecraft.client.gui.screens.Screen {
+    OneclientMenuStub() {
+      super(net.minecraft.network.chat.Component.literal("Main menu"));
+    }
   }
 
   /**

@@ -16,6 +16,8 @@ compatibility.
 
 ### Added
 
+- "Replays" in the top-left corner of OneClient's main menu, and an "Open replays" key (unbound by
+  default) that opens the replay browser from any main menu or in game.
 - Server switches behind a proxy (Velocity, BungeeCord) no longer split anything: the recording
   carries on, and the replay switches worlds where the recording did, also when seeking or
   exporting across it.

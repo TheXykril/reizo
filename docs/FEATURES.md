@@ -208,5 +208,10 @@ without it (ADR 0010). Not affiliated with or endorsed by Polyfrost or OneClient
   notifications typed info, success, warning or error, and an export shows one notification with
   a progress bar. Switch "OneConfig notifications" on Reizo's OneConfig page; any failure falls
   back to Minecraft toasts for the session. GT: without OneConfig, toasts stay vanilla.
-- Editor entry in the OneClient main menu, PolyCompose styling:
-  **planned**.
+- **Entry in OneClient's main menu:** **partial**, evidence GT (`checkMainMenuEntries`: a stand-in
+  screen named like OneClient's menu gets a "Replays" button in its top-left corner that opens the
+  replay browser; the "Open replays" key opens it from the title screen and that menu). OneClient
+  has no API for menu entries, so its menu (`org.polyfrost.oneclient.gui.OneClientMenuScreen`) is
+  recognized by class name; not run inside OneClient yet. The key (unbound by default) also opens
+  the browser in game.
+- PolyCompose styling: **planned**.
