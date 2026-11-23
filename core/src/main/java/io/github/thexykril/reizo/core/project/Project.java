@@ -90,6 +90,9 @@ public final class Project {
     /** Include the game's sounds (rendered offline from the sounds that play). */
     public boolean audio = true;
 
+    /** Motion blur: renders averaged per frame (180° shutter); 1 is off. */
+    public int motionBlur = 1;
+
     /** Output file name; relative to the exports folder unless absolute. */
     public String output;
   }

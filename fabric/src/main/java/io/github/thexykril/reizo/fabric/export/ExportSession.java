@@ -64,7 +64,9 @@ public final class ExportSession {
   private FrameEncoder encoder;
   private int width;
   private int height;
-  private int frame; // next frame to capture
+  private int frame; // next render (sample) to capture; one per frame without motion blur
+  private int delivered; // renders read back so far
+  private int[] blurSum; // per-channel sums of the current frame's renders (motion blur)
   private int captured;
   private long virtualBaseMs = -1;
   // Whether the frame being rendered now shows the next frame's time (decided once per frame).
@@ -166,7 +168,8 @@ public final class ExportSession {
     ExportSession s = current;
     if (s != null && s.audio && s.state == State.RUNNING) {
       // The frame being prepared now is the one these sounds belong to.
-      s.sounds.onPlay(Minecraft.getInstance(), sound, s.frame * 1000.0 / s.plan.fps());
+      s.sounds.onPlay(
+          Minecraft.getInstance(), sound, s.plan.timeOfSample(s.frame) - s.plan.startMs());
     }
   }
 
@@ -251,7 +254,7 @@ public final class ExportSession {
     // here, before the frame's ticks, so the capture after it matches what was rendered.
     s.readyThisFrame = s.frameReady() && s.encoder.hasRoom();
     int shown = s.readyThisFrame ? s.frame : Math.max(0, s.frame - 1);
-    return s.virtualBaseMs + Math.round(shown * 1000.0 / s.plan.fps());
+    return s.virtualBaseMs + Math.round(s.plan.timeOfSample(shown) - s.plan.startMs());
   }
 
   /** Called after each rendered frame. */
@@ -311,7 +314,7 @@ public final class ExportSession {
         mc.options.hideGui = true;
         ReplayEditor.setPathPlaying(true);
         server.setManual(true, plan.startMs());
-        server.advanceTo(Math.round(plan.timeOfFrame(0)), 1);
+        server.advanceTo(Math.round(plan.timeOfSample(0)), 1);
         state = State.RUNNING;
       }
       case RUNNING -> {
@@ -332,16 +335,18 @@ public final class ExportSession {
         int index = frame;
         Screenshot.takeScreenshot(target, image -> deliver(index, image));
         frame++;
-        if (frame % 10 == 0) {
+        if (frame % (10 * plan.samples()) == 0) {
           mc.getWindow()
               .setTitle(
                   String.format(
-                      java.util.Locale.ROOT, "Reizo export %.0f%%", 100 * plan.progress(frame)));
+                      java.util.Locale.ROOT,
+                      "Reizo export %.0f%%",
+                      100 * plan.progress(frame / plan.samples())));
         }
-        if (frame >= plan.frameCount()) {
+        if (frame >= plan.sampleCount()) {
           state = State.FINISHING;
         } else {
-          server.advanceTo(Math.round(plan.timeOfFrame(frame)), frame + 1);
+          server.advanceTo(Math.round(plan.timeOfSample(frame)), frame + 1);
         }
       }
       case FINISHING -> {
@@ -382,16 +387,42 @@ public final class ExportSession {
       if (state != State.RUNNING && state != State.FINISHING) {
         return;
       }
-      if (index != captured) {
-        throw new IllegalStateException("frame " + index + " arrived, expected " + captured);
+      if (index != delivered) {
+        throw new IllegalStateException("render " + index + " arrived, expected " + delivered);
       }
+      delivered++;
       int[] abgr = image.getPixelsABGR();
+      int n = plan.samples();
+      if (n > 1) {
+        // Motion blur: sum this frame's renders, then encode their average.
+        if (blurSum == null || blurSum.length != abgr.length * 3) {
+          blurSum = new int[abgr.length * 3];
+        }
+        if (index % n == 0) {
+          java.util.Arrays.fill(blurSum, 0);
+        }
+        for (int i = 0, o = 0; i < abgr.length; i++) {
+          int p = abgr[i];
+          blurSum[o++] += p & 0xFF;
+          blurSum[o++] += (p >>> 8) & 0xFF;
+          blurSum[o++] += (p >>> 16) & 0xFF;
+        }
+        if (index % n != n - 1) {
+          return;
+        }
+      }
       byte[] rgba = new byte[abgr.length * 4];
       for (int i = 0, o = 0; i < abgr.length; i++) {
-        int p = abgr[i];
-        rgba[o++] = (byte) p;
-        rgba[o++] = (byte) (p >>> 8);
-        rgba[o++] = (byte) (p >>> 16);
+        if (n > 1) {
+          rgba[o++] = (byte) ((blurSum[i * 3] + n / 2) / n);
+          rgba[o++] = (byte) ((blurSum[i * 3 + 1] + n / 2) / n);
+          rgba[o++] = (byte) ((blurSum[i * 3 + 2] + n / 2) / n);
+        } else {
+          int p = abgr[i];
+          rgba[o++] = (byte) p;
+          rgba[o++] = (byte) (p >>> 8);
+          rgba[o++] = (byte) (p >>> 16);
+        }
         rgba[o++] = (byte) 0xFF;
       }
       encoder.submit(rgba);
@@ -431,7 +462,7 @@ public final class ExportSession {
     ReplayServer server = ReplayPlayback.current();
     if (server != null) {
       server.setManual(false, 0);
-      server.seek(Math.round(plan.timeOfFrame(Math.max(0, frame - 1))));
+      server.seek(Math.round(plan.timeOfSample(Math.max(0, frame - 1))));
     }
     current = null;
     if (result == State.DONE) {

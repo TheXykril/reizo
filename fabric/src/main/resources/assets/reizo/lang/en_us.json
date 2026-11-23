@@ -128,12 +128,14 @@
   "reizo.export.format": "Format",
   "reizo.export.file": "File name (in reizo/exports)",
   "reizo.export.audio": "Sound",
+  "reizo.export.motion_blur": "Motion blur",
+  "reizo.export.blur_samples": "%s samples",
   "reizo.export.file_hint": "Automatic: replay name and date",
   "reizo.export.range_all": "Range: whole replay (%s – %s). Set In/Out in the timeline (Y).",
   "reizo.export.range": "Range: %s – %s, from the timeline",
   "reizo.export.clear_range": "Whole replay",
   "reizo.export.start": "Export",
   "reizo.export.no_formats": "This FFmpeg has none of the supported video encoders",
-  "reizo.export.note": "Rendered frame by frame from the window, then scaled to the size.",
+  "reizo.export.note": "Rendered frame by frame at the chosen size; the window shows part of each frame meanwhile.",
   "reizo.export.hardware_note": "Hardware encoding needs a matching GPU and driver."
 }

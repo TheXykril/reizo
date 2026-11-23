@@ -101,7 +101,9 @@ screen, effects, audio, shadow recording, multi-version.
   `ExportSession.onSound`; `SoundCapture` stores a `core.audio.SoundCue` with the camera pose at the
   frame being prepared, decodes clips with `JOrbisAudioStream`, `AudioMixer` mixes 48 kHz stereo,
   and `FfmpegCommand.muxAudio` adds it to the picture (written first to `<name>.video.<ext>`).
-- Next: more effects (bloom, DoF, motion blur), music/looping sounds and microphone (#17), effects (#15), recorded
+- Motion blur: `ExportPlan(samples, shutter)`; `ExportSession.frame` counts renders and
+  `deliver` averages each frame's renders before encoding.
+- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), recorded
   player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected
