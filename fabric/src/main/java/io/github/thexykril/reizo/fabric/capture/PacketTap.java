@@ -49,8 +49,10 @@ public final class PacketTap {
     if (c == null || phase == null || suppressed) {
       return;
     }
+    long start = System.nanoTime();
     try {
       c.onPacket(phase, packetBytes);
+      RecorderStats.packet(System.nanoTime() - start);
     } catch (RuntimeException e) {
       // Recording must never break the connection. Log once to avoid flooding.
       if (!errorLogged) {

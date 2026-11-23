@@ -288,9 +288,13 @@ public final class RecorderClient implements ClientModInitializer {
   private void onClientTick(Minecraft mc) {
     ReplayPlayback.tick(mc);
     RecorderKeys.handle(this);
-    tickShadow(mc);
+    long start = System.nanoTime();
+    boolean worked = tickShadow(mc);
     RecordingSession s = session();
     if (s == null || mc.player == null || s.state() != RecordingSession.State.RECORDING) {
+      if (worked) {
+        io.github.thexykril.reizo.fabric.capture.RecorderStats.tick(System.nanoTime() - start);
+      }
       return;
     }
     LocalPlayerState state = sampler.sample(mc.player);
@@ -303,16 +307,18 @@ public final class RecorderClient implements ClientModInitializer {
         s.submitPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
       }
     }
+    io.github.thexykril.reizo.fabric.capture.RecorderStats.tick(System.nanoTime() - start);
   }
 
-  private void tickShadow(Minecraft mc) {
+  /** Keeps the shadow buffer going; returns whether it did any work this tick. */
+  private boolean tickShadow(Minecraft mc) {
     ShadowBuffer buffer = capture.shadow();
     if (buffer == null
         || mc.level == null
         || mc.player == null
         || ReplayPlayback.isActive()
         || !capture.canRecord()) {
-      return;
+      return false;
     }
     if (buffer.needsSegment()) {
       long start = System.nanoTime();
@@ -334,6 +340,7 @@ public final class RecorderClient implements ClientModInitializer {
         buffer.onPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
       }
     }
+    return true;
   }
 
   private void onDisconnect() {
