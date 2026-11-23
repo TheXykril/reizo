@@ -52,6 +52,16 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   selected slot and offhand, hearts (absorption, hardcore), food, armor, XP and air, laid out like
   vanilla. Setting "Recorded player's HUD in POV", keyframeable as "Reizo" in the editor. Not
   shown yet: inventory and container screens, status effects, the attack indicator.
+- **Recorded player's inventory and container screens in POV:** **partial**, evidence GT
+  (`recordFromJoin`: the open inventory is recorded as `PLAYER_SCREEN` frames whose slots decode;
+  `checkReplayControls`: the recorded inventory screen is drawn in POV without opening a real
+  screen; screenshot `reizo-replay-pov-hud`). The game's own screen classes, with the recorded
+  slots, mouse position, hovered slot, tooltip and cursor stack; the inventory shows the recorded
+  player's model. Setting "Recorded player's inventory in POV", keyframeable under "Reizo".
+  Screen and container packets no longer reach the replay camera, so a recorded chest no longer
+  opens on the viewer and stays open. Not covered: creative tabs (shown as the survival
+  inventory), screens without a menu type (horse, sign, book, merchant trades), furnace progress
+  arrows.
 - **Spectator camera during playback:** **partial**, evidence GT (camera is in spectator mode with
   its own identity). Plain spectator flight; no speed or roll controls yet.
 - **Camera modes free / player view / follow (V key):** **partial**, evidence GT

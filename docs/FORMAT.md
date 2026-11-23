@@ -45,6 +45,7 @@ whole stream. A block is valid only if fully present with matching magic and CRC
 | 3 | `MARKER` | UTF-8 label |
 | 4 | `LIVE_START` | empty. Frames before it are a prelude replayed from cache at time 0 |
 | 5 | `PLAYER_HUD` | see below |
+| 6 | `PLAYER_SCREEN` | see below |
 
 Unknown ids must be skipped by readers.
 
@@ -88,6 +89,27 @@ items: VarInt count (10: hotbar slots 0 to 8, then the offhand), then each stack
 
 `gameMode` is the `GameType` id (0 survival, 1 creative, 2 adventure, 3 spectator). `air` can be
 negative while drowning.
+
+### `PLAYER_SCREEN` layout 1
+
+The inventory or container screen the recorded player had open, sampled from the client (the
+player's own inventory screen never reaches the server). Written after that tick's
+`LOCAL_PLAYER` frame when the screen, its slots or the mouse changed. Big-endian.
+
+```
+layout:u8(=1) kind:u8 menuTypeLength:u16 menuType:utf8 titleLength:int32 title:bytes
+mouseX:f32 mouseY:f32 itemsLength:int32 items:bytes
+kind: 0 none, 1 player inventory, 2 creative inventory, 3 container
+menuType: registry id of the menu type for kind 3 (for example minecraft:generic_9x3), else empty
+title: kind 3 only, ComponentSerialization.TRUSTED_STREAM_CODEC against the recording's registries
+mouseX, mouseY: mouse position as a fraction of the window, 0 to 1
+items: itemsLength -1 means unchanged since the previous PLAYER_SCREEN frame; otherwise a VarInt
+       count, then every slot of the menu in order and last the stack on the cursor, each with
+       ItemStack.OPTIONAL_STREAM_CODEC
+```
+
+For kind 2 the slots are those of the player's inventory menu: the creative tabs are not
+recorded.
 
 ## Time
 

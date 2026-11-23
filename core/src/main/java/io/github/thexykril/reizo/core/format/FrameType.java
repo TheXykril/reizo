@@ -33,7 +33,12 @@ public enum FrameType {
    * What the local player's HUD showed (hotbar, selected slot, health, food, armor, experience,
    * air), written whenever it changes. Payload: {@link PlayerHudState}.
    */
-  PLAYER_HUD(5);
+  PLAYER_HUD(5),
+  /**
+   * The inventory or container screen the local player has open, with its slots and the mouse,
+   * written whenever it changes. Payload: {@link PlayerScreenState}.
+   */
+  PLAYER_SCREEN(6);
 
   private final int id;
 

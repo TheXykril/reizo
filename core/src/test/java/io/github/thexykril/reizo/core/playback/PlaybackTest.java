@@ -105,6 +105,7 @@ class PlaybackTest {
             Frame.packet(50, ProtocolPhase.PLAY, new byte[] {11}),
             Frame.of(55, FrameType.LOCAL_PLAYER, new byte[] {7}),
             Frame.of(58, FrameType.PLAYER_HUD, new byte[] {8}),
+            Frame.of(59, FrameType.PLAYER_SCREEN, new byte[] {6}),
             Frame.of(60, FrameType.MARKER, new byte[] {0}),
             Frame.packet(100, ProtocolPhase.PLAY, new byte[] {12}));
     ReplayScript script = ReplayScript.of(frames);
@@ -119,11 +120,12 @@ class PlaybackTest {
     assertArrayEquals(new byte[] {10}, first.get(0).bytes());
     assertEquals(0, script.due(49).size());
     List<ReplayScript.Entry> rest = script.due(1_000);
-    assertEquals(4, rest.size());
+    assertEquals(5, rest.size());
     assertEquals(ReplayScript.Kind.LOCAL_PLAYER, rest.get(1).kind());
     assertArrayEquals(new byte[] {7}, rest.get(1).bytes());
     assertEquals(ReplayScript.Kind.PLAYER_HUD, rest.get(2).kind());
     assertArrayEquals(new byte[] {8}, rest.get(2).bytes());
+    assertEquals(ReplayScript.Kind.PLAYER_SCREEN, rest.get(3).kind());
     assertTrue(script.finished());
   }
 

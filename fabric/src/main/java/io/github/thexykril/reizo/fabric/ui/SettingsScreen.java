@@ -55,10 +55,20 @@ public final class SettingsScreen extends Screen {
             .create(
                 x,
                 y,
-                310,
+                150,
                 20,
-                Component.translatable("reizo.settings.player_hud"),
+                Component.translatable("reizo.settings.player_hud_short"),
                 (b, v) -> config.showPlayerHud = v));
+    // Side by side so the screen still fits at GUI scale 3 on a 720p window.
+    addRenderableWidget(
+        CycleButton.onOffBuilder(config.showPlayerScreens)
+            .create(
+                x + 160,
+                y,
+                150,
+                20,
+                Component.translatable("reizo.settings.player_screens_short"),
+                (b, v) -> config.showPlayerScreens = v));
     y += 24;
     addRenderableWidget(
         CycleButton.onOffBuilder(config.storeServerName)
