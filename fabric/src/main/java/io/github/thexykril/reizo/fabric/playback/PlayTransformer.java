@@ -33,11 +33,14 @@ import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
 import net.minecraft.network.protocol.game.ClientboundRespawnPacket;
 import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
 import net.minecraft.network.protocol.game.ClientboundTickingStatePacket;
 import net.minecraft.network.protocol.game.CommonPlayerSpawnInfo;
 import net.minecraft.network.protocol.game.GameProtocols;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.entity.player.Abilities;
 import net.minecraft.world.level.GameType;
@@ -60,8 +63,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Packets that would move, rotate, hurt or kill the camera, or change its game mode or
  *       abilities, are dropped. The first position packet is kept so the camera starts where the
  *       recorded player started.
- *   <li>Each local player sample becomes position, head rotation and swing packets for the recorded
- *       player entity, which is added on the first sample.
+ *   <li>Each local player sample becomes position, head rotation, swing and pose packets for the
+ *       recorded player entity, which is added on the first sample.
  * </ul>
  *
  * Everything else passes through as the captured bytes. Not thread-safe; used by the replay thread.
@@ -100,6 +103,8 @@ final class PlayTransformer {
   private int recordedEntityId = -1;
   private boolean recordedPlayerAdded;
   private int lastSwingTime = Integer.MAX_VALUE;
+  private int lastPose = -1;
+  private int lastLivingFlags = -1;
 
   PlayTransformer(
       RegistryAccess access,
@@ -209,6 +214,8 @@ final class PlayTransformer {
     if (id == respawnId) {
       ClientboundRespawnPacket p = (ClientboundRespawnPacket) decode(bytes);
       recordedPlayerAdded = false; // the new level does not have the recorded player yet
+      lastPose = -1;
+      lastLivingFlags = -1;
       return List.of(
           encode(
               new ClientboundRespawnPacket(spectator(p.commonPlayerSpawnInfo()), p.dataToKeep())));
@@ -269,6 +276,10 @@ final class PlayTransformer {
       out.add(animate(recordedEntityId, action));
     }
     lastSwingTime = swinging ? s.swingTime() : Integer.MAX_VALUE;
+    byte[] data = poseData(s);
+    if (data != null) {
+      out.add(data);
+    }
     return out;
   }
 
@@ -335,6 +346,33 @@ final class PlayTransformer {
     } finally {
       buf.release();
     }
+  }
+
+  /**
+   * Entity data for the sample's pose (crouching, swimming, sleeping...) and item use, when they
+   * changed. The shared flags byte is left alone: it also holds bits only the server knows
+   * (burning, invisible, glowing), which the recorded server packets set.
+   */
+  private byte[] poseData(LocalPlayerState s) {
+    Pose[] poses = Pose.values();
+    int pose = s.pose() < poses.length ? s.pose() : Pose.STANDING.ordinal();
+    int living = s.has(LocalPlayerState.FLAG_USING_ITEM) ? 1 : 0;
+    if (pose == lastPose && living == lastLivingFlags) {
+      return null;
+    }
+    lastPose = pose;
+    lastLivingFlags = living;
+    return encode(
+        new ClientboundSetEntityDataPacket(
+            recordedEntityId,
+            List.of(
+                SynchedEntityData.DataValue.create(
+                    io.github.thexykril.reizo.fabric.mixin.EntityDataAccessors.reizo$pose(),
+                    poses[pose]),
+                SynchedEntityData.DataValue.create(
+                    io.github.thexykril.reizo.fabric.mixin.LivingEntityDataAccessors
+                        .reizo$livingFlags(),
+                    (byte) living))));
   }
 
   private byte[] rotateHead(int entityId, float headYRot) {

@@ -53,6 +53,12 @@ Packet ids are those of the recording's protocol version (`meta.protocolVersion`
 1.21.11). Decoding requires that version's codecs; play packets also need the registries from the
 recorded configuration phase.
 
+Not every play packet came from the server. The recorder adds vanilla packets the server never
+sends to the recording player: the start snapshot (`meta.startSnapshot`) and the local player's
+equipment (`ClientboundSetEquipmentPacket` for the local player's entity id, written after that
+tick's `LOCAL_PLAYER` frame whenever a held or worn item changes, and in full after a respawn or
+dimension change). Readers treat them like any other play packet.
+
 ### `LOCAL_PLAYER` layout 1
 
 ```

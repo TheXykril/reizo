@@ -543,6 +543,21 @@ public final class RecordingGameTest implements FabricClientGameTest {
       check(session != null, "pause menu start failed");
       check(context.computeOnClient(mc -> mc.screen == null), "pause menu still open");
       registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
+      // Equipment changes during the recording must show on the recorded player in playback.
+      world
+          .getServer()
+          .runOnServer(
+              server -> {
+                var p = server.getPlayerList().getPlayers().get(0);
+                p.setItemSlot(
+                    net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+                    new net.minecraft.world.item.ItemStack(
+                        net.minecraft.world.item.Items.DIAMOND_SWORD));
+                p.setItemSlot(
+                    net.minecraft.world.entity.EquipmentSlot.HEAD,
+                    new net.minecraft.world.item.ItemStack(
+                        net.minecraft.world.item.Items.IRON_HELMET));
+              });
       context.getInput().holdKeyFor(options -> options.keyUp, 40);
       context.waitTicks(5);
       // R alone must not stop it; Shift+R (the default, like Lunar) does.
@@ -551,7 +566,13 @@ public final class RecordingGameTest implements FabricClientGameTest {
       check(
           context.computeOnClient(mc -> RecorderClient.get().session()) != null,
           "R without Shift stopped the recording");
+      // Shift is also sneak: hold it a moment so the recording ends crouching.
       context.getInput().holdKey(GLFW.GLFW_KEY_LEFT_SHIFT);
+      context.waitTicks(5);
+      check(
+          context.computeOnClient(
+              mc -> mc.player.getPose() == net.minecraft.world.entity.Pose.CROUCHING),
+          "player is not crouching before the stop");
       context.getInput().pressKey(GLFW.GLFW_KEY_R);
       context.getInput().releaseKey(GLFW.GLFW_KEY_LEFT_SHIFT);
       context.waitTicks(2);
@@ -615,6 +636,22 @@ public final class RecordingGameTest implements FabricClientGameTest {
             });
     double offSq = shown.distanceSq(stats.lastPlayer);
     check(offSq < 0.25, "recorded player at " + shown + ", walk ended at " + stats.lastPlayer);
+    context.runOnClient(
+        mc -> {
+          var e =
+              (net.minecraft.world.entity.player.Player)
+                  mc.level.getEntity(ReplayPlayback.current().view().recordedEntityId());
+          check(
+              e.getMainHandItem().is(net.minecraft.world.item.Items.DIAMOND_SWORD),
+              "recorded player does not hold the sword: " + e.getMainHandItem());
+          check(
+              e.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD)
+                  .is(net.minecraft.world.item.Items.IRON_HELMET),
+              "recorded player does not wear the helmet");
+          check(
+              e.getPose() == net.minecraft.world.entity.Pose.CROUCHING,
+              "recorded player is not crouching at the end: " + e.getPose());
+        });
     checkSeeking(context, stats);
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
