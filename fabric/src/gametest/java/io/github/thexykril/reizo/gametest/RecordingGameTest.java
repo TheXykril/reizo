@@ -1554,7 +1554,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
             .findFirst()
             .orElse(null);
     check(loop != null, "the looping sound was not followed: " + s.soundCues());
-    float click = s.soundCues().get(0).gain();
+    // Find the click by name: a recorded sound can be captured before it.
+    var clickCue =
+        s.soundCues().stream()
+            .filter(c -> !c.positional() && c.clip().contains("click"))
+            .findFirst()
+            .orElse(null);
+    check(clickCue != null, "the button click was not captured: " + s.soundCues());
+    float click = clickCue.gain();
     check(click > 0 && click <= 0.5f + 1e-4f, "sound at 50% exported with gain " + click);
     check(
         loop.endMs() - loop.timeMs() > 700 && loop.endMs() - loop.timeMs() < 1500,

@@ -25,8 +25,9 @@ working without an executed test or a documented manual check.
 
 ## Requirements
 
-- Minecraft **1.21.11** (Java 21+) or **26.3** (Java 25+), with Fabric Loader ≥ 0.20.1 and Fabric API.
-  26.3 support is new and not yet tested by hand.
+- Minecraft **1.21.10** or **1.21.11** (Java 21+), or **26.2** or **26.3** (Java 25+), with Fabric
+  Loader ≥ 0.20.1 and Fabric API. Each version has its own jar. Versions other than 1.21.11 are new
+  and only tested by the automated in-game tests, not yet by hand.
 
 ## Using it (current build)
 

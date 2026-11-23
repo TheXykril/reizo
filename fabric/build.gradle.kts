@@ -133,7 +133,22 @@ fun word(
 val before12111 = sc.eval(sc.current.version, "<1.21.11")
 // Not the "Identifier" in "SPDX-License-Identifier" headers.
 rename("(?<!-)\\bIdentifier\\b", "ResourceLocation", "\\bResourceLocation\\b", "Identifier", before12111)
-rename("\\bimport net\\.minecraft\\.util\\.Util;", "import net.minecraft.Util;", "\\bimport net\\.minecraft\\.Util;", "import net.minecraft.util.Util;", before12111)
+rename(
+    "\\bimport net\\.minecraft\\.util\\.Util;",
+    "import net.minecraft.Util;",
+    "\\bimport net\\.minecraft\\.Util;",
+    "import net.minecraft.util.Util;",
+    before12111,
+)
+word("CLIENTBOUND_MOUNT_SCREEN_OPEN", "CLIENTBOUND_HORSE_SCREEN_OPEN", before12111)
+// Screen.init took the Minecraft instance until 1.21.11.
+rename(
+    "\\bscreen\\.init\\(width, height\\)",
+    "screen.init(mc, width, height)",
+    "\\bscreen\\.init\\(mc, width, height\\)",
+    "screen.init(width, height)",
+    before12111,
+)
 
 // 26.1 renamed GuiGraphics and the render methods to "extract" its render state.
 word("GuiGraphics", "GuiGraphicsExtractor")

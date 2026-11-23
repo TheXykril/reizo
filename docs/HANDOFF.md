@@ -14,6 +14,10 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
+- **1.21.10 and 26.2 (ADR 0007 notes, 2026-11-23).** Four Stonecutter versions now. Version blocks
+  chain with `else if`; 26.2 mixes 26.x render names with 1.21.11 input and GPU APIs. 20/20
+  gametests on 1.21.10 and 26.2 locally; CI tests 1.21.11 and 26.3 on PRs and all four on main.
+  Next versions: 1.21.1 and 26.1.2.
 - **Recorded player's screens in POV, branch `feat/player-screens`.** Frame type `PLAYER_SCREEN`
   (6) from `capture/ScreenSampler`; `ReplayServer.screen()` keeps the latest (slots carried over
   when a frame says unchanged). `ui/PlayerScreenOverlay` builds the vanilla screen
