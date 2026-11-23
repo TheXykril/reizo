@@ -124,7 +124,11 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   contrast, saturation, temperature, vignette and letterbox (1.85, 2, 2.39), keyframed over replay
   time with linear blending, in the Effects panel (timeline → Effects). Shown in the replay and in
   exports. No pass runs when the grade is neutral or outside replays. Covered by the timeline's undo; effect keyframes show as purple squares on the marker track.
-- **Planned:** motion blur, depth of field, bloom, camera shake, chromatic aberration, blur,
+- **Motion blur in exports:** **implemented**, evidence UT (`ExportTest`: render times over a
+  180° shutter), GT (`exportRegionVp9` with 4 renders per frame still has one frame per frame).
+  Export settings "Motion blur": off, 4, 8 or 16 renders averaged per frame; costs that many times
+  the render time.
+- **Planned:** depth of field, bloom, camera shake, chromatic aberration, blur,
   fades, chroma key, resource pack / shader per clip, HUD elements (scoreboard, boss bar) in POV.
 
 ## Audio (M6)

@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- Motion blur for exports (export settings): 4, 8 or 16 renders averaged per frame over a 180°
+  shutter.
 - Exported videos have the game's sound, rendered in sync from the sounds that play during the
   export ("Sound" in the export settings).
 - With OneConfig (for example in OneClient): the recording indicator is also a HUD element

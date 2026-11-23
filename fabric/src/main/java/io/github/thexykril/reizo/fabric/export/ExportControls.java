@@ -68,7 +68,7 @@ public final class ExportControls {
         new FfmpegCommand.Settings(format.encoder(), r.crf, "medium", r.width, r.height, "yuv420p");
     ExportSession.start(
         mc,
-        new ExportPlan(in, out, r.fps),
+        new ExportPlan(in, out, r.fps, Math.max(1, Math.min(16, r.motionBlur)), 0.5),
         output,
         settings,
         ffmpeg.get(),

@@ -56,6 +56,9 @@ public final class ExportSettingsScreen extends Screen {
 
   static final List<Integer> FRAME_RATES = List.of(24, 30, 60, 120);
 
+  /** Renders averaged per frame for motion blur; 1 is off. */
+  static final List<Integer> MOTION_BLUR = List.of(1, 4, 8, 16);
+
   /** Quality steps as CRF-like values (lower is better). */
   static final List<Integer> QUALITIES = List.of(14, 18, 23, 28);
 
@@ -153,8 +156,39 @@ public final class ExportSettingsScreen extends Screen {
                     ReplayEditor.changed();
                   }));
     }
+    y += 24;
+    addRenderableWidget(
+        CycleButton.onOffBuilder(r.audio)
+            .create(
+                x,
+                y,
+                150,
+                20,
+                Component.translatable("reizo.export.audio"),
+                (b, v) -> {
+                  r.audio = v;
+                  ReplayEditor.changed();
+                }));
+    addRenderableWidget(
+        CycleButton.builder(
+                (Integer v) ->
+                    v <= 1
+                        ? Component.translatable("options.off")
+                        : Component.translatable("reizo.export.blur_samples", v),
+                MOTION_BLUR.contains(r.motionBlur) ? r.motionBlur : 1)
+            .withValues(MOTION_BLUR)
+            .create(
+                x + 160,
+                y,
+                150,
+                20,
+                Component.translatable("reizo.export.motion_blur"),
+                (b, v) -> {
+                  r.motionBlur = v;
+                  ReplayEditor.changed();
+                }));
     y += 34;
-    fileName = new EditBox(font, x, y, 200, 20, Component.translatable("reizo.export.file"));
+    fileName = new EditBox(font, x, y, 310, 20, Component.translatable("reizo.export.file"));
     fileName.setMaxLength(120);
     fileName.setHint(Component.translatable("reizo.export.file_hint"));
     fileName.setValue(r.output == null ? "" : r.output);
@@ -164,18 +198,6 @@ public final class ExportSettingsScreen extends Screen {
           ReplayEditor.changed();
         });
     addRenderableWidget(fileName);
-    addRenderableWidget(
-        CycleButton.onOffBuilder(r.audio)
-            .create(
-                x + 210,
-                y,
-                100,
-                20,
-                Component.translatable("reizo.export.audio"),
-                (b, v) -> {
-                  r.audio = v;
-                  ReplayEditor.changed();
-                }));
     y += 34;
     if (ReplayEditor.inMs() >= 0 || ReplayEditor.outMs() >= 0) {
       addRenderableWidget(
@@ -211,7 +233,7 @@ public final class ExportSettingsScreen extends Screen {
     super.render(g, mouseX, mouseY, partialTick);
     g.drawCenteredString(font, title, width / 2, 15, 0xFFFFFFFF);
     int x = width / 2 - 155;
-    g.drawString(font, Component.translatable("reizo.export.file"), x, 72, 0xFFA0A0A0);
+    g.drawString(font, Component.translatable("reizo.export.file"), x, 106, 0xFFA0A0A0);
     var server = ReplayPlayback.current();
     if (server != null) {
       long duration = server.script().durationMs();
@@ -226,11 +248,11 @@ public final class ExportSettingsScreen extends Screen {
               ReplayHud.time(in),
               ReplayHud.time(out)),
           x,
-          116,
+          140,
           whole ? 310 : 205,
           0xFFFFFFFF);
     }
-    int y = 140;
+    int y = 164;
     if (problem != null) {
       wrapped(g, Component.translatable(problem), x, y, 310, 0xFFFF6060);
     } else {

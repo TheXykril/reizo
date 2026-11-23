@@ -37,6 +37,22 @@ class ExportTest {
   }
 
   @Test
+  void motionBlurSpreadsSamplesOverTheShutter() {
+    ExportPlan plan = new ExportPlan(1000, 2000, 50, 4, 0.5); // 20 ms frames, 10 ms open
+    assertEquals(51, plan.frameCount());
+    assertEquals(204, plan.sampleCount());
+    assertEquals(1000, plan.timeOfSample(0), 1e-9);
+    assertEquals(1007.5, plan.timeOfSample(3), 1e-9);
+    assertEquals(1020, plan.timeOfSample(4), 1e-9, "next frame starts on its own time");
+    assertEquals(plan.timeOfFrame(50), plan.timeOfSample(200), 1e-9);
+    ExportPlan none = new ExportPlan(0, 1000, 30);
+    assertEquals(none.frameCount(), none.sampleCount());
+    assertEquals(none.timeOfFrame(7), none.timeOfSample(7), 1e-9);
+    assertThrows(IllegalArgumentException.class, () -> new ExportPlan(0, 10, 30, 0, 0.5));
+    assertThrows(IllegalArgumentException.class, () -> new ExportPlan(0, 10, 30, 2, 1.5));
+  }
+
+  @Test
   void commandForX264WithScaling() {
     List<String> cmd =
         FfmpegCommand.build(

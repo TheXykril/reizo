@@ -985,6 +985,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
           // Larger than the 320x240 window: the game renders at this size for the export.
           render.width = 640;
           render.height = 360;
+          // Motion blur: four renders averaged per frame; still one frame each in the file.
+          render.motionBlur = 4;
           check(ExportControls.exportCurrent(mc, result::set), "VP9 export did not start");
         });
     context.waitFor(mc -> result.get() != null, 20 * 240);
@@ -1046,6 +1048,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         mc -> {
           ReplayEditor.setRegion(true, -1);
           ReplayEditor.setRegion(false, -1);
+          ReplayEditor.project().render.motionBlur = 1;
         });
     LOGGER.info("exportRegionVp9 OK: {} frames of {}..{} ms in {}", expected, in, out, s.output());
   }
