@@ -79,6 +79,71 @@ public final class RecordingGameTest implements FabricClientGameTest {
     saveShadowAfterWalking(context);
     browseAndPlay(context);
     recoverAfterCrash(context);
+    measureRecordingCost(context);
+  }
+
+  /**
+   * Performance baseline (#6), headless: what recording costs the game while walking for 10 s, then
+   * what shadow recording costs. Logs the numbers (docs/TESTING.md has the ones from real machines)
+   * and fails only on gross regressions, since CI machines are slow and shared.
+   */
+  private void measureRecordingCost(ClientGameTestContext context) {
+    try (TestSingleplayerContext world = context.worldBuilder().create()) {
+      world.getClientWorld().waitForChunksDownload();
+      context.waitTicks(20);
+      io.github.thexykril.reizo.fabric.capture.RecorderStats.reset();
+      context.runOnClient(mc -> RecorderClient.get().toggleRecording());
+      RecordingSession session = context.computeOnClient(mc -> RecorderClient.get().session());
+      check(session != null, "recording did not start");
+      long start = System.nanoTime();
+      context.getInput().holdKeyFor(options -> options.keyUp, 200);
+      double seconds = (System.nanoTime() - start) / 1e9;
+      var rec = io.github.thexykril.reizo.fabric.capture.RecorderStats.snapshot();
+      context.runOnClient(mc -> RecorderClient.get().toggleRecording());
+      Path archive = await(context, session);
+      long bytes;
+      try {
+        bytes = Files.size(archive);
+      } catch (java.io.IOException e) {
+        throw new AssertionError(e);
+      }
+      double mbPerMin = bytes / 1048576.0 / seconds * 60;
+      check(
+          session.droppedFrames() == 0, "recording dropped " + session.droppedFrames() + " frames");
+
+      io.github.thexykril.reizo.fabric.capture.RecorderStats.reset();
+      context.runOnClient(
+          mc -> {
+            RecorderClient.get().config().shadowEnabled = true;
+            RecorderClient.get().config().shadowSeconds = 30;
+            RecorderClient.get().applyShadowSettings();
+          });
+      context.getInput().holdKeyFor(options -> options.keyDown, 200);
+      var shadow = io.github.thexykril.reizo.fabric.capture.RecorderStats.snapshot();
+      long shadowBytes = context.computeOnClient(mc -> RecorderClient.get().shadow().bytes());
+      context.runOnClient(
+          mc -> {
+            RecorderClient.get().config().shadowEnabled = false;
+            RecorderClient.get().applyShadowSettings();
+          });
+      LOGGER.info(
+          "measureRecordingCost OK: recording {} MB/min ({} bytes in {} s), {} us per tick over {}"
+              + " ticks, {} us per packet over {} packets; shadow {} us per tick (segment"
+              + " snapshots included), {} KB in memory",
+          String.format("%.2f", mbPerMin),
+          bytes,
+          String.format("%.1f", seconds),
+          String.format("%.1f", rec.microsPerTick()),
+          rec.ticks(),
+          String.format("%.2f", rec.microsPerPacket()),
+          rec.packets(),
+          String.format("%.1f", shadow.microsPerTick()),
+          shadowBytes / 1024);
+      check(rec.microsPerTick() < 2000, "recording costs " + rec.microsPerTick() + " us per tick");
+      check(rec.microsPerPacket() < 500, "capture costs " + rec.microsPerPacket() + " us/packet");
+      check(mbPerMin < 30, "recording writes " + mbPerMin + " MB/min");
+    }
+    context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
   }
 
   /**

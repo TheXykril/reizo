@@ -122,6 +122,9 @@ screen, effects, audio, shadow recording, multi-version.
 - OneConfig notifications: `compat/OneConfigNotifications` (compileOnly `notifications` 1.9.1),
   used by `RecorderClient.toast` when `useOneConfigNotifications()`; export progress notification
   in `ExportControls`. Untested at runtime: check in OneClient.
+- Recording cost: `capture/RecorderStats` (packet and tick nanos); gametest
+  `measureRecordingCost` logs MB/min and per-tick/per-packet cost; table in docs/TESTING.md. #6 still
+  needs numbers from Hyperion.
 - Next: music/looping sounds and microphone (#17), effects (#15), performance baseline (#6).
 
 ## 5. Files and modules affected

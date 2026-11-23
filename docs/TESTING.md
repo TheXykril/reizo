@@ -27,12 +27,29 @@ reported separately.
   reconfiguration, cache size cap, single session.
 - `RecordingGameTest` (in-game) — auto-record from join (complete; config, login and chunk packets
   present; marker saved), manual mid-session recording while walking (incomplete flag, login
-  prelude, ≥10 local player frames, player moved, duration > 1 s).
+  prelude, ≥10 local player frames, player moved, duration > 1 s). Also playback, replay controls,
+  timeline, effects (grade, depth of field, bloom), keyframed settings, recorded player equipment
+  and pose, dedicated server recording (`recordOnDedicatedServer`), crash recovery
+  (`recoverAfterCrash`), shadow recording, exports with sound and motion blur, and the recording
+  cost benchmark (`measureRecordingCost`).
+
+## Performance baseline
+
+`measureRecordingCost` walks for 200 ticks while recording, then 200 ticks with shadow recording
+on, and logs: MB per minute on disk, the client-thread cost per tick (player sample, equipment,
+shadow segment snapshots) and the network-thread cost per captured packet (`RecorderStats`). It
+fails only on gross regressions (2 ms per tick, 0.5 ms per packet, 30 MB/min, any dropped frame).
+
+| Date | Machine | MB/min | µs per tick (recording) | µs per packet | µs per tick (shadow) | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-23 | Cloud container, Xvfb, llvmpipe | 0.08 | 65 | 35 | 78 | Flat test world, walking; ran at about 10 TPS under software rendering |
+
+Still needed for #6: the same test and a spark profile on Hyperion during normal play on a busy
+server (FPS with and without recording, allocation rate), recorded in this table.
 
 ## Planned suites (by milestone)
 
-Recording compatibility across versions, multiplayer (dedicated server gametest), crash gametest
-(kill mid-recording), playback state equality, timeline operations, camera interpolation, audio
+Recording compatibility across versions, playback state equality, timeline operations, camera interpolation, audio
 sync, export validation (ffprobe the output), performance benchmarks (FPS delta, allocation rate,
 MB/min, export fps), OneClient pack compatibility (run gametests with the OneClient mod list).
 
