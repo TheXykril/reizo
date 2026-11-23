@@ -176,7 +176,7 @@ public final class TimelineScreen extends Screen {
   private int movingPanel;
   private double moveOffX;
   private double moveOffY;
-  private double lastMouseY;
+  private int hoverY = -1;
   private boolean showTitle;
   private int timeTextX = -1;
   private int timelineY;
@@ -316,6 +316,7 @@ public final class TimelineScreen extends Screen {
       {"reizo.editor.forward", "»"},
       {"reizo.editor.next_marker", "⏭"},
     };
+    transportX0 = x - 3;
     for (String[] t : transport) {
       FlatButton b = icon(x, 2, 16, t[0], t[1], this::transport);
       if (t[0].equals("reizo.editor.play")) {
@@ -325,6 +326,7 @@ public final class TimelineScreen extends Screen {
     }
     timeTextX = x + 4;
     x = timeTextX + Draw.width(font, "00:00 / 00:00") + 6;
+    transportX1 = x - 2;
     speedButton =
         addRenderableWidget(
             new FlatButton(
@@ -843,6 +845,7 @@ public final class TimelineScreen extends Screen {
     if (showRight) {
       renderInspector(g);
     }
+    hoverY = popup == null ? mouseY : -1;
     renderTimeline(g, mouseX);
     renderTopBar(g, server);
     if (drag == Drag.PANEL) {
@@ -858,6 +861,9 @@ public final class TimelineScreen extends Screen {
   private void renderFrames(GuiGraphics g) {
     g.fill(0, 0, width, TOP_H, Theme.GROUND);
     Draw.hline(g, 0, width, TOP_H - 1, Theme.LINE);
+    if (transportX1 > transportX0) {
+      Draw.round(g, transportX0, 2, transportX1, TOP_H - 2, 4, Theme.RAISED);
+    }
     g.fill(0, TOP_H, RAIL_W, timelineY, Theme.GROUND);
     Draw.vline(g, RAIL_W - 1, TOP_H, timelineY, Theme.LINE);
     g.fill(0, timelineY, width, height, Theme.GROUND);
@@ -886,11 +892,14 @@ public final class TimelineScreen extends Screen {
       Draw.round(g, x0, y0, x1, y0 + TITLE_H, 5, Theme.GROUND, true, true);
       g.fill(x0, y0 + TITLE_H - 4, x1, y0 + TITLE_H, Theme.GROUND);
     } else {
-      g.fill(x0, y0, x1, y1, Theme.SURFACE);
-      g.fill(x0, y0, x1, y0 + TITLE_H, Draw.mix(Theme.SURFACE, 0xFF000000, 0.25));
-      Draw.vline(g, x0, y0, y1, Theme.LINE);
-      Draw.vline(g, x1 - 1, y0, y1, Theme.LINE);
-      Draw.hline(g, x0, x1, y1 - 1, Theme.LINE);
+      // Docked: an inset card on the window ground, like the floating one without the shadow.
+      g.fill(x0, y0, x1, y1, Draw.mix(Theme.GROUND, 0xFF000000, 0.35));
+      Draw.round(g, x0 + 2, y0 + 2, x1 - 2, y1 - 2, 5, Theme.LINE);
+      Draw.round(g, x0 + 2, y0 + 2, x1 - 2, y1 - 2, 5, Draw.mix(Theme.SURFACE, Theme.RAISED, 0.45));
+      Draw.round(g, x0 + 2, y0 + 2, x1 - 2, y0 + TITLE_H, 5, Theme.SURFACE, true, true);
+      g.fill(x0 + 2, y0 + TITLE_H - 4, x1 - 2, y0 + TITLE_H, Theme.SURFACE);
+      x0 += 2;
+      x1 -= 2;
     }
     Draw.hline(g, x0, x1, y0 + TITLE_H, Theme.LINE);
     Draw.label(g, font, Component.translatable(titleKey).getString(), x0 + 6, y0 + 3, Theme.DIM);
@@ -913,6 +922,8 @@ public final class TimelineScreen extends Screen {
   }
 
   private double lastMouseX;
+  private int transportX0;
+  private int transportX1;
 
   private void renderOutliner(GuiGraphics g, int mouseX, int mouseY) {
     int x0 = sX0;
@@ -1069,7 +1080,8 @@ public final class TimelineScreen extends Screen {
     // Ruler and lanes.
     Draw.round(g, left, rulerY, right, rulerY + RULER_H, 3, Theme.SURFACE);
     for (Lane l : lanes) {
-      Draw.round(g, 4, l.y, LABEL_W, l.y + LANE_H - 1, 3, Theme.SURFACE);
+      boolean hot = hoverY >= l.y && hoverY < l.y + LANE_H;
+      Draw.round(g, 4, l.y, LABEL_W, l.y + LANE_H - 1, 3, hot ? Theme.RAISED : Theme.SURFACE);
       Draw.round(g, 4, l.y + 2, 6, l.y + LANE_H - 3, 1, l.track.color);
       Draw.label(
           g,
@@ -1078,7 +1090,7 @@ public final class TimelineScreen extends Screen {
           9,
           l.y + 2,
           Theme.DIM);
-      Draw.round(g, left, l.y, right, l.y + LANE_H - 1, 3, Theme.RAISED);
+      Draw.round(g, left, l.y, right, l.y + LANE_H - 1, 3, hot ? Theme.HOVER : Theme.RAISED);
     }
     int bottom = lanesBottom();
 
@@ -1095,7 +1107,7 @@ public final class TimelineScreen extends Screen {
     }
     int hx = (int) Math.round(left + view.timeToX(head));
     g.fill(hx, rulerY, hx + 1, bottom, Theme.PLAYHEAD);
-    g.fill(hx - 2, rulerY, hx + 3, rulerY + 3, Theme.PLAYHEAD);
+    Draw.round(g, hx - 3, rulerY, hx + 4, rulerY + 6, 2, Theme.PLAYHEAD);
     g.disableScissor();
 
     renderOverview(g);
@@ -1157,7 +1169,7 @@ public final class TimelineScreen extends Screen {
       if (keys.size() > 1) {
         int a = xOf(keys.get(0).timeMs());
         int b = xOf(keys.get(keys.size() - 1).timeMs());
-        g.fill(a, ly + 5, b, ly + 7, Theme.alpha(Theme.TRACK_LOOK, 0x60));
+        clip(g, a, b, ly, Theme.TRACK_LOOK);
       }
       for (var k : keys) {
         Draw.diamond(g, xOf(k.timeMs()), ly + 6, 3, Theme.TRACK_LOOK);
@@ -1182,7 +1194,7 @@ public final class TimelineScreen extends Screen {
     if (keys.size() > 1) {
       int a = xOf(keys.get(0).timeMs());
       int b = xOf(keys.get(keys.size() - 1).timeMs());
-      g.fill(a, mid - 1, b, mid + 1, Theme.alpha(Theme.TRACK_CAMERA, 0x70));
+      clip(g, a, b, cy, Theme.TRACK_CAMERA);
     }
     for (CameraKeyframe k : keys) {
       boolean sel = selection.contains(k.timeMs());
@@ -1192,6 +1204,15 @@ public final class TimelineScreen extends Screen {
       }
       Draw.diamond(g, x, mid, 4, sel ? Theme.ACCENT_HOVER : Theme.TRACK_CAMERA);
     }
+  }
+
+  /** A clip block on a lane from x {@code a} to {@code b}: a tinted body with a bright top edge. */
+  private void clip(GuiGraphics g, int a, int b, int laneTop, int color) {
+    if (b - a < 2) {
+      return;
+    }
+    Draw.round(g, a, laneTop + 1, b, laneTop + LANE_H - 2, 2, Draw.mix(Theme.RAISED, color, 0.32));
+    Draw.hline(g, a + 1, b - 1, laneTop + 1, Draw.mix(Theme.RAISED, color, 0.8));
   }
 
   private void renderOverview(GuiGraphics g) {

@@ -150,10 +150,10 @@ public final class DragField extends AbstractWidget {
       fx = x0 + (int) Math.round((clamp(v) - min) / (max - min) * getWidth());
     }
     if (fx > x0 + 1 && fx < x1 - 1) {
-      Draw.round(g, x0, y0, fx, y1, 3, Draw.mix(ground, accent, hot ? 0.38 : 0.26), true, false);
+      Draw.round(g, x0, y0, fx, y1, 3, Draw.mix(ground, accent, hot ? 0.30 : 0.20), true, false);
       Draw.round(g, fx, y0, x1, y1, 3, ground, false, true);
     } else {
-      Draw.round(g, x0, y0, x1, y1, 3, fx >= x1 - 1 ? Draw.mix(ground, accent, hot ? 0.38 : 0.26) : ground);
+      Draw.round(g, x0, y0, x1, y1, 3, fx >= x1 - 1 ? Draw.mix(ground, accent, hot ? 0.30 : 0.20) : ground);
     }
     int lx = x0 + 5;
     if (marked.getAsBoolean()) {
