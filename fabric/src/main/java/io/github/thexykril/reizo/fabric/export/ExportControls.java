@@ -74,6 +74,7 @@ public final class ExportControls {
         ffmpeg.get(),
         r.audio,
         session -> {
+          dismissProgress();
           switch (session.state()) {
             case DONE ->
                 RecorderClient.toast(
@@ -88,8 +89,39 @@ public final class ExportControls {
             onEnd.accept(session);
           }
         });
+    if (RecorderClient.useOneConfigNotifications()) {
+      // In OneClient: one notification with a progress bar instead of a start toast.
+      try {
+        progressNotification =
+            io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.progress(
+                Component.translatable("reizo.export.started").getString(),
+                output.getFileName().toString(),
+                () -> {
+                  ExportSession s = ExportSession.current();
+                  return s == null ? 1 : s.progress();
+                });
+        return true;
+      } catch (Throwable t) {
+        RecorderClient.oneConfigNotificationsFailed(t);
+      }
+    }
     RecorderClient.toast("reizo.export.started", null);
     return true;
+  }
+
+  /** The OneConfig progress notification of the running export, or null. */
+  private static Object progressNotification;
+
+  private static void dismissProgress() {
+    Object n = progressNotification;
+    progressNotification = null;
+    if (n != null) {
+      try {
+        io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.dismiss(n);
+      } catch (Throwable t) {
+        RecorderClient.oneConfigNotificationsFailed(t);
+      }
+    }
   }
 
   private static String safe(String name) {

@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- With OneConfig (for example in OneClient): Reizo's messages show as OneConfig notifications, and
+  exports show their progress in one. Can be turned off on Reizo's OneConfig page.
 - Depth of field (strength and focus distance) and bloom in the Effects panel, keyframed like
   the other effects.
 - The recorded player in replays now holds its items, wears its armor and shows its pose

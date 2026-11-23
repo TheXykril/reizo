@@ -44,6 +44,9 @@ public final class ClientConfig {
    */
   public boolean shadowEnabled = false;
 
+  /** With OneConfig installed: show Reizo's messages as OneConfig notifications. */
+  public boolean oneConfigNotifications = true;
+
   /** How much play a shadow save covers at least, in seconds (30 to 600). */
   public int shadowSeconds = 120;
 

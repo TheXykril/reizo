@@ -437,10 +437,55 @@ public final class RecorderClient implements ClientModInitializer {
 
   public static void toast(String titleKey, Component body) {
     Minecraft mc = Minecraft.getInstance();
+    if (useOneConfigNotifications()) {
+      try {
+        io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.send(
+            toastKind(titleKey),
+            Component.translatable(titleKey).getString(),
+            body == null ? null : body.getString());
+        return;
+      } catch (Throwable t) {
+        oneConfigNotificationsFailed(t);
+      }
+    }
     SystemToast.addOrUpdate(
         mc.getToastManager(),
         SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
         Component.translatable(titleKey),
         body);
+  }
+
+  private static boolean oneConfigNotificationsFailed;
+
+  /** Whether messages go to OneConfig's notifications (installed, enabled, and working). */
+  public static boolean useOneConfigNotifications() {
+    return !oneConfigNotificationsFailed
+        && instance != null
+        && instance.config.oneConfigNotifications
+        && net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig");
+  }
+
+  /** Disables OneConfig notifications for this session after a failure. */
+  public static void oneConfigNotificationsFailed(Throwable t) {
+    oneConfigNotificationsFailed = true;
+    LOGGER.warn("OneConfig notifications failed; using Minecraft toasts", t);
+  }
+
+  /**
+   * How a message looks as a OneConfig notification, from its key. The enum is Reizo's own class,
+   * so this works without OneConfig.
+   */
+  public static io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.Kind toastKind(
+      String key) {
+    if (key.contains("failed") || key.contains("no_ffmpeg")) {
+      return io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.Kind.ERROR;
+    }
+    if (key.contains("not_connected") || key.contains("empty") || key.contains("cancelled")) {
+      return io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.Kind.WARNING;
+    }
+    if (key.endsWith(".saved") || key.endsWith(".done") || key.endsWith(".recovered")) {
+      return io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.Kind.SUCCESS;
+    }
+    return io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.Kind.INFO;
   }
 }
