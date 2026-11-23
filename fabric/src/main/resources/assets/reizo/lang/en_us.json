@@ -139,6 +139,7 @@
   "reizo.export.format": "Format",
   "reizo.export.file": "File name (in reizo/exports)",
   "reizo.export.audio": "Sound",
+  "reizo.export.music": "Music",
   "reizo.export.motion_blur": "Motion blur",
   "reizo.export.blur_samples": "%s samples",
   "reizo.export.file_hint": "Automatic: replay name and date",

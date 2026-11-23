@@ -24,6 +24,7 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.resources.sounds.TickableSoundInstance;
 import net.minecraft.client.sounds.JOrbisAudioStream;
 import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,11 +57,23 @@ final class SoundCapture {
   }
 
   private final List<SoundCue> cues = new ArrayList<>();
+  private final float soundVolume;
+  private final float musicVolume;
+
+  /** Levels from the export settings, 0 to 1, on top of the game's own volume settings. */
+  SoundCapture(float soundVolume, float musicVolume) {
+    this.soundVolume = soundVolume;
+    this.musicVolume = musicVolume;
+  }
+
   private final Map<SoundInstance, Followed> playing = new IdentityHashMap<>();
   private final Set<SoundInstance> beforeStart = Collections.newSetFromMap(new IdentityHashMap<>());
 
   /** Records a sound that starts at {@code videoTimeMs}. Client thread. */
   void onPlay(Minecraft mc, SoundInstance sound, double videoTimeMs) {
+    if ((sound.getSource() == SoundSource.MUSIC ? musicVolume : soundVolume) <= 0) {
+      return; // turned off in the export settings: not decoded or mixed
+    }
     if (sound.resolve(mc.getSoundManager()) == null) {
       return;
     }
@@ -164,12 +177,13 @@ final class SoundCapture {
     return sound instanceof TickableSoundInstance t && t.isStopped();
   }
 
-  private static SoundCue.Point point(
+  private SoundCue.Point point(
       Minecraft mc, SoundInstance sound, Sound resolved, double videoTimeMs) {
     float volume = sound.getVolume();
     float gain =
         Math.max(0, Math.min(1, volume))
-            * Math.max(0, Math.min(1, mc.options.getFinalSoundSourceVolume(sound.getSource())));
+            * Math.max(0, Math.min(1, mc.options.getFinalSoundSourceVolume(sound.getSource())))
+            * (sound.getSource() == SoundSource.MUSIC ? musicVolume : soundVolume);
     float pitch = Math.max(0.5f, Math.min(2f, sound.getPitch()));
     float range = Math.max(volume, 1f) * resolved.getAttenuationDistance();
     Camera camera = mc.gameRenderer.getMainCamera();

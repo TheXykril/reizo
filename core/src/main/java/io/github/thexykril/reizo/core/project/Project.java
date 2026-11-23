@@ -110,6 +110,12 @@ public final class Project {
     /** Include the game's sounds (rendered offline from the sounds that play). */
     public boolean audio = true;
 
+    /** Level of the game's sounds other than music in the export, percent (0 to 100). */
+    public int soundVolume = 100;
+
+    /** Level of the music in the export, percent (0 to 100). */
+    public int musicVolume = 100;
+
     /** Motion blur: renders averaged per frame (180° shutter); 1 is off. */
     public int motionBlur = 1;
 

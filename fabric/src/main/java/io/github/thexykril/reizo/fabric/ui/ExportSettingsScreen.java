@@ -157,16 +157,34 @@ public final class ExportSettingsScreen extends Screen {
                   }));
     }
     y += 24;
+    // Sound and music levels; "Off" for sound leaves the sound track out entirely.
     addRenderableWidget(
-        CycleButton.onOffBuilder(r.audio)
+        CycleButton.builder(ExportSettingsScreen::volumeLabel, r.audio ? volume(r.soundVolume) : 0)
+            .withValues(VOLUMES)
             .create(
                 x,
                 y,
-                150,
+                102,
                 20,
                 Component.translatable("reizo.export.audio"),
                 (b, v) -> {
-                  r.audio = v;
+                  r.audio = v > 0;
+                  if (v > 0) {
+                    r.soundVolume = v;
+                  }
+                  ReplayEditor.changed();
+                }));
+    addRenderableWidget(
+        CycleButton.builder(ExportSettingsScreen::volumeLabel, volume(r.musicVolume))
+            .withValues(VOLUMES)
+            .create(
+                x + 104,
+                y,
+                102,
+                20,
+                Component.translatable("reizo.export.music"),
+                (b, v) -> {
+                  r.musicVolume = v;
                   ReplayEditor.changed();
                 }));
     addRenderableWidget(
@@ -178,9 +196,9 @@ public final class ExportSettingsScreen extends Screen {
                 MOTION_BLUR.contains(r.motionBlur) ? r.motionBlur : 1)
             .withValues(MOTION_BLUR)
             .create(
-                x + 160,
+                x + 208,
                 y,
-                150,
+                102,
                 20,
                 Component.translatable("reizo.export.motion_blur"),
                 (b, v) -> {
@@ -221,6 +239,23 @@ public final class ExportSettingsScreen extends Screen {
         Button.builder(Component.translatable("gui.back"), b -> onClose())
             .bounds(width / 2 + 5, height - 28, 150, 20)
             .build());
+  }
+
+  private static final List<Integer> VOLUMES = List.of(0, 25, 50, 75, 100);
+
+  private static Component volumeLabel(Integer v) {
+    return v <= 0 ? Component.translatable("options.off") : Component.literal(v + "%");
+  }
+
+  /** The closest offered level to a stored one. */
+  private static int volume(int stored) {
+    int best = 100;
+    for (int v : VOLUMES) {
+      if (Math.abs(v - stored) < Math.abs(best - stored)) {
+        best = v;
+      }
+    }
+    return best;
   }
 
   private void startExport() {

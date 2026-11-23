@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (OneClient main menu entry).
+Last updated: 2026-11-23 by Claude (export sound and music levels).
 
 ## 1. Current project phase
 
@@ -173,6 +173,11 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-23, cloud box, export levels (branch `feat/export-levels`):
+- `./gradlew build`: pass. Gametests: all pass (20 OK lines); `exportVideo` exports at sound 50%.
+  The settings screenshot at 320x240 was partly covered by a chat-verification toast, so the
+  three-button row (Sound, Music, Motion blur) still needs a look on a real window.
 
 2026-11-23, cloud box, main menu entry (branch `feat/main-menu-entry`):
 - `./gradlew build`: pass. Gametests: all pass (20 OK lines), adding `checkMainMenuEntries`;
