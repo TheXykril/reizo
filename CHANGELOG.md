@@ -19,10 +19,10 @@ compatibility.
 
 ### Added
 
+- Recordings made in OneClient note it (and its version) in their metadata.
 - The inventory and chest screens the recorded player opened now show in player view (POV) replays,
   with the mouse, hovered item and the item on the cursor. They can be turned off in the settings
   or keyframed in the editor.
-
 - The recorded player's HUD in player view (POV): hotbar with the selected slot and offhand,
   health, hunger, armor, experience and air, as they were while recording. It can be turned off in
   the settings or keyframed in the editor, and shows in exports.

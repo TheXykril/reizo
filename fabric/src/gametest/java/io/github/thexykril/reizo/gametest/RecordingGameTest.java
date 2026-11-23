@@ -646,6 +646,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
         "no chunks recorded");
     check(meta.markers.size() == 1, "marker missing");
+    check(meta.client == null, "recorded as made in " + meta.client + " without OneClient");
     check(stats.hudFrames > 0, "no HUD frames recorded");
     check(stats.screenFrames > 0, "the open inventory was not recorded");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
