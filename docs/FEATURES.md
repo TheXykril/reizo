@@ -9,7 +9,8 @@ descriptions, not verified by us.
 **Evidence:** `UT` unit test, `GT` in-game client gametest, `MV` manual validation (who/when),
 `—` none yet. A feature without evidence cannot be `implemented`.
 
-Last verified: 2026-11-22, commit see HANDOFF.md.
+Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds for Minecraft
+1.21.11 and, since 2026-11-23, 26.3 (same 20 checks).
 
 ## Recording
 

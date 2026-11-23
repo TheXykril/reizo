@@ -111,11 +111,7 @@ public final class EffectRenderer {
       lastApplied = null;
       return;
     }
-    //? if >=26.1 {
-    /*RenderTarget main = mc.gameRenderer.mainRenderTarget();
-    *///?} else {
     RenderTarget main = mc.getMainRenderTarget();
-    //?}
     int w = main.width;
     int h = main.height;
     if (copy == null || copy.width != w || copy.height != h) {

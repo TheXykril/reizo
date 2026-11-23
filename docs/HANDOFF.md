@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (export sound and music levels).
+Last updated: 2026-11-23 by Claude (Stonecutter and the 26.3 port, branch `feat/multi-version`).
 
 ## 1. Current project phase
 
@@ -13,6 +13,15 @@ optional OneConfig page (M7 first slice, ADR 0010) are in open PRs. Not started:
 screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
+
+- **Multi-version (ADR 0007 step 2), branch `feat/multi-version`, PR for owner review, not merged
+  by agents.** Stonecutter 0.10, Loom 1.19.4, Gradle 9.8.0 (needs a JDK 25 to run Gradle).
+  Projects `:fabric:1.21.11` (active) and `:fabric:26.3` share `fabric/src`. Renames are regex
+  rules in `fabric/build.gradle.kts`, accessors in `fabric/compat/Compat.java`, the rest `//?`
+  blocks (see docs/DEVELOPMENT.md). Gametests: 20/20 OK on both versions (2026-11-23, cloud box).
+  26.3 under Xvfb has no usable GLX visual; it runs on Vulkan (Mesa lavapipe), and CI installs
+  `mesa-vulkan-drivers`. Switching the active version to 26.3 and back leaves the sources
+  unchanged (checked). Untested on 26.3: real GPU, sound by ear, OneConfig, OneClient.
 
 - Research: OneClient, OneConfig, Lunar Rewind, Flashback, Hindsight (docs/RESEARCH.md).
 - Owner decisions: license GPL-3.0-or-later; name **Reizo**; Flashback-inspired clean-room design;
