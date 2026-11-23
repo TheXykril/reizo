@@ -137,6 +137,7 @@ rename("\\bimport net\\.minecraft\\.util\\.Util;", "import net.minecraft.Util;",
 
 // 26.1 renamed GuiGraphics and the render methods to "extract" its render state.
 word("GuiGraphics", "GuiGraphicsExtractor")
+word("renderWithTooltipAndSubtitles", "extractRenderStateWithTooltipAndSubtitles")
 rename(
     "public void render\\((?=GuiGraphics)",
     "public void extractRenderState(",

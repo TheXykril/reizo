@@ -94,6 +94,14 @@ final class PlayTransformer {
   private final int respawnId;
   private final int tickingStateId;
   private final int startConfigurationId;
+
+  /**
+   * Screen and container packets meant for the recorded player. The camera must not open the
+   * recorded player's chests or books (they would take over the viewer's input and never close,
+   * since closing was the recorded client's own action); recorded screens are drawn from {@code
+   * PLAYER_SCREEN} frames instead.
+   */
+  private final java.util.Set<Integer> screenPacketIds = new java.util.HashSet<>();
   private volatile float recordedTickRate = 20f;
   private volatile boolean recordedFrozen;
   private final java.util.concurrent.atomic.AtomicBoolean recordedTickStateChanged =
@@ -130,6 +138,28 @@ final class PlayTransformer {
         idOf(net.minecraft.network.protocol.game.ClientboundStartConfigurationPacket.INSTANCE);
     this.gameEventId =
         idOf(new ClientboundGameEventPacket(ClientboundGameEventPacket.CHANGE_GAME_MODE, 0));
+    java.util.Set<net.minecraft.network.protocol.PacketType<?>> screenTypes =
+        java.util.Set.of(
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_OPEN_SCREEN,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_MOUNT_SCREEN_OPEN,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_OPEN_SIGN_EDITOR,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_OPEN_BOOK,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_MERCHANT_OFFERS,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_CONTAINER_CLOSE,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_CONTAINER_SET_CONTENT,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_CONTAINER_SET_SLOT,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_CONTAINER_SET_DATA,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_SET_CURSOR_ITEM,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_SET_PLAYER_INVENTORY,
+            net.minecraft.network.protocol.game.GamePacketTypes.CLIENTBOUND_PLACE_GHOST_RECIPE);
+    GameProtocols.CLIENTBOUND_TEMPLATE
+        .details()
+        .listPackets(
+            (type, networkId) -> {
+              if (screenTypes.contains(type)) {
+                screenPacketIds.add(networkId);
+              }
+            });
     Holder<net.minecraft.world.level.dimension.DimensionType> overworld =
         access.lookupOrThrow(Registries.DIMENSION_TYPE).getOrThrow(BuiltinDimensionTypes.OVERWORLD);
     this.respawnId =
@@ -204,7 +234,11 @@ final class PlayTransformer {
       // The replay server plays a recorded server switch itself (ReplayScript.Kind.RECONFIGURE).
       return List.of();
     }
-    if (id == playerRotationId || id == setHealthId || id == combatKillId || id == abilitiesId) {
+    if (id == playerRotationId
+        || id == setHealthId
+        || id == combatKillId
+        || id == abilitiesId
+        || screenPacketIds.contains(id)) {
       return List.of();
     }
     if (id == playerInfoId && !recordedPlayerInfoSeen) {

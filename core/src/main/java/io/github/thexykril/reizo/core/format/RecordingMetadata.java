@@ -54,6 +54,9 @@ public final class RecordingMetadata {
   public String modVersion;
   public String loader;
 
+  /** The client the recording was made in, for example "OneClient 1.0.0"; null for plain Fabric. */
+  public String client;
+
   /** "singleplayer", "multiplayer" or "realms". */
   public String serverType;
 

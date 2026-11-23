@@ -99,6 +99,7 @@ public final class ReplayServer implements AutoCloseable {
   private volatile boolean closed;
   private volatile int playPacketsSent;
   private volatile io.github.thexykril.reizo.core.format.PlayerHudState hud;
+  private volatile io.github.thexykril.reizo.core.format.PlayerScreenState screen;
 
   /**
    * Opens the listening socket. Call {@link #start()} afterwards.
@@ -239,6 +240,7 @@ public final class ReplayServer implements AutoCloseable {
           script.rewind();
           playPacketsSent = 0;
           hud = null;
+          screen = null;
           tickStateChanged.set(true);
         }
         clock.seek(seek);
@@ -276,6 +278,20 @@ public final class ReplayServer implements AutoCloseable {
             hud = io.github.thexykril.reizo.core.format.PlayerHudState.decode(entry.bytes());
           } catch (io.github.thexykril.reizo.core.format.FormatException e) {
             LOGGER.debug("Skipping an unreadable HUD sample", e);
+          }
+          continue;
+        }
+        if (entry.kind() == ReplayScript.Kind.PLAYER_SCREEN) {
+          try {
+            var s = io.github.thexykril.reizo.core.format.PlayerScreenState.decode(entry.bytes());
+            var before = screen;
+            // Slots are written only when they change; keep the last ones otherwise.
+            screen =
+                s.items() != null || before == null
+                    ? s
+                    : s.withItems(before.items());
+          } catch (io.github.thexykril.reizo.core.format.FormatException e) {
+            LOGGER.debug("Skipping an unreadable screen sample", e);
           }
           continue;
         }
@@ -507,6 +523,14 @@ public final class ReplayServer implements AutoCloseable {
   /** The recorded player's HUD at the current replay time, or null when none was recorded. */
   public io.github.thexykril.reizo.core.format.PlayerHudState hud() {
     return hud;
+  }
+
+  /**
+   * The screen the recorded player had open at the current replay time, or null when none was
+   * recorded. Its {@code items} can be null when the slots were not recorded yet.
+   */
+  public io.github.thexykril.reizo.core.format.PlayerScreenState screen() {
+    return screen;
   }
 
   /** The packet transformer once the replay is in the play phase, else null. For tests. */

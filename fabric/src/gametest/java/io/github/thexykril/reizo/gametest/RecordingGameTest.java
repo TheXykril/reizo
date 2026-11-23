@@ -630,6 +630,12 @@ public final class RecordingGameTest implements FabricClientGameTest {
       registries = context.computeOnClient(mc -> mc.getConnection().registryAccess());
       context.runOnClient(mc -> RecorderClient.get().addMarker("join test"));
       context.waitTicks(5);
+      // Left open until the world closes, so the replay ends on the recorded inventory screen.
+      context.runOnClient(
+          mc ->
+              mc.setScreen(
+                  new net.minecraft.client.gui.screens.inventory.InventoryScreen(mc.player)));
+      context.waitTicks(5);
     } finally {
       context.runOnClient(mc -> RecorderClient.get().config().autoRecordOnJoin = false);
     }
@@ -646,7 +652,9 @@ public final class RecordingGameTest implements FabricClientGameTest {
         stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
         "no chunks recorded");
     check(meta.markers.size() == 1, "marker missing");
+    check(meta.client == null, "recorded as made in " + meta.client + " without OneClient");
     check(stats.hudFrames > 0, "no HUD frames recorded");
+    check(stats.screenFrames > 0, "the open inventory was not recorded");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
     // Without OneConfig, messages stay Minecraft toasts; the kinds used inside OneClient.
     check(!RecorderClient.useOneConfigNotifications(), "OneConfig notifications without OneConfig");
@@ -752,6 +760,17 @@ public final class RecordingGameTest implements FabricClientGameTest {
         "player view does not look through the recorded player");
     // The recorded player's hotbar and status bars are drawn from the recording in player view.
     context.waitFor(mc -> io.github.thexykril.reizo.fabric.ui.PlayerHudOverlay.visible(mc), 20 * 5);
+    // The inventory screen open when the recording ended is drawn from the recording too.
+    context.waitFor(
+        mc -> io.github.thexykril.reizo.fabric.ui.PlayerScreenOverlay.visible(mc), 20 * 5);
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(
+            mc ->
+                io.github.thexykril.reizo.fabric.ui.PlayerScreenOverlay.current()
+                        instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen
+                    && mc.screen == null),
+        "recorded inventory not drawn, or opened as a real screen");
     context.takeScreenshot("reizo-replay-pov-hud");
     context.runOnClient(mc -> RecorderClient.get().config().showPlayerHud = false);
     check(
@@ -1769,6 +1788,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     int playPackets;
     int localPlayerFrames;
     int hudFrames;
+    int screenFrames;
     final Map<String, Integer> packetNames = new HashMap<>();
     Pos firstPlayer;
     Pos lastPlayer;
@@ -1783,6 +1803,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
           + localPlayerFrames
           + " hud="
           + hudFrames
+          + " screen="
+          + screenFrames
           + " types="
           + packetNames.size();
     }
@@ -1835,6 +1857,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
                   == io.github.thexykril.reizo.fabric.capture.HudSampler.ITEM_COUNT,
               "HUD frame without the hotbar and offhand");
           stats.hudFrames++;
+        } else if (type == FrameType.PLAYER_SCREEN) {
+          io.github.thexykril.reizo.core.format.PlayerScreenState screen =
+              io.github.thexykril.reizo.core.format.PlayerScreenState.decode(frame.payload());
+          if (screen.items() != null && screen.open()) {
+            io.github.thexykril.reizo.fabric.capture.HudSampler.decodeItems(
+                screen.items(), registries);
+          }
+          stats.screenFrames++;
         }
       }
     } catch (Exception e) {
