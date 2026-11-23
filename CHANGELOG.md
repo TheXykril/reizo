@@ -20,9 +20,17 @@ compatibility.
 - A backwards seek no longer moves the free camera to the world origin.
 - Seeking a paused replay to before its world had loaded left the client on the "reconfiguring"
   screen. Seeks now start no earlier than the recording's first world packet.
+- Seeking backwards in the editor (or with a Reizo panel open) closed it, because the replay world
+  is rebuilt. The editor now comes back once the world has loaded.
 
 ### Added
 
+- Clips (ADR 0016, proposed): a Video track at the top of the timeline. S (or the scissors tool)
+  splits at the playhead; drag a clip's end to trim it; drag a clip to move it; click a clip and
+  press Delete to remove it; the right-click menu splits, deletes, moves clips left or right, or
+  resets them. The timeline shows the edited video's time, playback in the editor follows the clip
+  order, and export renders each clip frame-exact and joins them into one file. Clips are saved in
+  the project and covered by undo. Keyframes stay on replay time, so cutting never moves them.
 - A new replay editor look (ADR 0015, proposed): docked panels in a dark theme with a blue accent,
   in the spirit of OneClient. A top bar with play controls, the time, speed, the view (Free, POV,
   Follow, Path), undo and Export; a tool rail; a Scene list of the replay's players and entities

@@ -33,6 +33,23 @@ class TimelineTest {
   }
 
   @Test
+  void withDurationKeepsZoomOrShowsAll() {
+    TimelineView all = new TimelineView(10_000);
+    all.setWidth(100);
+    TimelineView shorter = all.withDuration(6_000);
+    assertEquals(6_000, shorter.spanMs());
+    assertEquals(100, shorter.widthPx());
+
+    TimelineView zoomed = new TimelineView(10_000);
+    zoomed.setWidth(100);
+    zoomed.zoom(4, 100);
+    long span = zoomed.spanMs();
+    TimelineView cut = zoomed.withDuration(8_000);
+    assertEquals(span, cut.spanMs());
+    assertEquals(8_000 - span, cut.startMs());
+  }
+
+  @Test
   void viewConvertsBetweenTimeAndX() {
     TimelineView v = new TimelineView(10_000);
     v.setWidth(1000);
