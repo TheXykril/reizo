@@ -14,6 +14,10 @@ compatibility.
 
 ### Added
 
+- Settings over time (timeline → Settings), like Rewind's mod properties: keyframe Minecraft's
+  brightness, distortion effects, entity shadows and view bobbing, and with OneConfig (for example
+  in OneClient) every switch and slider of every OneConfig mod. Your own values come back when the
+  replay closes.
 - Motion blur for exports (export settings): 4, 8 or 16 renders averaged per frame over a 180°
   shutter.
 - Exported videos have the game's sound, rendered in sync from the sounds that play during the

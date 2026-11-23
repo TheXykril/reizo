@@ -11,6 +11,7 @@ import io.github.thexykril.reizo.core.camera.CameraKeyframe;
 import io.github.thexykril.reizo.core.camera.CameraPath;
 import io.github.thexykril.reizo.core.effects.EffectTrack;
 import io.github.thexykril.reizo.core.effects.Grade;
+import io.github.thexykril.reizo.core.effects.PropertyTracks;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,6 +53,22 @@ public final class Project {
 
   /** Effect keyframes (image grade over time); empty when the project has none. */
   public List<Effect> effects = new ArrayList<>();
+
+  /** Keyframed game and mod settings (see {@link PropertyTracks}); empty when none. */
+  public List<Setting> settings = new ArrayList<>();
+
+  /** JSON form of one setting's track. */
+  public static final class Setting {
+    public String id;
+    public String kind = PropertyTracks.Kind.NUMBER.name();
+    public List<SettingKey> keys = new ArrayList<>();
+  }
+
+  /** JSON form of a setting keyframe. */
+  public static final class SettingKey {
+    public long t;
+    public double v;
+  }
 
   /** JSON form of an effect keyframe. */
   public static final class Effect {
@@ -165,6 +182,40 @@ public final class Project {
     }
   }
 
+  /** The setting tracks described by this project. */
+  public PropertyTracks settings() {
+    PropertyTracks tracks = new PropertyTracks();
+    for (Setting s : settings) {
+      if (s == null || s.id == null || s.keys == null) {
+        continue;
+      }
+      PropertyTracks.Kind kind = parse(PropertyTracks.Kind.class, s.kind);
+      for (SettingKey k : s.keys) {
+        if (k != null && Double.isFinite(k.v)) {
+          tracks.put(s.id, kind, k.t, k.v);
+        }
+      }
+    }
+    return tracks;
+  }
+
+  /** Replaces the stored setting tracks. */
+  public void setSettings(PropertyTracks tracks) {
+    settings = new ArrayList<>();
+    for (String id : tracks.properties()) {
+      Setting s = new Setting();
+      s.id = id;
+      s.kind = tracks.kind(id).name();
+      for (PropertyTracks.Keyframe k : tracks.keyframes(id)) {
+        SettingKey key = new SettingKey();
+        key.t = k.timeMs();
+        key.v = k.value();
+        s.keys.add(key);
+      }
+      settings.add(s);
+    }
+  }
+
   public String toJson() {
     return GSON.toJson(this);
   }
@@ -191,6 +242,9 @@ public final class Project {
     }
     if (p.effects == null) {
       p.effects = new ArrayList<>();
+    }
+    if (p.settings == null) {
+      p.settings = new ArrayList<>();
     }
     if (p.render == null) {
       p.render = new Render();
