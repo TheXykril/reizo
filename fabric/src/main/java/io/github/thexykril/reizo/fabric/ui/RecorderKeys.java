@@ -43,6 +43,7 @@ public final class RecorderKeys {
   private static KeyMapping fovOut;
   private static KeyMapping cameraReset;
   private static KeyMapping pathDisplay;
+  private static KeyMapping hideEntity;
   private static KeyMapping openReplays;
 
   /** Degrees per tick while a roll or FOV key is held. */
@@ -162,6 +163,10 @@ public final class RecorderKeys {
     pathDisplay =
         KeyBindingHelper.registerKeyBinding(
             new KeyMapping("key.reizo.path_display", InputConstants.KEY_G, replay));
+    // H is unused by vanilla.
+    hideEntity =
+        KeyBindingHelper.registerKeyBinding(
+            new KeyMapping("key.reizo.hide_entity", InputConstants.KEY_H, replay));
   }
 
   /** The key that opens the replay browser (unbound by default). */
@@ -262,6 +267,11 @@ public final class RecorderKeys {
         status(mc, Component.translatable(on ? "reizo.path.on" : "reizo.path.off"));
       }
     }
+    while (hideEntity.consumeClick()) {
+      if (active) {
+        hideLookedAt(mc);
+      }
+    }
     while (pathSmoothing.consumeClick()) {
       if (active) {
         status(
@@ -271,6 +281,22 @@ public final class RecorderKeys {
                 io.github.thexykril.reizo.fabric.playback.ReplayEditor.cycleSmoothing()));
       }
     }
+  }
+
+  /** Hides the entity the camera looks at from now on, or shows it again. */
+  static void hideLookedAt(Minecraft mc) {
+    var server = io.github.thexykril.reizo.fabric.playback.ReplayPlayback.current();
+    var entity = io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.lookedAt(mc);
+    if (server == null || entity == null) {
+      status(mc, Component.translatable("reizo.hide.none"));
+      return;
+    }
+    long now = Math.min(server.replayTimeMs(), server.script().durationMs());
+    boolean hidden = io.github.thexykril.reizo.fabric.playback.ReplayEntityHider.toggle(entity, now);
+    status(
+        mc,
+        Component.translatable(
+            hidden ? "reizo.hide.hidden" : "reizo.hide.shown", entity.getName()));
   }
 
   private static void cameraKeys(Minecraft mc, boolean active) {
