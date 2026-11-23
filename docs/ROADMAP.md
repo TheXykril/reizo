@@ -98,6 +98,50 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
   already captured in recordings and replay correctly. A replay can't answer the mod's requests,
   so they probably don't.
 
+## M9 — Editing studio (semi-full)
+
+Goal (Xykril, 2026-11-23): Reizo should feel like a semi-full editing studio inside the game, made
+for Minecraft clips. Cover what a clip needs: cuts, several clips, transitions, titles and basic
+audio. Out of scope: a full color-grading suite and multitrack audio mixing like a pro editor.
+
+- Clips: cut a recording into clips, trim and split them, and put clips from one or more
+  recordings in order on one timeline; ripple delete and move. Each clip keeps its own camera path,
+  settings and effects.
+- Transitions between clips: cut, fade through black, crossfade, and a few wipes, with a length.
+- Speed per clip: slow motion and fast forward with eased speed ramps (keyframed replay speed).
+- Titles and text: keyframed text overlays with a font, size, color, outline and position; simple
+  in/out animations (fade, slide, typewriter); title-card presets for intros and outros.
+- Image overlays: a logo or watermark with position, size and opacity.
+- Audio: game sound and music levels per clip, fades in and out, one music or voice-over track
+  from a file with a volume curve, and the recorded microphone (M6). No full mixer.
+- Basic look: the existing color grade (exposure, contrast, saturation, temperature) per clip with
+  a few presets; letterbox bars and aspect-ratio presets.
+- Render presets: YouTube 1080p60, 4K, Shorts 1080x1920 (M4 vertical export), GIF, and a frame
+  sequence; a render queue that exports several projects or regions one after another.
+
+## M10 — Creative replay controls
+
+Basics first (Lunar's Rewind has the first three):
+
+- Time of day and weather keyframes in replays: override the recorded time and weather (clear,
+  rain, thunder) for a shot or a timelapse, blended between keyframes, shown in exports.
+- Hide entities: click a mob, item or player in the replay (or pick from a list) to hide it from
+  that point, keyframeable, also in exports.
+- Hide or show groups: all players, all mobs, items, particles, name tags.
+
+Then:
+
+- Privacy mode: one switch to hide or replace other players' names, skins and chat in exports.
+- Chat as subtitles: recorded chat shown as styled, keyframeable captions instead of the chat box.
+- Green screen and depth export: export without the sky (a solid key color or alpha), or a depth
+  pass, so editors can composite over other footage.
+- 360° and VR export: equirectangular video with the metadata YouTube needs to show it in 360.
+- Ghost compare: play a second recording as a translucent ghost player next to the first, for
+  speedruns and parkour.
+- Share links: upload a recording or an export and get a link (needs a host; decide privacy and
+  cost first, so an ADR before building).
+- The rolling buffer that saves the last few minutes already exists (shadow recording, M5).
+
 ## M8 — More Minecraft versions
 
 Plan: [ADR 0007](DECISIONS/0007-multi-version-strategy.md) (accepted). Starts only after M1–M4 work
