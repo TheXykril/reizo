@@ -14,7 +14,7 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 - [x] Pause-menu recording controls (Lunar: ESC → hover indicator → Record)
 - [x] Modifier-key bindings (Shift+R default like Lunar)
 - [x] Multiplayer gametest against a dedicated server (`createServer` in the gametest API)
-- [ ] Crash gametest: kill the client mid-recording, verify recovery
+- [x] Crash gametest: simulated kill mid-recording (copied working directory with a torn tail), verify recovery
 - [ ] Performance baseline: FPS, allocation rate, MB/min recorded
 
 ## M2 — Playback and free camera (vertical slice steps 5–7)
