@@ -28,7 +28,12 @@ public enum FrameType {
    * Marks that frames before this point were synthesized from a cache, not observed live (for
    * example configuration data replayed when a recording starts mid-session). Payload empty.
    */
-  LIVE_START(4);
+  LIVE_START(4),
+  /**
+   * What the local player's HUD showed (hotbar, selected slot, health, food, armor, experience,
+   * air), written whenever it changes. Payload: {@link PlayerHudState}.
+   */
+  PLAYER_HUD(5);
 
   private final int id;
 

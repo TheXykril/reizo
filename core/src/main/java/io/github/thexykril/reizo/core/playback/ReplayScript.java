@@ -36,7 +36,9 @@ public final class ReplayScript {
     /** Encoded {@link io.github.thexykril.reizo.core.format.LocalPlayerState}. */
     LOCAL_PLAYER,
     /** The server sent the client back to configuration (a server switch); a new world follows. */
-    RECONFIGURE
+    RECONFIGURE,
+    /** Encoded {@link io.github.thexykril.reizo.core.format.PlayerHudState}. */
+    PLAYER_HUD
   }
 
   private final List<byte[]> configuration;
@@ -67,9 +69,10 @@ public final class ReplayScript {
     int againAt = 0;
     for (Frame f : frames) {
       FrameType type = f.type();
-      if (type == FrameType.LOCAL_PLAYER) {
+      if (type == FrameType.LOCAL_PLAYER || type == FrameType.PLAYER_HUD) {
         if (sawPlay && again == null) { // no world while configuring
-          timeline.add(new Entry(f.timeMs(), Kind.LOCAL_PLAYER, f.payload()));
+          Kind kind = type == FrameType.LOCAL_PLAYER ? Kind.LOCAL_PLAYER : Kind.PLAYER_HUD;
+          timeline.add(new Entry(f.timeMs(), kind, f.payload()));
         }
         continue;
       }

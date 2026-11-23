@@ -46,6 +46,12 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   rotation, arm swing, pose (crouching, swimming, sleeping, elytra pose) and item use; held items
   and armor (GT `playBackWalk`: sword in hand, helmet worn and crouching at the end). Missing: the
   elytra and burning/invisible flags come only from the server's own packets.
+- **Recorded player's HUD in player view (POV):** **partial**, evidence GT (`recordFromJoin`:
+  `PLAYER_HUD` frames recorded and their items decode; `checkReplayControls`: the overlay is drawn
+  in POV and hidden with its setting off; screenshot `reizo-replay-pov-hud`). Hotbar with the
+  selected slot and offhand, hearts (absorption, hardcore), food, armor, XP and air, laid out like
+  vanilla. Setting "Recorded player's HUD in POV", keyframeable as "Reizo" in the editor. Not
+  shown yet: inventory and container screens, status effects, the attack indicator.
 - **Spectator camera during playback:** **partial**, evidence GT (camera is in spectator mode with
   its own identity). Plain spectator flight; no speed or roll controls yet.
 - **Camera modes free / player view / follow (V key):** **partial**, evidence GT

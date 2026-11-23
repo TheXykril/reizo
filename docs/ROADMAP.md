@@ -42,10 +42,11 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 
 - ✓ (first slice, ADR 0012) Post-processing pipeline (only active in editor/export), effect tracks with keyframed intensity
 - Text/image overlays, transitions, letterboxing
-- Recorded player's HUD in POV, like Lunar Rewind: hotbar with the selected slot, health, hunger,
-  armor and XP, and the inventory or container screens they opened. Needs the selected slot, stats
-  and open-screen events in `LOCAL_PLAYER` frames. Separate toggles for the hotbar/HUD and for
-  inventory screens, keyframeable in the editor and applied in export.
+- ✓ (first slice) Recorded player's HUD in POV, like Lunar Rewind: hotbar with the selected slot
+  and offhand, health, hunger, armor, XP and air from `PLAYER_HUD` frames. A setting and a
+  keyframeable "Reizo" toggle, applied in export.
+- Second slice: the inventory or container screens the recorded player opened (needs open-screen
+  events and the client-only inventory screen), with its own toggle.
 - ✓ Shadow recording (rolling buffer, save last N minutes; ADR 0011)
 
 ## M6 — Audio

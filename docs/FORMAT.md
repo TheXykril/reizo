@@ -44,6 +44,7 @@ whole stream. A block is valid only if fully present with matching magic and CRC
 | 2 | `LOCAL_PLAYER` | see below |
 | 3 | `MARKER` | UTF-8 label |
 | 4 | `LIVE_START` | empty. Frames before it are a prelude replayed from cache at time 0 |
+| 5 | `PLAYER_HUD` | see below |
 
 Unknown ids must be skipped by readers.
 
@@ -69,6 +70,24 @@ flags: 1 onGround, 2 sprinting, 4 sneaking, 8 usingItem, 16 swinging, 32 swing i
 
 `pose` is the `Pose` enum ordinal of the recording's Minecraft version. Written only on ticks where
 the state changed.
+
+### `PLAYER_HUD` layout 1
+
+What the recorded player's own HUD showed, sampled from the client because the server does not
+send all of it (the selected slot and creative inventories are the client's own). Written after
+that tick's `LOCAL_PLAYER` frame, only on ticks where something changed. Big-endian.
+
+```
+layout:u8(=1) selectedSlot:u8 gameMode:u8 flags:u8 health:f32 maxHealth:f32 absorption:f32
+food:u8 saturation:f32 armor:u8 experienceLevel:int32 experienceProgress:f32
+air:int16 maxAir:int16 itemsLength:int32 items:bytes
+flags: 1 hardcore
+items: VarInt count (10: hotbar slots 0 to 8, then the offhand), then each stack with
+       ItemStack.OPTIONAL_STREAM_CODEC against the recording's registries
+```
+
+`gameMode` is the `GameType` id (0 survival, 1 creative, 2 adventure, 3 spectator). `air` can be
+negative while drowning.
 
 ## Time
 

@@ -98,6 +98,7 @@ public final class ReplayServer implements AutoCloseable {
   private volatile Socket socket;
   private volatile boolean closed;
   private volatile int playPacketsSent;
+  private volatile io.github.thexykril.reizo.core.format.PlayerHudState hud;
 
   /**
    * Opens the listening socket. Call {@link #start()} afterwards.
@@ -237,6 +238,7 @@ public final class ReplayServer implements AutoCloseable {
           this.transformer = transformer;
           script.rewind();
           playPacketsSent = 0;
+          hud = null;
           tickStateChanged.set(true);
         }
         clock.seek(seek);
@@ -266,6 +268,14 @@ public final class ReplayServer implements AutoCloseable {
             // The new world's login right away: an export waits for the world before it moves
             // the replay time on, and the login was recorded a little after the switch.
             queue.addAll(script.throughNextPlayPacket());
+          }
+          continue;
+        }
+        if (entry.kind() == ReplayScript.Kind.PLAYER_HUD) {
+          try {
+            hud = io.github.thexykril.reizo.core.format.PlayerHudState.decode(entry.bytes());
+          } catch (io.github.thexykril.reizo.core.format.FormatException e) {
+            LOGGER.debug("Skipping an unreadable HUD sample", e);
           }
           continue;
         }
@@ -492,6 +502,11 @@ public final class ReplayServer implements AutoCloseable {
       }
       Thread.sleep(10);
     }
+  }
+
+  /** The recorded player's HUD at the current replay time, or null when none was recorded. */
+  public io.github.thexykril.reizo.core.format.PlayerHudState hud() {
+    return hud;
   }
 
   /** The packet transformer once the replay is in the play phase, else null. For tests. */

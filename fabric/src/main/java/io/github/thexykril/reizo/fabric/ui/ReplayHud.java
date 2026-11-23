@@ -30,6 +30,9 @@ public final class ReplayHud {
   private static final int TEXT = 0xFFFFFFFF;
   private static final int DIM = 0xFFB0B0B0;
 
+  /** Space the replay bar takes at the bottom of the screen, margin included. */
+  public static final int HEIGHT = 28;
+
   private ReplayHud() {}
 
   public static void register() {
@@ -49,8 +52,8 @@ public final class ReplayHud {
     Font font = mc.font;
     int width = Math.min(360, g.guiWidth() - 20);
     int x = (g.guiWidth() - width) / 2;
-    int height = 24;
-    int y = g.guiHeight() - height - 4;
+    int height = HEIGHT - 4;
+    int y = g.guiHeight() - HEIGHT;
     g.fill(x, y, x + width, y + height, BACKGROUND);
 
     String state = server.clock().isRunning() ? "▶" : "❚❚";

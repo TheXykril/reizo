@@ -640,6 +640,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         stats.packetNames.getOrDefault("ClientboundLevelChunkWithLightPacket", 0) > 0,
         "no chunks recorded");
     check(meta.markers.size() == 1, "marker missing");
+    check(stats.hudFrames > 0, "no HUD frames recorded");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
     // Without OneConfig, messages stay Minecraft toasts; the kinds used inside OneClient.
     check(!RecorderClient.useOneConfigNotifications(), "OneConfig notifications without OneConfig");
@@ -743,6 +744,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
                 mc.getCameraEntity().getId() == recordedId
                     && mc.options.getCameraType() == CameraType.FIRST_PERSON),
         "player view does not look through the recorded player");
+    // The recorded player's hotbar and status bars are drawn from the recording in player view.
+    context.waitFor(mc -> io.github.thexykril.reizo.fabric.ui.PlayerHudOverlay.visible(mc), 20 * 5);
+    context.takeScreenshot("reizo-replay-pov-hud");
+    context.runOnClient(mc -> RecorderClient.get().config().showPlayerHud = false);
+    check(
+        !context.computeOnClient(io.github.thexykril.reizo.fabric.ui.PlayerHudOverlay::visible),
+        "player HUD shown with its setting off");
+    context.runOnClient(mc -> RecorderClient.get().config().showPlayerHud = true);
 
     context.getInput().pressKey(InputConstants.KEY_V);
     context.waitTicks(2);
@@ -1753,6 +1762,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     int configPackets;
     int playPackets;
     int localPlayerFrames;
+    int hudFrames;
     final Map<String, Integer> packetNames = new HashMap<>();
     Pos firstPlayer;
     Pos lastPlayer;
@@ -1765,6 +1775,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
           + playPackets
           + " localPlayer="
           + localPlayerFrames
+          + " hud="
+          + hudFrames
           + " types="
           + packetNames.size();
     }
@@ -1808,6 +1820,15 @@ public final class RecordingGameTest implements FabricClientGameTest {
           }
           stats.lastPlayer = p;
           stats.localPlayerFrames++;
+        } else if (type == FrameType.PLAYER_HUD) {
+          io.github.thexykril.reizo.core.format.PlayerHudState hud =
+              io.github.thexykril.reizo.core.format.PlayerHudState.decode(frame.payload());
+          check(
+              io.github.thexykril.reizo.fabric.capture.HudSampler.decodeItems(hud.items(), registries)
+                      .size()
+                  == io.github.thexykril.reizo.fabric.capture.HudSampler.ITEM_COUNT,
+              "HUD frame without the hotbar and offhand");
+          stats.hudFrames++;
         }
       }
     } catch (Exception e) {

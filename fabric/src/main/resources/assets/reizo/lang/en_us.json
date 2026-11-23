@@ -62,6 +62,7 @@
   "reizo.settings.title": "Reizo settings",
   "reizo.settings.auto_record": "Record automatically on join",
   "reizo.settings.indicator": "Recording indicator",
+  "reizo.settings.player_hud": "Recorded player's HUD in POV",
   "reizo.settings.server_name": "Save server or world name",
   "reizo.settings.shadow": "Shadow recording",
   "reizo.settings.shadow_length": "Keep",
