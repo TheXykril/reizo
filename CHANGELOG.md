@@ -21,6 +21,13 @@ compatibility.
 
 ### Added
 
+- A new replay editor look (ADR 0015, proposed): docked panels in a dark theme with a blue accent,
+  in the spirit of OneClient. A top bar with play controls, the time, speed, the view (Free, POV,
+  Follow, Path), undo and Export; a tool rail; a Scene list of the replay's players and entities
+  (click to look at one, click its eye to hide it); an Inspector with Keyframe, Look and World tabs
+  (time of day, rain and thunder sliders); and a timeline with separate Markers, Camera, Look,
+  World, Entities and Settings tracks. Tab folds the side panels; small windows keep only the top
+  bar and the timeline.
 - Hide entities in a replay: press H while looking at a mob, item or player to hide it from that
   moment on (press again to show it). Hidden entities are keyframed switches in Timeline →
   Settings, undoable, saved with the project and hidden in exports too.

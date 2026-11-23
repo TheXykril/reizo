@@ -7,7 +7,6 @@ package io.github.thexykril.reizo.fabric.ui;
 import io.github.thexykril.reizo.core.effects.PropertyTracks;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
-import io.github.thexykril.reizo.fabric.playback.ReplayServer;
 import io.github.thexykril.reizo.fabric.settings.KeyframedSetting;
 import io.github.thexykril.reizo.fabric.settings.KeyframedSettings;
 import java.util.ArrayList;
@@ -27,7 +26,7 @@ import net.minecraft.network.chat.Component;
  * replay puts the player's own values back when it closes.
  */
 public final class KeyframedSettingsScreen extends Screen {
-  static final long TOLERANCE_MS = 100;
+  static final long TOLERANCE_MS = SettingEdits.TOLERANCE_MS;
   private static final int PANEL_WIDTH = 200;
   private static final int ROW_HEIGHT = 18;
   private static final int LIST_Y = 38;
@@ -45,7 +44,6 @@ public final class KeyframedSettingsScreen extends Screen {
   private Button toggle;
   private Button removeButton;
   private Button clearButton;
-  private long lastEditMs;
 
   public KeyframedSettingsScreen(Screen parent) {
     super(Component.translatable("reizo.settings_track.title"));
@@ -152,7 +150,7 @@ public final class KeyframedSettingsScreen extends Screen {
   /** Selects a setting by id (used by the rows and by tests). */
   public void select(String id) {
     selectedId = id;
-    lastEditMs = 0;
+    SettingEdits.breakUndoGroup();
     rebuildControl();
     refreshRows();
   }
@@ -231,46 +229,24 @@ public final class KeyframedSettingsScreen extends Screen {
     clearButton.active = ReplayEditor.settings().has(s.id());
   }
 
-  /** The value at the playhead: the track's, or the live value without one. */
-  private double shownValue(KeyframedSetting s) {
-    double v = ReplayEditor.settings().valueAt(s.id(), playhead());
-    return Double.isNaN(v) ? s.get() : v;
+  private static double shownValue(KeyframedSetting s) {
+    return SettingEdits.shownValue(s);
   }
 
-  private long playhead() {
-    ReplayServer server = ReplayPlayback.current();
-    return server == null ? 0 : Math.min(server.replayTimeMs(), server.script().durationMs());
+  private static long playhead() {
+    return SettingEdits.playhead();
   }
 
   /** Sets a keyframe for {@code s} at the playhead (or edits the one there). */
   void edit(KeyframedSetting s, double value) {
-    long now = System.currentTimeMillis();
-    if (now - lastEditMs > 700) {
-      ReplayEditor.recordUndo();
-    }
-    lastEditMs = now;
-    PropertyTracks tracks = ReplayEditor.settings();
-    long near = tracks.nearest(s.id(), playhead(), TOLERANCE_MS);
-    tracks.put(s.id(), s.kind(), near >= 0 ? near : playhead(), KeyframedSettings.clamp(s, value));
-    ReplayEditor.settingsChanged();
-    if (toggle != null) {
-      lastEditMs = 0;
-    }
+    SettingEdits.edit(s, value, toggle == null);
     refreshControl();
     refreshRows();
   }
 
   private void removeHere() {
     KeyframedSetting s = selected();
-    if (s == null) {
-      return;
-    }
-    long near = ReplayEditor.settings().nearest(s.id(), playhead(), TOLERANCE_MS);
-    if (near >= 0) {
-      ReplayEditor.recordUndo();
-      lastEditMs = 0;
-      ReplayEditor.settings().remove(s.id(), near);
-      ReplayEditor.settingsChanged();
+    if (s != null && SettingEdits.removeHere(s)) {
       refreshControl();
       refreshRows();
     }
@@ -280,7 +256,7 @@ public final class KeyframedSettingsScreen extends Screen {
     KeyframedSetting s = selected();
     if (s != null && ReplayEditor.settings().has(s.id())) {
       ReplayEditor.recordUndo();
-      lastEditMs = 0;
+      SettingEdits.breakUndoGroup();
       ReplayEditor.settings().removeProperty(s.id());
       ReplayEditor.settingsChanged();
       refreshControl();
