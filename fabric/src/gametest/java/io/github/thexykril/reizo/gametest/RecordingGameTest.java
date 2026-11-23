@@ -1332,10 +1332,41 @@ public final class RecordingGameTest implements FabricClientGameTest {
                 .play(
                     net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
                         net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1f)));
+    // A looping sound that moves past the camera and is stopped after a second is followed.
+    context.waitFor(
+        mc -> ExportSession.current() != null && ExportSession.current().framesCaptured() > 40,
+        20 * 120);
+    PassingLoop passing = context.computeOnClient(PassingLoop::new);
+    context.runOnClient(mc -> mc.getSoundManager().play(passing));
+    // Without an audio device (CI) the sound engine never ticks the sound, so the test does; then
+    // the game stops it, as an entity's sound is stopped when it leaves.
+    for (int i = 0; i < 20; i++) {
+      context.runOnClient(mc -> passing.tick());
+      context.waitTicks(1);
+    }
+    context.runOnClient(mc -> mc.getSoundManager().stop(passing));
     context.waitFor(mc -> result.get() != null, 20 * 240);
     ExportSession s = result.get();
     check(s.state() == ExportSession.State.DONE, "export ended " + s.state() + ": " + s.error());
-    check(s.soundsCaptured() >= 1, "no sound captured during the export");
+    check(s.soundsCaptured() >= 2, "sounds captured during the export: " + s.soundsCaptured());
+    var loop =
+        s.soundCues().stream()
+            .filter(io.github.thexykril.reizo.core.audio.SoundCue::loop)
+            .findFirst()
+            .orElse(null);
+    check(loop != null, "the looping sound was not followed: " + s.soundCues());
+    check(
+        loop.endMs() - loop.timeMs() > 700 && loop.endMs() - loop.timeMs() < 1500,
+        "looping sound from " + loop.timeMs() + " to " + loop.endMs() + " ms");
+    check(
+        loop.path().size() >= 10
+            && Math.abs(loop.path().get(loop.path().size() - 1).x() - loop.x()) > 2,
+        "looping sound path: " + loop.path().size() + " points");
+    LOGGER.info(
+        "exportVideo: loop {} to {} ms, {} path points",
+        loop.timeMs(),
+        loop.endMs(),
+        loop.path().size());
     String streams =
         run(
             "ffprobe",
@@ -1383,6 +1414,18 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(
         Math.abs(onsetMs - s.firstSoundMs()) <= 50,
         "sound at " + onsetMs + " ms, expected " + s.firstSoundMs() + " ms");
+    // The click (0.28 s, half of it silent) starts again about every 0.28 s while the loop plays.
+    double from = loop.timeMs() / 1000 - 0.03;
+    double to = loop.endMs() / 1000;
+    var onsets = java.util.regex.Pattern.compile("silence_end: ([0-9.]+)").matcher(silence);
+    int repeats = 0;
+    while (onsets.find()) {
+      double t = Double.parseDouble(onsets.group(1));
+      if (t >= from && t < to) {
+        repeats++;
+      }
+    }
+    check(repeats >= 3, "the loop started " + repeats + " times in its second: " + silence);
     check(
         !java.nio.file.Files.exists(s.output().resolveSibling("gametest-export.video.mp4")),
         "temporary video left behind");
@@ -1640,6 +1683,29 @@ public final class RecordingGameTest implements FabricClientGameTest {
   private static void check(boolean condition, String message) {
     if (!condition) {
       throw new AssertionError(message);
+    }
+  }
+
+  /** A looping click that moves along +X past the camera, 0.4 blocks per tick. */
+  private static final class PassingLoop
+      extends net.minecraft.client.resources.sounds.AbstractTickableSoundInstance {
+    PassingLoop(net.minecraft.client.Minecraft mc) {
+      super(
+          net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(),
+          net.minecraft.sounds.SoundSource.MASTER,
+          net.minecraft.util.RandomSource.create(1));
+      var at = mc.gameRenderer.getMainCamera().position();
+      this.x = at.x - 4;
+      this.y = at.y;
+      this.z = at.z;
+      this.looping = true;
+      this.delay = 0;
+      this.relative = false;
+    }
+
+    @Override
+    public void tick() {
+      x += 0.4;
     }
   }
 }

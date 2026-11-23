@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (keyframed settings).
+Last updated: 2026-11-23 by Claude (followed sounds and music in exports).
 
 ## 1. Current project phase
 
@@ -66,6 +66,11 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 4. Active implementation work
 
+- Export sound (`fabric/export/SoundCapture`, `core.audio`): every sound is followed while it
+  plays (`SoundEngine.stop` hook in `SoundEngineMixin`, per-frame samples for positional and
+  tickable sounds, one-shots for at most 30 s). Loops repeat until stopped; music is included and
+  decoded only as far as the video needs. Sounds that started before the export range are still
+  missing, except loops started while the export prepared (entity sounds after the seek).
 - OneConfig page (`fabric/compat/OneConfigIntegration`): builds against the OneConfig 1.9.1 API but
   has never run inside OneConfig. The cloud proxy blocks OneConfig's runtime dependencies
   (repo.hypixel.net, jitpack), so it needs a manual check in OneClient on Hyperion: page shows under
@@ -156,6 +161,14 @@ ADRs 0001–0010 in docs/DECISIONS/. Most important for the next agent:
   auth errors in dev logs.
 
 ## 8. Test results
+
+2026-11-23, cloud box, followed sounds (branch `feat/followed-sounds`):
+- `./gradlew build`: pass (`AudioTest` adds looping, stopping, moving and pitch changes).
+  Gametests: 18 of 18 pass; `exportVideo` plays a looping click that moves 8 blocks past the
+  camera and is stopped after 20 ticks: followed from 2050 to 3050 ms with 20 path points, and
+  the click starts again at least 3 times in that second of the MP4's sound track. Without an
+  audio device the sound engine does not tick sounds, so the test ticks it; on Hyperion check a
+  minecart ride and music in an export by ear.
 
 2026-11-22, cloud box, export settings (branch `feat/export-settings`):
 - `./gradlew build`: pass (75 unit tests). Gametests: pass, adding the settings screen from the
