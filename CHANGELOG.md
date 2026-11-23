@@ -14,6 +14,8 @@ compatibility.
 
 ### Added
 
+- The recorded player in replays now holds its items, wears its armor and shows its pose
+  (crouching, swimming, sleeping) and item use.
 - Settings over time (timeline → Settings), like Rewind's mod properties: keyframe Minecraft's
   brightness, distortion effects, entity shadows and view bobbing, and with OneConfig (for example
   in OneClient) every switch and slider of every OneConfig mod. Your own values come back when the

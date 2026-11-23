@@ -53,6 +53,10 @@ public final class RecorderClient implements ClientModInitializer {
   private CaptureController capture;
   private final LocalPlayerSampler sampler = new LocalPlayerSampler();
   private final LocalPlayerSampler shadowSampler = new LocalPlayerSampler();
+  private final io.github.thexykril.reizo.fabric.capture.EquipmentTracker equipment =
+      new io.github.thexykril.reizo.fabric.capture.EquipmentTracker();
+  private final io.github.thexykril.reizo.fabric.capture.EquipmentTracker shadowEquipment =
+      new io.github.thexykril.reizo.fabric.capture.EquipmentTracker();
 
   /** Shadow lengths offered in the settings, in seconds. */
   public static final List<Integer> SHADOW_LENGTHS = List.of(30, 60, 120, 300, 600);
@@ -218,6 +222,7 @@ public final class RecorderClient implements ClientModInitializer {
     try {
       capture.start(meta, () -> WorldSnapshot.capture(mc));
       sampler.reset();
+      equipment.reset();
       LOGGER.info("Recording started: {} (complete from join: {})", meta.id, meta.completeFromJoin);
       toast(
           "reizo.toast.started",
@@ -292,6 +297,12 @@ public final class RecorderClient implements ClientModInitializer {
     if (state != null) {
       s.submit(FrameType.LOCAL_PLAYER, state.encode());
     }
+    if (mc.getConnection() != null) {
+      byte[] held = equipment.sample(mc.player, mc.getConnection().registryAccess());
+      if (held != null) {
+        s.submitPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
+      }
+    }
   }
 
   private void tickShadow(Minecraft mc) {
@@ -307,6 +318,7 @@ public final class RecorderClient implements ClientModInitializer {
       long start = System.nanoTime();
       buffer.startSegment(WorldSnapshot.capture(mc));
       shadowSampler.reset();
+      shadowEquipment.reset();
       LOGGER.debug(
           "Shadow segment started in {} ms, buffer {} MB",
           (System.nanoTime() - start) / 1_000_000,
@@ -315,6 +327,12 @@ public final class RecorderClient implements ClientModInitializer {
     LocalPlayerState state = shadowSampler.sample(mc.player);
     if (state != null) {
       buffer.onFrame(FrameType.LOCAL_PLAYER, state.encode());
+    }
+    if (mc.getConnection() != null) {
+      byte[] held = shadowEquipment.sample(mc.player, mc.getConnection().registryAccess());
+      if (held != null) {
+        buffer.onPacket(io.github.thexykril.reizo.core.format.ProtocolPhase.PLAY, held);
+      }
     }
   }
 

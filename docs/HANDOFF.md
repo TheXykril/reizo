@@ -108,8 +108,11 @@ screen, effects, audio, shadow recording, multi-version.
   `compat.OneConfigSettings`; driver applies per frame from `GameRendererMixin` render HEAD and
   restores originals on the first frame without a replay). Panel `ui/KeyframedSettingsScreen`.
   The OneConfig source is untested at runtime: check in OneClient on Hyperion.
-- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), recorded
-  player pose and equipment, multiplayer and crash gametests (#4, #5), performance baseline (#6).
+- Recorded player pose and equipment: `capture/EquipmentTracker` writes a vanilla
+  `ClientboundSetEquipmentPacket` for the local player when held/worn items change (after the
+  tick's sample); `PlayTransformer.poseData` sends pose and living flags from samples
+  (accessor mixins `EntityDataAccessors`, `LivingEntityDataAccessors`).
+- Next: more effects (bloom, DoF), music/looping sounds and microphone (#17), effects (#15), multiplayer and crash gametests (#4, #5), performance baseline (#6).
 
 ## 5. Files and modules affected
 

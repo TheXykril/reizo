@@ -25,8 +25,8 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 | Crash backup / recovery | ✓ | ? | ? | partial | implemented | UT | Max ~1 s loss; GT for real crash pending |
 | Shadow (rolling buffer) recording | ✓ 30 s–10 min | ? | ✓ 2 min | ✓ 30 s–10 min | implemented | UT, GT | Off by default; ADR 0011. Pause menu "Save last" or a key (unbound). Snapshot hitch not yet measured on real hardware |
 | World/entity state reconstruction | ✓ | ✓ | ✓ | ✓ | partial | GT | All clientbound packets recorded byte-exact and re-decodable; basic playback (GT) |
-| Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; not yet replayed |
-| Inventory / equipment | ✓ | ✓ | ? | ✓ | partial | — | Present in recorded packets; untested on playback |
+| Local player movement & animation | ✓ | ✓ | ✓ | ✓ | partial | GT | Position/rotation/pose/swing/flags per changed tick; replayed on the recorded player |
+| Inventory / equipment | ✓ | ✓ | ✓ | ✓ | partial | GT | Inventory in recorded packets; own held items and armor recorded as equipment packets and shown on playback |
 | Particles & sounds | ✓ | ✓ | ✓ | ✓ | partial | — | Server-sent ones are in packets; client-only effects not captured |
 | Multiplayer recording | ✓ | ✓ | ✓ | ✓ | partial | — | Same pipeline as singleplayer; no multiplayer test yet |
 | Start mid-session with full world | ✓ | ✓ | ? | ✗ | partial | GT | Config + login prelude only; loaded chunks missing until world snapshots (M2) |
@@ -42,7 +42,9 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
 - **Recorded player shown during playback:** **partial**, evidence GT (`playBack`, `playBackWalk`:
   separate player entity with the recorded UUID; after a recorded walk it ends at the recorded end
   position within 0.5 blocks; also works for mid-session recordings). Movement, rotation, head
-  rotation and arm swing only. Sneaking, held items and armor are not shown yet.
+  rotation, arm swing, pose (crouching, swimming, sleeping, elytra pose) and item use; held items
+  and armor (GT `playBackWalk`: sword in hand, helmet worn and crouching at the end). Missing: the
+  elytra and burning/invisible flags come only from the server's own packets.
 - **Spectator camera during playback:** **partial**, evidence GT (camera is in spectator mode with
   its own identity). Plain spectator flight; no speed or roll controls yet.
 - **Camera modes free / player view / follow (V key):** **partial**, evidence GT
@@ -66,7 +68,7 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   0.5 blocks). A backwards seek replays from the start, so it is slow for long recordings until
   snapshots exist. The time bar shows play state, time, speed, camera mode and markers; it is not
   visually checked yet.
-- Frame step, timeline navigation with the mouse, follow any entity, recorded player pose and equipment,
+- Frame step, timeline navigation with the mouse, follow any entity,
   markers in timeline, Quick View: **planned**.
 
 ## Replay browser (#10)
