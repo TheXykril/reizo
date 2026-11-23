@@ -12,24 +12,37 @@ import java.util.List;
 
 /**
  * The content of a recording, split the way a replay uses it: the configuration phase first (all at
- * once, before the clock starts), then a timeline of play packets and local player samples.
+ * once, before the clock starts), then a timeline of play packets and local player samples. A
+ * server switch in the middle (a proxy sending the client back to configuration) is a {@link
+ * Kind#RECONFIGURE} entry holding the next configuration phase.
  *
  * <p>Markers and other frame types are for the editor and are skipped here.
  */
 public final class ReplayScript {
-  /** One timeline entry: either a raw play packet or a local player sample. */
-  public record Entry(int timeMs, Kind kind, byte[] bytes) {}
+  /**
+   * One timeline entry: a raw play packet, a local player sample, or a new configuration phase.
+   *
+   * @param configuration for {@link Kind#RECONFIGURE}, the configuration packets in order
+   */
+  public record Entry(int timeMs, Kind kind, byte[] bytes, List<byte[]> configuration) {
+    public Entry(int timeMs, Kind kind, byte[] bytes) {
+      this(timeMs, kind, bytes, List.of());
+    }
+  }
 
   public enum Kind {
     /** Raw play packet (id + body), as captured. */
     PLAY_PACKET,
     /** Encoded {@link io.github.thexykril.reizo.core.format.LocalPlayerState}. */
-    LOCAL_PLAYER
+    LOCAL_PLAYER,
+    /** The server sent the client back to configuration (a server switch); a new world follows. */
+    RECONFIGURE
   }
 
   private final List<byte[]> configuration;
   private final List<Entry> timeline;
   private final int playPacketCount;
+  private final int reconfigureCount;
   private int next;
 
   private ReplayScript(List<byte[]> configuration, List<Entry> timeline) {
@@ -37,6 +50,8 @@ public final class ReplayScript {
     this.timeline = timeline;
     this.playPacketCount =
         (int) timeline.stream().filter(e -> e.kind() == Kind.PLAY_PACKET).count();
+    this.reconfigureCount =
+        (int) timeline.stream().filter(e -> e.kind() == Kind.RECONFIGURE).count();
   }
 
   /**
@@ -48,10 +63,12 @@ public final class ReplayScript {
     List<byte[]> configuration = new ArrayList<>();
     List<Entry> timeline = new ArrayList<>();
     boolean sawPlay = false;
+    List<byte[]> again = null; // a later configuration phase being collected
+    int againAt = 0;
     for (Frame f : frames) {
       FrameType type = f.type();
       if (type == FrameType.LOCAL_PLAYER) {
-        if (sawPlay) {
+        if (sawPlay && again == null) { // no world while configuring
           timeline.add(new Entry(f.timeMs(), Kind.LOCAL_PLAYER, f.payload()));
         }
         continue;
@@ -60,16 +77,25 @@ public final class ReplayScript {
         continue;
       }
       if (f.packetPhase() == ProtocolPhase.CONFIGURATION) {
-        if (sawPlay) {
-          // A second configuration phase (server transfer) is not supported yet: stop there.
-          break;
+        if (!sawPlay) {
+          configuration.add(f.packetBytes());
+        } else {
+          if (again == null) {
+            again = new ArrayList<>();
+            againAt = f.timeMs();
+          }
+          again.add(f.packetBytes());
         }
-        configuration.add(f.packetBytes());
       } else {
+        if (again != null) {
+          timeline.add(new Entry(againAt, Kind.RECONFIGURE, new byte[0], List.copyOf(again)));
+          again = null;
+        }
         sawPlay = true;
         timeline.add(new Entry(f.timeMs(), Kind.PLAY_PACKET, f.packetBytes()));
       }
     }
+    // A recording that ends inside a configuration phase has no world after it: left out.
     if (configuration.isEmpty() || !sawPlay) {
       throw new IllegalArgumentException(
           "recording has no "
@@ -82,6 +108,11 @@ public final class ReplayScript {
   /** Configuration-phase packets (id + payload), in order. */
   public List<byte[]> configuration() {
     return configuration;
+  }
+
+  /** Number of server switches (later configuration phases) in the timeline. */
+  public int reconfigureCount() {
+    return reconfigureCount;
   }
 
   /** Number of play packets in the timeline. */
@@ -110,6 +141,22 @@ public final class ReplayScript {
   /** True when every timeline entry has been handed out. */
   public synchronized boolean finished() {
     return next >= timeline.size();
+  }
+
+  /**
+   * Hands out the entries up to and including the next play packet, whatever their time. After a
+   * server switch this is the new world's login, which the client needs before it shows anything.
+   */
+  public synchronized List<Entry> throughNextPlayPacket() {
+    List<Entry> out = new ArrayList<>();
+    while (next < timeline.size()) {
+      Entry e = timeline.get(next++);
+      out.add(e);
+      if (e.kind() == Kind.PLAY_PACKET) {
+        break;
+      }
+    }
+    return out;
   }
 
   /**

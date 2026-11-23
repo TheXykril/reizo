@@ -80,6 +80,8 @@ public final class ReplayServer implements AutoCloseable {
       new java.util.concurrent.atomic.AtomicLong(-1);
   private final AtomicInteger seeks = new AtomicInteger();
   private volatile boolean reconfiguring;
+  private volatile boolean switching;
+  private volatile boolean oldWorldGone;
   private volatile boolean manual;
   private volatile long manualTime;
   private final java.util.concurrent.atomic.AtomicLong manualTarget =
@@ -246,8 +248,27 @@ public final class ReplayServer implements AutoCloseable {
         manualTime = frameTarget;
       }
       List<ReplayScript.Entry> due = script.due(manual ? manualTime : clock.timeMs());
+      java.util.ArrayDeque<ReplayScript.Entry> queue = new java.util.ArrayDeque<>(due);
       int written = 0;
-      for (ReplayScript.Entry entry : due) {
+      while (!queue.isEmpty()) {
+        ReplayScript.Entry entry = queue.poll();
+        if (entry.kind() == ReplayScript.Kind.RECONFIGURE) {
+          // A recorded server switch: the client goes through configuration into the new world.
+          if (written > 0) {
+            out.flush();
+          }
+          access = switchServer(out, access, entry.configuration());
+          transformer =
+              new PlayTransformer(access, profile, recordedPlayerUuid, recordedPlayerName);
+          this.transformer = transformer;
+          tickStateChanged.set(true);
+          if (queue.stream().noneMatch(e -> e.kind() == ReplayScript.Kind.PLAY_PACKET)) {
+            // The new world's login right away: an export waits for the world before it moves
+            // the replay time on, and the login was recorded a little after the switch.
+            queue.addAll(script.throughNextPlayPacket());
+          }
+          continue;
+        }
         List<byte[]> packets =
             entry.kind() == ReplayScript.Kind.PLAY_PACKET
                 ? transformer.packet(entry.bytes())
@@ -299,8 +320,14 @@ public final class ReplayServer implements AutoCloseable {
    */
   private RegistryAccess configure(OutputStream out, RegistryAccess previous)
       throws IOException, InterruptedException {
+    return configure(out, previous, script.configuration());
+  }
+
+  private RegistryAccess configure(
+      OutputStream out, RegistryAccess previous, List<byte[]> configuration)
+      throws IOException, InterruptedException {
     int finishedBefore = configurationsFinished.get();
-    for (byte[] packet : script.configuration()) {
+    for (byte[] packet : configuration) {
       writeFrame(out, packet);
     }
     out.flush();
@@ -319,12 +346,14 @@ public final class ReplayServer implements AutoCloseable {
   private RegistryAccess restart(OutputStream out, RegistryAccess access)
       throws IOException, InterruptedException {
     reconfiguring = true;
+    oldWorldGone = false;
     try {
       int ackedBefore = configurationAcks.get();
       LOGGER.info("Replay seeking back: asking the client to reconfigure");
       writeFrame(out, encodePlay(access, ClientboundStartConfigurationPacket.INSTANCE));
       out.flush();
       awaitCount(configurationAcks, ackedBefore + 1);
+      oldWorldGone = true;
       LOGGER.info("Replay restarting for a backwards seek");
       return configure(out, access);
     } catch (IOException | InterruptedException | RuntimeException e) {
@@ -333,6 +362,37 @@ public final class ReplayServer implements AutoCloseable {
     }
     // Stays true until the client shows the new world (restartDone), so the client tick does not
     // mistake the missing world for the player leaving the replay.
+  }
+
+  /**
+   * Plays a recorded server switch: sends the client back to configuration and through the recorded
+   * configuration phase of the next server.
+   */
+  private RegistryAccess switchServer(
+      OutputStream out, RegistryAccess access, List<byte[]> configuration)
+      throws IOException, InterruptedException {
+    switching = true;
+    reconfiguring = true;
+    oldWorldGone = false;
+    try {
+      int ackedBefore = configurationAcks.get();
+      LOGGER.info("Replay switching servers, as recorded");
+      writeFrame(out, encodePlay(access, ClientboundStartConfigurationPacket.INSTANCE));
+      out.flush();
+      awaitCount(configurationAcks, ackedBefore + 1);
+      oldWorldGone = true;
+      return configure(out, access, configuration);
+    } catch (IOException | InterruptedException | RuntimeException e) {
+      reconfiguring = false;
+      switching = false;
+      throw e;
+    }
+    // Both stay true until the client shows the new world (restartDone).
+  }
+
+  /** True while a recorded server switch is being played (not a backwards seek). */
+  public boolean isSwitchingServers() {
+    return switching;
   }
 
   /**
@@ -387,6 +447,16 @@ public final class ReplayServer implements AutoCloseable {
   /** Called on the client thread once the rebuilt world is shown after a backwards seek. */
   public void restartDone() {
     reconfiguring = false;
+    switching = false;
+    oldWorldGone = false;
+  }
+
+  /**
+   * During a restart or switch: true once the client has dropped the old world (it answers the
+   * switch to configuration only after that), so any world it shows from then on is the new one.
+   */
+  public boolean oldWorldGone() {
+    return oldWorldGone;
   }
 
   /** True while the client is being sent back through configuration for a backwards seek. */

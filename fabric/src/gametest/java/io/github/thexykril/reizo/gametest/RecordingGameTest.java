@@ -393,6 +393,32 @@ public final class RecordingGameTest implements FabricClientGameTest {
           });
       context.waitFor(mc -> findPig(mc) != null, 20 * 10);
       context.waitTicks(20);
+      // A server switch behind a proxy: the server sends the client back to configuration and
+      // then into a world again. The recording carries on through it.
+      server.runOnServer(s -> s.getPlayerList().getPlayers().get(0).connection.switchToConfig());
+      context.waitFor(mc -> mc.getConnection() == null || mc.level == null, 20 * 10);
+      for (int i = 0; i < 100 && !returnToWorld(server); i++) {
+        context.waitTicks(1);
+      }
+      context.waitFor(mc -> mc.level != null && mc.player != null && mc.screen == null, 20 * 30);
+      connection.getClientWorld().waitForChunksDownload();
+      context.waitTicks(10);
+      check(
+          context.computeOnClient(mc -> RecorderClient.get().session()) == session,
+          "the recording did not carry on through the server switch");
+      server.runOnServer(
+          s -> {
+            var player = s.getPlayerList().getPlayers().get(0);
+            var pig =
+                net.minecraft.world.entity.EntityType.PIG.create(
+                    player.level(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            pig.setPos(player.getX() - 2, player.getY(), player.getZ());
+            pig.setNoAi(true);
+            pig.setCustomName(net.minecraft.network.chat.Component.literal("reizo-pig-2"));
+            player.level().addFreshEntity(pig);
+          });
+      context.waitFor(mc -> findPig(mc, "reizo-pig-2") != null, 20 * 10);
+      context.waitTicks(20);
     } finally {
       context.runOnClient(mc -> RecorderClient.get().config().autoRecordOnJoin = false);
     }
@@ -424,23 +450,109 @@ public final class RecordingGameTest implements FabricClientGameTest {
               && replay.script().finished()
               && mc.level != null
               && mc.screen == null
-              && findPig(mc) != null;
+              && findPig(mc, "reizo-pig-2") != null;
         },
         20 * 60);
+    check(
+        context.computeOnClient(mc -> ReplayPlayback.current().script().reconfigureCount()) == 1,
+        "the server switch is not in the replay");
+    // Back to before the switch: the first server's world, without the second pig.
+    long start = context.computeOnClient(mc -> ReplayPlayback.current().script().startMs());
+    context.runOnClient(mc -> ReplayPlayback.current().seek(start + 300));
+    context.waitFor(
+        mc ->
+            !ReplayPlayback.current().isReconfiguring()
+                && mc.screen == null
+                && findPig(mc) != null
+                && findPig(mc, "reizo-pig-2") == null,
+        20 * 30);
+    exportAcrossServerSwitch(context);
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));
     LOGGER.info("recordOnDedicatedServer OK: {} -> {}", archive.getFileName(), stats);
   }
 
+  /** Exports the whole replay, server switch included: every planned frame is in the video. */
+  private void exportAcrossServerSwitch(ClientGameTestContext context) {
+    if (io.github.thexykril.reizo.core.export.FfmpegCommand.locate(null, System.getenv("PATH"))
+        .isEmpty()) {
+      LOGGER.warn("exportAcrossServerSwitch SKIPPED: ffmpeg not on PATH");
+      return;
+    }
+    java.util.concurrent.atomic.AtomicReference<ExportSession> result =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    long[] range = new long[2];
+    context.runOnClient(
+        mc -> {
+          var script = ReplayPlayback.current().script();
+          range[0] = script.startMs();
+          range[1] = script.durationMs();
+          ReplayEditor.setRegion(true, range[0]);
+          ReplayEditor.setRegion(false, range[1]);
+          var render = ReplayEditor.project().render;
+          render.fps = 10;
+          render.width = 0;
+          render.height = 0;
+          render.crf = 35;
+          render.codec = "libx264";
+          render.motionBlur = 1;
+          render.output = "gametest-switch.mp4";
+          check(ExportControls.exportCurrent(mc, result::set), "export did not start");
+        });
+    context.waitFor(mc -> result.get() != null, 20 * 240);
+    ExportSession s = result.get();
+    check(s.state() == ExportSession.State.DONE, "export ended " + s.state() + ": " + s.error());
+    int expected =
+        new io.github.thexykril.reizo.core.export.ExportPlan(range[0], range[1], 10).frameCount();
+    String frames =
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_frames",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_read_frames",
+            "-of",
+            "csv=p=0",
+            s.output().toString());
+    check(
+        frames.strip().equals(String.valueOf(expected)),
+        "export across the switch has " + frames.strip() + " frames, expected " + expected);
+    LOGGER.info("exportAcrossServerSwitch OK: {} frames", expected);
+  }
+
+  /** Sends the player waiting in configuration back into the world; false while there is none. */
+  private static boolean returnToWorld(TestDedicatedServerContext server) {
+    java.util.concurrent.atomic.AtomicBoolean done =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    server.runOnServer(
+        s -> {
+          for (var c : s.getConnection().getConnections()) {
+            if (c.getPacketListener()
+                instanceof net.minecraft.server.network.ServerConfigurationPacketListenerImpl l) {
+              l.returnToWorld();
+              done.set(true);
+            }
+          }
+        });
+    return done.get();
+  }
+
   private static net.minecraft.world.entity.Entity findPig(Minecraft mc) {
+    return findPig(mc, "reizo-pig");
+  }
+
+  private static net.minecraft.world.entity.Entity findPig(Minecraft mc, String name) {
     if (mc.level == null) {
       return null;
     }
     for (var e : mc.level.entitiesForRendering()) {
       if (e.getType() == net.minecraft.world.entity.EntityType.PIG
           && e.getCustomName() != null
-          && "reizo-pig".equals(e.getCustomName().getString())) {
+          && name.equals(e.getCustomName().getString())) {
         return e;
       }
     }

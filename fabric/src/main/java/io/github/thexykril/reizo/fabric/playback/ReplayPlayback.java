@@ -257,13 +257,22 @@ public final class ReplayPlayback {
     if (server.isReconfiguring()) {
       // A backwards seek rebuilds the world: it is gone until the new login packet arrives.
       if (levelBeforeRestart == null) {
-        // First tick of the restart: remember the old world to tell the new one apart, and where
-        // the free camera was, so the seek does not move it.
+        // First tick of the restart: remember where the free camera was in the old world, so the
+        // seek does not move it. A recorded server switch goes to
+        // another world, so the camera is not carried over.
         levelBeforeRestart = mc.level == null ? NO_LEVEL : mc.level;
-        // Refresh it if the old world is still there; otherwise keep what the seek remembered.
-        rememberCamera(mc);
-      } else if (inWorld && mc.level != levelBeforeRestart) {
-        LOGGER.info("Replay world rebuilt after a backwards seek");
+        if (!server.isSwitchingServers() && !server.oldWorldGone()) {
+          // Refresh it if the old world is still there; otherwise keep what the seek remembered.
+          rememberCamera(mc);
+        }
+      }
+      // Not "a different level than on the first tick": during an export the client does not tick
+      // while it waits for the new world, so the first tick can already see it.
+      if (inWorld && server.oldWorldGone()) {
+        LOGGER.info(
+            server.isSwitchingServers()
+                ? "Replay world rebuilt after a recorded server switch"
+                : "Replay world rebuilt after a backwards seek");
         server.restartDone();
         ReplayCamera.reset();
         // Recorded respawns can replace the camera player shortly after: keep the camera where it

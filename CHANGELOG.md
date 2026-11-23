@@ -8,12 +8,17 @@ compatibility.
 
 ### Fixed
 
+- Exporting a multiplayer recording from its very first moment waited forever on the loading
+  screen.
 - A backwards seek no longer moves the free camera to the world origin.
 - Seeking a paused replay to before its world had loaded left the client on the "reconfiguring"
   screen. Seeks now start no earlier than the recording's first world packet.
 
 ### Added
 
+- Server switches behind a proxy (Velocity, BungeeCord) no longer split anything: the recording
+  carries on, and the replay switches worlds where the recording did, also when seeking or
+  exporting across it.
 - Exports now include music, looping sounds and moving sounds (minecarts, elytra, bees): sounds
   follow their source and the camera while they play, and loops repeat until they stop.
 - With OneConfig (for example in OneClient): Reizo's messages show as OneConfig notifications, and
