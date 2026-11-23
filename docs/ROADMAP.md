@@ -66,13 +66,19 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 ## M7 — OneClient integration and polish
 
 - OneConfig settings, keybinds and notifications; main menu entry point; style alignment
-- Live PvP stats overlay in replays: the recorded player's reach, CPS, combo and damage dealt and
-  taken, each keyframeable. Recorded as Reizo's own frames (clicks and swings from the client,
-  hits from the attack and damage packets). Drawn as OneConfig HUD elements when OneConfig is
-  installed, so they can be placed and styled in OneConfig's HUD editor next to OneClient's own,
-  with a plain Reizo overlay otherwise. OneClient's own CPS, reach and similar HUD elements can't
-  show the recorded values: they measure the person watching the replay, not the recording. A
-  setting can hide them during replays and exports.
+- OneClient's own HUD elements showing the recorded player in replays (spike first; dropped if
+  the spike fails, with no Reizo-drawn replacement). OneClient's HUD elements come from Polyfrost's
+  EvergreenHUD (GPL-3.0, OneConfig HUD API). During a replay they measure the person watching:
+  CPS and Keystrokes count OneConfig's mouse and key events; Reach, Combo, Armor, Position and the
+  like read `mc.player`, which is the replay camera, not the recorded player.
+  1. Record the recorded player's attack, use and movement key presses as Reizo frames.
+  2. In POV, post them as OneConfig `MouseInputEvent` / `KeyInputEvent` through its event bus so
+     CPS and Keystrokes count them, without moving the camera or firing keybinds.
+  3. Point the elements that read `mc.player` at the recorded player while in POV (a mixin on
+     EvergreenHUD, so it depends on its internals and may need updating with its releases). Its
+     Reach and Combo check that the attacker is `mc.player` and not a spectator.
+  4. Keyframeable show/hide per element in the editor; they draw in exports like the rest of the
+     HUD.
 - Distant terrain (LOD) in replays and exports with Distant Horizons and Voxy (optional, needs a
   spike first). During a replay the client is connected to Reizo's local replay server, so both
   mods see an unknown server with no LOD data and show nothing past the render distance.
