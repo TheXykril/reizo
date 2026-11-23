@@ -84,7 +84,7 @@ public final class KeyframedSettings {
               }
               KeyframedSetting s = find(e.getKey());
               if (s != null) {
-                setSafely(s, e.getValue());
+                restoreSafely(s, e.getValue());
               }
               return true;
             });
@@ -114,7 +114,7 @@ public final class KeyframedSettings {
     for (Map.Entry<String, Double> e : originals.entrySet()) {
       KeyframedSetting s = find(e.getKey());
       if (s != null) {
-        setSafely(s, e.getValue());
+        restoreSafely(s, e.getValue());
       }
     }
     originals.clear();
@@ -125,6 +125,14 @@ public final class KeyframedSettings {
       s.set(v);
     } catch (RuntimeException e) {
       LOGGER.warn("Could not set {}", s.id(), e);
+    }
+  }
+
+  private static void restoreSafely(KeyframedSetting s, double v) {
+    try {
+      s.restore(v);
+    } catch (RuntimeException e) {
+      LOGGER.warn("Could not restore {}", s.id(), e);
     }
   }
 

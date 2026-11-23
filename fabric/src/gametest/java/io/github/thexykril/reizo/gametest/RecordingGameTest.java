@@ -830,6 +830,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     checkFreeCamera(context);
     checkEffects(context);
     checkKeyframedSettings(context);
+    checkTimeAndWeather(context);
     LOGGER.info("checkReplayControls OK");
   }
 
@@ -1042,6 +1043,56 @@ public final class RecordingGameTest implements FabricClientGameTest {
         context.computeOnClient(mc -> mc.options.entityShadows().get() != shadowsBefore),
         "redo did not bring the settings back");
     LOGGER.info("checkKeyframedSettings OK");
+  }
+
+  /** Time of day and weather keyframes override the recorded ones, and removing them goes back. */
+  private void checkTimeAndWeather(ClientGameTestContext context) {
+    String time = "reizo:time_of_day";
+    String rain = "reizo:rain";
+    String thunder = "reizo:thunder";
+    double recordedTime =
+        context.computeOnClient(
+            mc -> io.github.thexykril.reizo.fabric.settings.KeyframedSettings.find(time).get());
+    check(
+        context.computeOnClient(mc -> mc.level.getRainLevel(1f) == 0f),
+        "the test world should be clear");
+    context.runOnClient(
+        mc -> {
+          var tracks = ReplayEditor.settings();
+          ReplayEditor.recordUndo();
+          tracks.put(time, PropertyTracks.Kind.NUMBER, 0, 18_000);
+          tracks.put(rain, PropertyTracks.Kind.NUMBER, 0, 1);
+          tracks.put(thunder, PropertyTracks.Kind.NUMBER, 0, 1);
+          ReplayEditor.settingsChanged();
+        });
+    context.waitTicks(5);
+    context.takeScreenshot("reizo-replay-night-storm");
+    context.runOnClient(
+        mc -> {
+          double shown =
+              io.github.thexykril.reizo.fabric.settings.KeyframedSettings.find(time).get();
+          check(Math.abs(shown - 18_000) < 1, "time of day not overridden: " + shown);
+          check(mc.level.getRainLevel(1f) == 1f, "rain not overridden: " + mc.level.getRainLevel(1f));
+          check(
+              mc.level.getThunderLevel(1f) == 1f,
+              "thunder not overridden: " + mc.level.getThunderLevel(1f));
+          check(mc.level.isRaining() && mc.level.isThundering(), "the level does not report a storm");
+          check(ReplayEditor.undo(), "nothing to undo");
+        });
+    context.waitTicks(2);
+    context.runOnClient(
+        mc -> {
+          double shown =
+              io.github.thexykril.reizo.fabric.settings.KeyframedSettings.find(time).get();
+          // The recorded clock keeps running underneath, so allow for the ticks since.
+          check(
+              Math.abs(shown - recordedTime) < 200,
+              "time of day not back to the recording: " + shown + ", was " + recordedTime);
+          check(mc.level.getRainLevel(1f) == 0f, "rain not back to the recording");
+          check(!io.github.thexykril.reizo.fabric.playback.ReplayWorldLook.thunderOverridden(),
+              "thunder override left behind");
+        });
+    LOGGER.info("checkTimeAndWeather OK: recorded time {}", Math.round(recordedTime));
   }
 
   /** Manual start after joining, while the player walks: local player frames must track motion. */

@@ -19,6 +19,8 @@ compatibility.
 
 ### Added
 
+- Time of day, rain and thunder can be keyframed in a replay (Timeline → Settings), for night shots,
+  storms or timelapses. They show in exports; the recording itself is unchanged.
 - The inventory and chest screens the recorded player opened now show in player view (POV) replays,
   with the mouse, hovered item and the item on the cursor. They can be turned off in the settings
   or keyframed in the editor.
