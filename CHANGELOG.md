@@ -13,6 +13,8 @@ compatibility.
 - The settings screen fits at GUI scale 3 on a 720p window again.
 - Exporting a multiplayer recording from its very first moment waited forever on the loading
   screen.
+- Silent sounds no longer count as the start of an export's audio (seen on 26.1.2 and once on
+  1.21.10, where a test then measured the wrong sound).
 - Exporting across a recorded server switch could wait forever on the loading screen (seen on
   26.2).
 - A backwards seek no longer moves the free camera to the world origin.
@@ -34,8 +36,8 @@ compatibility.
   Settings, undoable, saved with the project and hidden in exports too.
 - Time of day, rain and thunder can be keyframed in a replay (Timeline → Settings), for night shots,
   storms or timelapses. They show in exports; the recording itself is unchanged.
-- Minecraft 1.21.10 and 26.2 support (separate jars), so every OneClient version from 1.21.10 up
-  is covered. Only tested by the automated in-game tests so far.
+- Minecraft 1.21.10, 26.1.2 and 26.2 support (separate jars), so every OneClient version from
+  1.21.10 up is covered. Only tested by the automated in-game tests so far.
 - Recordings made in OneClient note it (and its version) in their metadata.
 - The inventory and chest screens the recorded player opened now show in player view (POV) replays,
   with the mouse, hovered item and the item on the cursor. They can be turned off in the settings

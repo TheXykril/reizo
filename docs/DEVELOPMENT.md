@@ -18,7 +18,7 @@
 | `./gradlew :core:test` | Unit tests only (seconds) |
 | `./gradlew spotlessApply` | Format code, add license headers |
 | `./gradlew :fabric:1.21.11:runClient` | Dev client in `fabric/versions/1.21.11/run/` with `-Dreizo.debug=true` |
-| `xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest` | In-game end-to-end tests (also `:fabric:1.21.10:…`, `:fabric:26.2:…`, `:fabric:26.3:…`) |
+| `xvfb-run -a ./gradlew :fabric:1.21.11:runClientGameTest` | In-game end-to-end tests (also `:fabric:1.21.10:…`, `:fabric:26.1.2:…`, `:fabric:26.2:…`, `:fabric:26.3:…`) |
 | `./gradlew :fabric:1.21.11:genSourcesWithVineflower` | Decompiled Minecraft sources (Mojang names) for reading |
 | `scripts/check.sh` | Everything CI runs, plus gametests if a display/Xvfb exists |
 
