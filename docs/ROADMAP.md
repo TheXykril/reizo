@@ -57,6 +57,21 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 ## M7 — OneClient integration and polish
 
 - OneConfig settings, keybinds and notifications; main menu entry point; style alignment
+- Distant terrain (LOD) in replays and exports with Distant Horizons and Voxy (optional, needs a
+  spike first). During a replay the client is connected to Reizo's local replay server, so both
+  mods see an unknown server with no LOD data and show nothing past the render distance.
+  1. Spike: find out how each mod names its LOD storage (per server and dimension), and whether it
+     has an API to choose the storage or feed LODs (Distant Horizons has a public API; Voxy's is
+     less settled). Check which Minecraft versions each supports.
+  2. Reuse: during a replay, point the mod at the LOD data of the server the recording came from,
+     read-only. This adds nothing to the recording, but it only works on the machine that recorded,
+     and it shows today's terrain rather than the terrain at the time of the recording.
+  3. Embed, optional: copy the LOD area around the recording into the `.reizo` file, so shared
+     replays show distant terrain too. This makes files much larger, so it would be a setting with
+     a radius.
+  Also check whether server-sent LODs (Distant Horizons can receive them from a server plugin) are
+  already captured in recordings and replay correctly. A replay can't answer the mod's requests,
+  so they probably don't.
 
 ## M8 — More Minecraft versions
 
