@@ -1483,6 +1483,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           render.crf = 30;
           render.codec = "libx264";
           render.output = "gametest-export.mp4";
+          render.soundVolume = 50; // the export's own level, on top of the game's
           check(ExportControls.exportCurrent(mc, result::set), "export did not start");
         });
     // A sound in the middle of the export ends up in its sound track.
@@ -1518,6 +1519,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
             .findFirst()
             .orElse(null);
     check(loop != null, "the looping sound was not followed: " + s.soundCues());
+    float click = s.soundCues().get(0).gain();
+    check(click > 0 && click <= 0.5f + 1e-4f, "sound at 50% exported with gain " + click);
     check(
         loop.endMs() - loop.timeMs() > 700 && loop.endMs() - loop.timeMs() < 1500,
         "looping sound from " + loop.timeMs() + " to " + loop.endMs() + " ms");

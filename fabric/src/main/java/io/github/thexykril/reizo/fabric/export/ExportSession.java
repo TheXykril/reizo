@@ -58,7 +58,7 @@ public final class ExportSession {
   private final String ffmpeg;
   private final Consumer<ExportSession> onEnd;
   private final boolean audio;
-  private final SoundCapture sounds = new SoundCapture();
+  private final SoundCapture sounds;
   private java.util.concurrent.CompletableFuture<Void> mux;
   private State state = State.PREPARING;
   private FrameEncoder encoder;
@@ -81,8 +81,11 @@ public final class ExportSession {
       FfmpegCommand.Settings settings,
       String ffmpeg,
       boolean audio,
+      float soundVolume,
+      float musicVolume,
       Consumer<ExportSession> onEnd) {
     this.audio = audio;
+    this.sounds = new SoundCapture(soundVolume, musicVolume);
     this.plan = plan;
     this.output = output;
     this.settings = settings;
@@ -115,6 +118,8 @@ public final class ExportSession {
       FfmpegCommand.Settings settings,
       String ffmpeg,
       boolean audio,
+      float soundVolume,
+      float musicVolume,
       Consumer<ExportSession> onEnd) {
     ReplayServer server = ReplayPlayback.current();
     if (server == null || mc.level == null) {
@@ -123,7 +128,8 @@ public final class ExportSession {
     if (current != null) {
       throw new IllegalStateException("An export is already running");
     }
-    ExportSession s = new ExportSession(plan, output, settings, ffmpeg, audio, onEnd);
+    ExportSession s =
+        new ExportSession(plan, output, settings, ffmpeg, audio, soundVolume, musicVolume, onEnd);
     s.hideGuiBefore = mc.options.hideGui;
     s.pathBefore = ReplayEditor.isPathPlaying();
     current = s;

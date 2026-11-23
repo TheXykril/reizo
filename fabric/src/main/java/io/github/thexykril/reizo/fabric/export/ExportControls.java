@@ -73,6 +73,8 @@ public final class ExportControls {
         settings,
         ffmpeg.get(),
         r.audio,
+        Math.max(0, Math.min(100, r.soundVolume)) / 100f,
+        Math.max(0, Math.min(100, r.musicVolume)) / 100f,
         session -> {
           dismissProgress();
           switch (session.state()) {

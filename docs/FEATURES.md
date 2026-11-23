@@ -158,8 +158,11 @@ Last verified: 2026-11-22, commit see HANDOFF.md.
   Loops that started while the export got ready (an entity's sound) play from the first frame.
   "Sound" on/off in the export settings (ADR 0013). Left out: one-shot sounds and music that
   started before the export range. Music and minecarts by ear on real hardware: **untested**.
-- Microphone, Simple Voice Chat (only where permitted), per-track volume, mute/solo, fades:
-  **planned**.
+- **Sound and music levels in exports:** **implemented**, evidence GT (`exportVideo` exports at
+  sound 50%: the click's gain is at most 0.5). Export settings "Sound" and "Music" (Off, 25 to
+  100%), on top of the game's own volume settings; stored in the project. Off leaves those sounds
+  out.
+- Microphone, Simple Voice Chat (only where permitted), fades: **planned**.
 
 ## Export (M4/M5)
 
