@@ -1,13 +1,26 @@
-// Fabric client mod for Minecraft 1.21.11 (Mojang mappings).
-// Thin adapter layer: hooks Minecraft and forwards data to :core.
+// Fabric client mod, built once per Minecraft version by Stonecutter (:fabric:<version>, ADR 0007).
+// Every version shares fabric/src; differences are //? blocks. Thin adapter layer: hooks Minecraft
+// and forwards data to :core. Names are Mojang's (mapped for 1.21.x, unobfuscated from 26.1).
+import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import net.fabricmc.loom.api.fabricapi.FabricApiExtension
+
 plugins {
-    alias(libs.plugins.loom)
+    java
 }
 
 val modId = providers.gradleProperty("mod_id").get()
+val minecraftVersion = property("minecraft_version") as String
+val remap = (property("loom_remap") as String).toBoolean()
+val javaVersion = property("java_version") as String
+val fabricApiVersion = property("fabric_api_version") as String
+
+// Obfuscated versions need the remapping Loom; 26.x is unobfuscated.
+apply(plugin = if (remap) "net.fabricmc.fabric-loom-remap" else "net.fabricmc.fabric-loom")
+val loom = extensions.getByType<LoomGradleExtensionAPI>()
+val modImplementation = if (remap) "modImplementation" else "implementation"
 
 base {
-    archivesName.set("$modId-fabric-${libs.versions.minecraft.get()}")
+    archivesName.set("$modId-fabric-$minecraftVersion")
 }
 
 repositories {
@@ -18,11 +31,7 @@ repositories {
     }
 }
 
-loom {
-    // Mixins live in the client source set only; the mod is client-side.
-    mixin {
-        defaultRefmapName.set("$modId.refmap.json")
-    }
+loom.apply {
     runs {
         named("client") {
             client()
@@ -38,7 +47,7 @@ loom {
 
 // Client gametests: a real Minecraft client creates a singleplayer world and records it.
 // Source set: src/gametest. Run headless with: xvfb-run ./gradlew :fabric:runClientGameTest
-fabricApi {
+extensions.configure<FabricApiExtension> {
     configureTests {
         createSourceSet.set(true)
         modId.set("$modId-gametest")
@@ -58,10 +67,12 @@ loom.runs.matching { it.name == "clientGameTest" }.configureEach {
 }
 
 dependencies {
-    minecraft("com.mojang:minecraft:${libs.versions.minecraft.get()}")
-    mappings(loom.officialMojangMappings())
+    "minecraft"("com.mojang:minecraft:$minecraftVersion")
+    if (remap) {
+        "mappings"(loom.officialMojangMappings())
+    }
     modImplementation(libs.fabric.loader)
-    modImplementation(libs.fabric.api)
+    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
 
     // Optional OneConfig settings page (only its Minecraft-independent config API is needed).
     compileOnly("org.polyfrost.oneconfig:config:${libs.versions.oneconfig.get()}") { isTransitive = false }
@@ -76,7 +87,7 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.2.20") { isTransitive = false }
 
     implementation(project(":core"))
-    include(project(":core"))
+    "include"(project(":core"))
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -87,7 +98,8 @@ tasks.processResources {
     val props =
         mapOf(
             "version" to project.version.toString(),
-            "minecraft_version" to libs.versions.minecraft.get(),
+            "minecraft_version" to minecraftVersion,
+            "java_version" to javaVersion,
             "loader_version" to
                 libs.versions.fabric.loader
                     .get(),
