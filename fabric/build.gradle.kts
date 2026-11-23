@@ -16,7 +16,7 @@ val fabricApiVersion = property("fabric_api_version") as String
 
 // Obfuscated versions need the remapping Loom; 26.x is unobfuscated.
 apply(plugin = if (remap) "net.fabricmc.fabric-loom-remap" else "net.fabricmc.fabric-loom")
-// Compose screens on OneConfig's UI kit (trial; an ADR follows if the UI moves to Compose).
+// Compose screens on OneConfig's components (docs/DECISIONS/0017-compose-screens.md).
 apply(plugin = "org.jetbrains.kotlin.jvm")
 apply(plugin = "org.jetbrains.kotlin.plugin.compose")
 extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {

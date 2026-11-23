@@ -22,3 +22,4 @@ in AGENTS.md needs an ADR.
 | [0014](0014-keyframed-settings.md) | Keyframed game and mod settings | Accepted |
 | [0015](0015-editor-ui-kit.md) | A docked editor built on a small Reizo UI kit | Proposed |
 | [0016](0016-clip-track.md) | A clip track that maps video time to replay time | Proposed |
+| [0017](0017-compose-screens.md) | Reizo screens on OneConfig's Compose components | Proposed |
