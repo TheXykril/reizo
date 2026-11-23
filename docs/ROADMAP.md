@@ -37,6 +37,15 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 - Editor screen: tracks, clips, trim/split, zoom/scroll, keyframe lanes, undo/redo, shortcuts
 - Deterministic frame-by-frame renderer (fixed timestep, no wall-clock dependence)
 - FFmpeg export (system FFmpeg first; bundled/downloaded later), H.264 software + hardware, progress, cancel
+- Auto highlights: while recording, detect kills, deaths, big falls, clutches (a save just before
+  fall damage or the void) and PvP combos, and add them as typed markers on the timeline. Jump
+  between them in the replay, and export a montage of the chosen ones in one click (a few seconds
+  before and after each, with an optional fade). Detection runs on the client from packets the
+  recording already has (death messages, health, combat events), so old recordings can be scanned
+  too.
+- Vertical 9:16 export for Shorts, Reels and TikTok: a crop or a second camera that reframes
+  automatically to keep the recorded player in frame, with smoothing so it doesn't jitter, and
+  keyframes to override it. Presets for 1080x1920.
 
 ## M5 — Effects, overlays, shadow recording
 
@@ -57,6 +66,13 @@ Goal: reliable, crash-safe recording of singleplayer and multiplayer sessions.
 ## M7 — OneClient integration and polish
 
 - OneConfig settings, keybinds and notifications; main menu entry point; style alignment
+- Live PvP stats overlay in replays: the recorded player's reach, CPS, combo and damage dealt and
+  taken, each keyframeable. Recorded as Reizo's own frames (clicks and swings from the client,
+  hits from the attack and damage packets). Drawn as OneConfig HUD elements when OneConfig is
+  installed, so they can be placed and styled in OneConfig's HUD editor next to OneClient's own,
+  with a plain Reizo overlay otherwise. OneClient's own CPS, reach and similar HUD elements can't
+  show the recorded values: they measure the person watching the replay, not the recording. A
+  setting can hide them during replays and exports.
 - Distant terrain (LOD) in replays and exports with Distant Horizons and Voxy (optional, needs a
   spike first). During a replay the client is connected to Reizo's local replay server, so both
   mods see an unknown server with no LOD data and show nothing past the render distance.
