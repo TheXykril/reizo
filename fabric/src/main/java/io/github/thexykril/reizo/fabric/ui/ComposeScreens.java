@@ -24,4 +24,8 @@ final class ComposeScreens {
   static Screen settings(Screen parent) {
     return new ComposeSettingsScreen(parent);
   }
+
+  static Screen timeline(Screen parent) {
+    return new ComposeTimelineScreen(parent);
+  }
 }

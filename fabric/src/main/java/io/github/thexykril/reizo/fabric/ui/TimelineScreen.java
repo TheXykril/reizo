@@ -214,6 +214,17 @@ public final class TimelineScreen extends Screen {
     super(Component.translatable("reizo.timeline.title"));
   }
 
+  /**
+   * Opens the editor. The Compose editor (ADR 0017) is opt-in with {@code
+   * -Dreizo.composeTimeline=true} until it does everything this screen does.
+   */
+  public static Screen create() {
+    if (ExportSettingsScreen.composeScreens() && Boolean.getBoolean("reizo.composeTimeline")) {
+      return ComposeScreens.timeline(null);
+    }
+    return new TimelineScreen();
+  }
+
   // --- Layout -----------------------------------------------------------------------------
 
   @Override
