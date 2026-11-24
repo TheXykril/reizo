@@ -39,6 +39,12 @@ public final class ClientConfig {
   public boolean showPlayerScreens = true;
 
   /**
+   * Open the classic replay editor instead of the new one (which needs OneConfig, as in
+   * OneClient). Without OneConfig the classic editor is always used.
+   */
+  public boolean classicEditor = false;
+
+  /**
    * Modifier that must be held with the start/stop key: "none", "shift", "control" or "alt". The
    * key itself is set in Controls (default R, so Shift+R like Lunar).
    */

@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import io.github.thexykril.reizo.fabric.RecorderClient;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -215,14 +216,35 @@ public final class TimelineScreen extends Screen {
   }
 
   /**
-   * Opens the editor. The Compose editor (ADR 0017) is opt-in with {@code
-   * -Dreizo.composeTimeline=true} until it does everything this screen does.
+   * The replay editor: the new one on OneConfig's Compose UI when OneConfig is installed, unless
+   * the classic editor is chosen in the settings; else this screen.
    */
   public static Screen create() {
-    if (ExportSettingsScreen.composeScreens() && Boolean.getBoolean("reizo.composeTimeline")) {
+    if (newEditorAvailable() && !RecorderClient.get().config().classicEditor) {
       return ComposeScreens.timeline(null);
     }
     return new TimelineScreen();
+  }
+
+  /** Whether the new editor can open here (OneConfig's Compose UI is usable). */
+  public static boolean newEditorAvailable() {
+    return ExportSettingsScreen.composeScreens();
+  }
+
+  /** Switches between the new and the classic editor, saves the choice, and opens that editor. */
+  public static void useClassicEditor(boolean classic) {
+    RecorderClient client = RecorderClient.get();
+    client.config().classicEditor = classic;
+    client.saveConfig();
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
+      try {
+        io.github.thexykril.reizo.fabric.compat.OneConfigIntegration.refresh();
+      } catch (Throwable ignored) {
+        // the page reads the settings again when it opens
+      }
+    }
+    Minecraft mc = Minecraft.getInstance();
+    mc.setScreen(create());
   }
 
   // --- Layout -----------------------------------------------------------------------------
@@ -384,6 +406,14 @@ public final class TimelineScreen extends Screen {
     icon(rx, 2, 16, "reizo.timeline.redo", "redo", b -> redo());
     rx -= 17;
     icon(rx, 2, 16, "reizo.timeline.undo", "undo", b -> undo());
+    if (newEditorAvailable()) {
+      Component newer = Component.translatable("reizo.timeline.new_editor");
+      int newerW = FlatButton.fitWidth(font, newer, 7);
+      rx -= newerW + 4;
+      addRenderableWidget(
+          new FlatButton(
+              rx, 3, newerW, 14, newer, FlatButton.Style.TONAL, b -> useClassicEditor(false)));
+    }
 
     // View mode segment, when it fits between the two groups.
     String[] modes = {"free", "pov", "follow", "path"};

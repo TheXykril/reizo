@@ -136,6 +136,8 @@
   "reizo.timeline.properties": "Properties",
   "reizo.timeline.export_tab": "Export",
   "reizo.timeline.media": "Media",
+  "reizo.timeline.classic_editor": "Classic editor",
+  "reizo.timeline.new_editor": "New editor",
   "reizo.timeline.music": "Music",
   "reizo.timeline.import_music": "Import music…",
   "reizo.timeline.music_hint": "Add a sound file from your computer. It starts at the playhead and is mixed into the export.",

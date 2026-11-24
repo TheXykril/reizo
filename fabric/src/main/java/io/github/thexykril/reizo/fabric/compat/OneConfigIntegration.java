@@ -30,6 +30,11 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
     OneConfigRecordingHud.register();
   }
 
+  /** Reads Reizo's settings into the page again, after they changed elsewhere. */
+  public static void refresh() {
+    Page.pull(RecorderClient.get().config());
+  }
+
   /** Reizo's registered page, or null before OneConfig ran this entrypoint. */
   private static Page page;
 
@@ -87,6 +92,12 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
         description = "In player view, show the inventory and chests they opened while recording.",
         category = "Replays")
     public static boolean showPlayerScreens = true;
+
+    @Switch(
+        title = "Classic replay editor",
+        description = "Open the previous editor instead of the new one.",
+        category = "Replays")
+    public static boolean classicEditor;
 
     @Switch(
         title = "Save server or world name",
@@ -154,6 +165,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
             "showIndicator",
             "showPlayerHud",
             "showPlayerScreens",
+            "classicEditor",
             "storeServerName",
             "toggleModifier",
             "ffmpegPath",
@@ -168,11 +180,12 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       pull(RecorderClient.get().config());
     }
 
-    private static void pull(ClientConfig c) {
+    static void pull(ClientConfig c) {
       autoRecordOnJoin = c.autoRecordOnJoin;
       showIndicator = c.showIndicator;
       showPlayerHud = c.showPlayerHud;
       showPlayerScreens = c.showPlayerScreens;
+      classicEditor = c.classicEditor;
       storeServerName = c.storeServerName;
       toggleModifier = modifierIndex(c.toggleModifier);
       ffmpegPath = c.ffmpegPath == null ? "" : c.ffmpegPath;
@@ -190,6 +203,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
       c.showIndicator = showIndicator;
       c.showPlayerHud = showPlayerHud;
       c.showPlayerScreens = showPlayerScreens;
+      c.classicEditor = classicEditor;
       c.storeServerName = storeServerName;
       c.toggleModifier = MODIFIERS[Math.max(0, Math.min(MODIFIERS.length - 1, toggleModifier))];
       c.ffmpegPath = ffmpegPath == null ? "" : ffmpegPath.strip();
