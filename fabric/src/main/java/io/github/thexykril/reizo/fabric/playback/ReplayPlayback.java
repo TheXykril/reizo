@@ -184,8 +184,13 @@ public final class ReplayPlayback {
     PacketTap.setSuppressed(true);
     server.start();
 
-    ServerData data =
-        new ServerData("Reizo replay: " + meta.name, "127.0.0.1", ServerData.Type.OTHER);
+    // Only shown on the connecting screen (OneClient's shows the name and the address). The real
+    // address is the local replay server's; showing "127.0.0.1" there reads like a network join.
+    String shown =
+        meta.name != null && !meta.name.isBlank()
+            ? meta.name
+            : archivePath.getFileName().toString().replaceFirst("\\.reizo$", "");
+    ServerData data = new ServerData(shown, "Reizo replay", ServerData.Type.OTHER);
     LOGGER.info("Playing {} ({} ms)", archivePath.getFileName(), script.durationMs());
     ConnectScreen.startConnecting(
         new TitleScreen(), mc, new ServerAddress("127.0.0.1", server.port()), data, false, null);
