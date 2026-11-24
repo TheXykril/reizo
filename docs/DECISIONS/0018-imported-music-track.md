@@ -1,6 +1,6 @@
 # 0018: Imported music on its own track, mixed into the export
 
-Status: Proposed (2026-11-24). Requested by the owner ("media menu for adding music from computer").
+Status: Accepted (2026-11-24, by the owner). Requested by the owner ("media menu for adding music from computer").
 
 ## Context
 
