@@ -37,7 +37,8 @@ public final class SettingsScreen extends KitScreen {
             .warn("Could not open Reizo's OneConfig page; using Reizo's own screen", t);
       }
     }
-    net.minecraft.client.Minecraft.getInstance().setScreen(new SettingsScreen(parent));
+    net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+    mc.setScreen(new SettingsScreen(parent));
   }
 
   public SettingsScreen(Screen parent) {
