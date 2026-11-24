@@ -154,6 +154,7 @@ public final class EffectRenderer {
   /** The world's depth, copied before Minecraft clears it for the hand; null until needed. */
   private static TextureTarget depth;
 
+
   /** Whether {@link #depth} holds this frame's world. */
   private static boolean depthKept;
 
@@ -162,6 +163,27 @@ public final class EffectRenderer {
    * copy of the depth while depth of field is on.
    */
   public static void keepDepth(Minecraft mc) {
+    if (keptBeforeShaderHand) {
+      // A shader pack already kept the world's depth this frame, before drawing its hand.
+      keptBeforeShaderHand = false;
+      return;
+    }
+    copyDepth(mc);
+  }
+
+  /** Whether the depth was kept by {@link #keepDepthBeforeShaderHand} this frame. */
+  private static boolean keptBeforeShaderHand;
+
+  /**
+   * Called by Iris (through a mixin) right before a shader pack draws the hand into the world's
+   * depth. Later in the frame the depth no longer holds the world, so keep it here.
+   */
+  public static void keepDepthBeforeShaderHand(Minecraft mc) {
+    copyDepth(mc);
+    keptBeforeShaderHand = depthKept;
+  }
+
+  private static void copyDepth(Minecraft mc) {
     depthKept = false;
     if (!ReplayPlayback.isActive() || ReplayEditor.gradeNow().dof() <= 0) {
       return;
@@ -190,6 +212,17 @@ public final class EffectRenderer {
   /** The target holding the world's depth for this frame: the kept copy, else the main one. */
   private static RenderTarget depthSource(RenderTarget main) {
     return depthKept ? depth : main;
+  }
+
+  /** The set focus distance, or the followed player's distance when focus is automatic. */
+  private static float focusDistance(Grade grade) {
+    if (grade.focus() > 0) {
+      return grade.focus();
+    }
+    if (ReplayCamera.mode() == ReplayCamera.Mode.FOLLOW && FollowCamera.subjectDistance() > 0) {
+      return FollowCamera.subjectDistance();
+    }
+    return 0;
   }
 
   /** Called after the world is rendered, before the HUD. */
@@ -230,12 +263,12 @@ public final class EffectRenderer {
     encoder.copyTextureToTexture(
         main.getColorTexture(), copy.getColorTexture(), 0, 0, 0, 0, 0, w, h);
     //? if >=26.2 {
-    /*// 26.2+ renders with reversed depth: depth 0 is the far plane and depth 1 the near one. Iris
-    // turns that back to the usual order while a shader pack draws the world.
+    /*// 26.2+ renders with reversed depth: depth 0 is the far plane and depth 1 the near one. The
+    // depth stays reversed with an Iris shader pack too (checked with Iris 1.11.7 and
+    // Complementary Reimagined in ShaderEffectsGameTest).
     float far = mc.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.depthFar;
-    boolean reversed = !io.github.thexykril.reizo.fabric.compat.ShaderPacks.inUse();
-    float depth0 = reversed ? far : 0.05f;
-    float depth1 = reversed ? 0.05f : far;
+    float depth0 = far;
+    float depth1 = 0.05f;
     try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
     *///?} else if >=26.1 {
     /*float depth0 = 0.05f;
@@ -249,7 +282,7 @@ public final class EffectRenderer {
       Std140Builder.intoBuffer(view.data())
           .putVec4(grade.exposure(), grade.contrast(), grade.saturation(), grade.temperature())
           .putVec4(grade.vignette(), (float) grade.letterboxBar(w, h), w / (float) h, 0)
-          .putVec4(grade.bloom(), grade.dof(), grade.focus(), 0)
+          .putVec4(grade.bloom(), grade.dof(), focusDistance(grade), 0)
           .putVec4(1f / w, 1f / h, depth0, depth1)
           // The shader's texture coordinates start at the bottom; the box's y starts at the top.
           .putVec4(
