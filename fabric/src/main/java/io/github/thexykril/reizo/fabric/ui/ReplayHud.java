@@ -18,7 +18,9 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
 
 /**
  * Replay bar at the bottom of the screen while a replay plays: play state, time, length, speed,
@@ -28,7 +30,47 @@ public final class ReplayHud {
   /** Space the replay bar takes at the bottom of the screen, margin included. */
   public static final int HEIGHT = 28;
 
+  /** How long a status message shows, fade included. */
+  private static final long STATUS_MS = 1600;
+
+  private static final long STATUS_FADE_MS = 300;
+
+  private static Component statusText;
+  private static long statusAt;
+
   private ReplayHud() {}
+
+  /**
+   * Shows a short message above the replay bar (speed, camera, marker changes), replacing the one
+   * before it. Drawn like the bar instead of Minecraft's action bar.
+   */
+  public static void status(Component message) {
+    statusText = message;
+    statusAt = Util.getMillis();
+  }
+
+  /** The status message on screen, or null. */
+  public static Component currentStatus() {
+    return statusText != null && Util.getMillis() - statusAt < STATUS_MS
+        ? statusText
+        : null;
+  }
+
+  private static void renderStatus(GuiGraphics g, Font font, int centerX, int bottom) {
+    Component text = currentStatus();
+    if (text == null) {
+      return;
+    }
+    long left = STATUS_MS - (Util.getMillis() - statusAt);
+    float fade = Math.min(1f, left / (float) STATUS_FADE_MS);
+    int w = Draw.width(font, text.getString()) + 20;
+    int h = 16;
+    int x = centerX - w / 2;
+    int y = bottom - h;
+    Draw.round(g, x, y, x + w, y + h, 8, Theme.alpha(Theme.GROUND, (int) (0xE8 * fade)));
+    int textAlpha = Math.max(4, (int) (0xFF * fade));
+    Draw.label(g, font, text.getString(), x + 10, y + 4, Theme.alpha(Theme.TEXT, textAlpha));
+  }
 
   public static void register() {
     HudElementRegistry.addLast(
@@ -115,6 +157,7 @@ public final class ReplayHud {
     }
     int px = barX + filled;
     Draw.round(g, px - 4, barY - 3, px + 4, barY + 5, 4, 0xFFFFFFFF);
+    renderStatus(g, font, x + width / 2, y - 6);
   }
 
   /** A play triangle centred on (cx, cy), 7 GUI pixels tall, drawn at window pixels. */

@@ -199,7 +199,7 @@ public final class RecorderKeys {
     }
     while (openReplays.consumeClick()) {
       if (mc.screen == null && !ReplayPlayback.isActive()) {
-        mc.setScreen(new ReplayBrowserScreen(null));
+        mc.setScreen(ReplayBrowserScreen.create(null));
       }
     }
     handleReplay(mc);
@@ -382,6 +382,10 @@ public final class RecorderKeys {
   }
 
   private static void status(Minecraft mc, Component message) {
-    mc.gui.setOverlayMessage(message, false);
+    if (ReplayPlayback.isActive()) {
+      ReplayHud.status(message);
+    } else {
+      mc.gui.setOverlayMessage(message, false);
+    }
   }
 }

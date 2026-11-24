@@ -82,8 +82,7 @@ public final class ExportSettingsScreen extends KitScreen implements ExportSetti
    * ADR 0017), else this kit screen.
    */
   public static Screen create(Screen parent) {
-    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")
-        && !Boolean.getBoolean("reizo.kitScreens")) {
+    if (composeScreens()) {
       try {
         return ComposeScreens.export(parent);
       } catch (Throwable t) {
@@ -91,6 +90,15 @@ public final class ExportSettingsScreen extends KitScreen implements ExportSetti
       }
     }
     return new ExportSettingsScreen(parent);
+  }
+
+  /**
+   * Whether Reizo's screens use OneConfig's Compose UI (ADR 0017): with OneConfig installed, unless
+   * {@code -Dreizo.kitScreens=true}.
+   */
+  static boolean composeScreens() {
+    return net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")
+        && !Boolean.getBoolean("reizo.kitScreens");
   }
 
   public ExportSettingsScreen(Screen parent) {

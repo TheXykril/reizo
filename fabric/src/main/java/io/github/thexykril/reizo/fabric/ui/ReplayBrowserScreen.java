@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Lists saved recordings and plays, renames or deletes them. Opened from the title screen and the
  * pause menu.
  */
-public final class ReplayBrowserScreen extends KitScreen {
+public final class ReplayBrowserScreen extends KitScreen implements ReplayBrowserView {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Browser");
   private static final DateTimeFormatter DATE =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
@@ -58,11 +58,48 @@ public final class ReplayBrowserScreen extends KitScreen {
     this.parent = parent;
   }
 
+  /**
+   * The replay browser: OneConfig's Compose screen when OneConfig is installed (ADR 0017), else this
+   * kit screen. {@code -Dreizo.kitScreens=true} forces the kit screens.
+   */
+  public static Screen create(Screen parent) {
+    if (ExportSettingsScreen.composeScreens()) {
+      try {
+        return ComposeScreens.browser(parent);
+      } catch (Throwable t) {
+        LOGGER.warn("OneConfig's Compose UI is not usable; using Reizo's own screen", t);
+      }
+    }
+    return new ReplayBrowserScreen(parent);
+  }
+
   /** One recording in the list. */
   record Row(RecordingStorage.Entry entry) {
     boolean playable() {
-      return entry.metadata().protocolVersion == SharedConstants.getProtocolVersion();
+      return ReplayBrowserScreen.playable(entry);
     }
+  }
+
+  /** Whether this Minecraft version can play the recording. */
+  static boolean playable(RecordingStorage.Entry entry) {
+    return entry.metadata().protocolVersion == SharedConstants.getProtocolVersion();
+  }
+
+  /** The second line of a row: when and where it was recorded. */
+  static String recordedLine(RecordingMetadata m) {
+    String server = m.serverName != null ? m.serverName : String.valueOf(m.serverType);
+    return DATE.format(Instant.ofEpochMilli(m.startedAtEpochMs)) + "  ·  " + server;
+  }
+
+  /** The third line of a playable row: version, size and markers. */
+  static String detailsLine(RecordingStorage.Entry entry) {
+    RecordingMetadata m = entry.metadata();
+    return m.minecraftVersion
+        + "  ·  "
+        + size(entry.sizeBytes())
+        + (m.markers.isEmpty()
+            ? ""
+            : "  ·  " + m.markers.size() + (m.markers.size() == 1 ? " marker" : " markers"));
   }
 
   @Override
@@ -87,13 +124,13 @@ public final class ReplayBrowserScreen extends KitScreen {
             Component.translatable("reizo.browser.play"),
             this::playSelected);
     y = footerY();
-    button(x, y, third, Component.translatable("reizo.browser.open_folder"), this::openFolder);
+    button(x, y, third, Component.translatable("reizo.browser.open_folder"), ReplayBrowserScreen::openFolder);
     button(
         x + third + GAP,
         y,
         third,
         Component.translatable("reizo.browser.settings"),
-        () -> minecraft.setScreen(new SettingsScreen(this)));
+        () -> minecraft.setScreen(SettingsScreen.create(this)));
     button(
         x + (third + GAP) * 2,
         y,
@@ -195,7 +232,9 @@ public final class ReplayBrowserScreen extends KitScreen {
           m.minecraftVersion
               + "  ·  "
               + size(row.entry.sizeBytes())
-              + (m.markers.isEmpty() ? "" : "  ·  " + m.markers.size() + " markers");
+              + (m.markers.isEmpty()
+            ? ""
+            : "  ·  " + m.markers.size() + (m.markers.size() == 1 ? " marker" : " markers"));
       Draw.label(g, font, Draw.fit(font, line3, w), x, y + 20, Theme.FAINT);
     }
   }
@@ -235,18 +274,18 @@ public final class ReplayBrowserScreen extends KitScreen {
 
   // ---- test hooks ----
 
-  /** The listed recordings, in list order. */
+  @Override
   public List<RecordingStorage.Entry> entries() {
     return rows.stream().map(Row::entry).toList();
   }
 
-  /** Selects a row like a click would. */
+  @Override
   public void select(int index) {
     selected = index;
     updateButtons();
   }
 
-  /** Presses Play. */
+  @Override
   public void pressPlay() {
     play.onPress(new net.minecraft.client.input.KeyEvent(com.mojang.blaze3d.platform.InputConstants.KEY_RETURN, 0, 0));
   }
@@ -311,7 +350,7 @@ public final class ReplayBrowserScreen extends KitScreen {
             true));
   }
 
-  private void openFolder() {
+  static void openFolder() {
     try {
       Files.createDirectories(storage().root());
       Util.getPlatform().openPath(storage().root());
@@ -320,7 +359,7 @@ public final class ReplayBrowserScreen extends KitScreen {
     }
   }
 
-  private static RecordingStorage storage() {
+  static RecordingStorage storage() {
     return RecorderClient.get().storage();
   }
 

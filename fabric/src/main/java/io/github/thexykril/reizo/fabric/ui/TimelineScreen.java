@@ -1637,7 +1637,7 @@ public final class TimelineScreen extends Screen {
     Minecraft mc = Minecraft.getInstance();
     PopupMenu m = new PopupMenu();
     switch (name) {
-      case "file" -> m.add(t("reizo.menu.replays"), "", () -> mc.setScreen(new ReplayBrowserScreen(this)))
+      case "file" -> m.add(t("reizo.menu.replays"), "", () -> mc.setScreen(ReplayBrowserScreen.create(this)))
           .add(t("reizo.timeline.export"), "", () -> mc.setScreen(ExportSettingsScreen.create(this)))
           .separator()
           .add(t("reizo.menu_bar.close"), "Esc", this::onClose);

@@ -23,6 +23,22 @@ public final class SettingsScreen extends KitScreen {
   private int shadowY;
   private int replayY;
 
+  /**
+   * Reizo's settings: OneConfig's Compose screen when OneConfig is installed (ADR 0017), else this
+   * kit screen.
+   */
+  public static Screen create(Screen parent) {
+    if (ExportSettingsScreen.composeScreens()) {
+      try {
+        return ComposeScreens.settings(parent);
+      } catch (Throwable t) {
+        org.slf4j.LoggerFactory.getLogger("Reizo/Settings")
+            .warn("OneConfig's Compose UI is not usable; using Reizo's own screen", t);
+      }
+    }
+    return new SettingsScreen(parent);
+  }
+
   public SettingsScreen(Screen parent) {
     super(Component.translatable("reizo.settings.title"));
     this.parent = parent;

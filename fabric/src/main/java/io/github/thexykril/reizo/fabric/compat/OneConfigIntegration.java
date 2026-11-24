@@ -30,7 +30,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
     OneConfigRecordingHud.register();
     context.originalScreen(
         () ->
-            Minecraft.getInstance().setScreen(new SettingsScreen(Minecraft.getInstance().screen)));
+            Minecraft.getInstance().setScreen(SettingsScreen.create(Minecraft.getInstance().screen)));
   }
 
   /** Reizo's page in OneConfig. Field names are the property ids. */
@@ -41,7 +41,7 @@ public final class OneConfigIntegration implements ConfigEntrypoint {
         text = "Open",
         category = "Replays")
     public static void openReplays() {
-      Minecraft.getInstance().setScreen(new ReplayBrowserScreen(null));
+      Minecraft.getInstance().setScreen(ReplayBrowserScreen.create(null));
     }
 
     @Button(
