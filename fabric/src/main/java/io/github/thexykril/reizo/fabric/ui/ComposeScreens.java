@@ -20,4 +20,8 @@ final class ComposeScreens {
   static Screen browser(Screen parent) {
     return new ComposeBrowserScreen(parent);
   }
+
+  static Screen settings(Screen parent) {
+    return new ComposeSettingsScreen(parent);
+  }
 }

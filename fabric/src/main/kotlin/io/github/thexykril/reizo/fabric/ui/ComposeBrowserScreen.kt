@@ -106,7 +106,7 @@ class ComposeBrowserScreen(private val parent: Screen?) :
                     TextButton(t("reizo.browser.open_folder"), { ReplayBrowserScreen.openFolder() }, style = ControlStyle.Ghost)
                     TextButton(
                         t("reizo.browser.settings"),
-                        { Minecraft.getInstance().setScreen(SettingsScreen(this@ComposeBrowserScreen)) },
+                        { Minecraft.getInstance().setScreen(SettingsScreen.create(this@ComposeBrowserScreen)) },
                         style = ControlStyle.Ghost,
                     )
                 }

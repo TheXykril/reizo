@@ -130,7 +130,7 @@ public final class ReplayBrowserScreen extends KitScreen implements ReplayBrowse
         y,
         third,
         Component.translatable("reizo.browser.settings"),
-        () -> minecraft.setScreen(new SettingsScreen(this)));
+        () -> minecraft.setScreen(SettingsScreen.create(this)));
     button(
         x + (third + GAP) * 2,
         y,

@@ -50,6 +50,7 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.GraphicsPreset;
 //?}
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.Options;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.ProtocolInfo;
@@ -316,6 +317,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
    * Opens the replay browser from the title screen button, checks it lists the recordings made
    * above, and plays the newest one with the Play button.
    */
+  private Screen browserBeforeSettings;
+
   private void browseAndPlay(ClientGameTestContext context) {
     context.waitFor(
         mc -> mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen, 20 * 10);
@@ -327,6 +330,17 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     context.waitTicks(2);
     context.takeScreenshot("reizo-replay-browser");
+    // Reizo's settings open from the browser and return to it.
+    context.runOnClient(
+        mc -> {
+          Screen browser = mc.screen;
+          mc.setScreen(io.github.thexykril.reizo.fabric.ui.SettingsScreen.create(browser));
+          browserBeforeSettings = browser;
+        });
+    context.waitTicks(3);
+    context.takeScreenshot("reizo-client-settings");
+    context.runOnClient(mc -> mc.setScreen(browserBeforeSettings));
+    context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     int listed = context.computeOnClient(mc -> ((ReplayBrowserView) mc.screen).entries().size());
     check(listed >= 2, "browser lists " + listed + " recordings, expected at least 2");
     context.runOnClient(
