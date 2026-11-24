@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.geometry.Rect
@@ -231,9 +232,30 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             Text(ReplayHud.time(now), style = OneConfigTheme.typography.bodyMedium)
             Text("/ " + ReplayHud.time(duration), color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
             Spacer(Modifier.weight(1f))
+            TextButton(t("reizo.timeline.split_short"), { splitAt(now) }, style = ControlStyle.Ghost)
+            TextButton(
+                t("reizo.timeline.delete_clip"),
+                { deleteClip() },
+                style = ControlStyle.Ghost,
+                enabled = selectedClip >= 0 && ReplayEditor.sequence().size() > 1,
+            )
+            Spacer(Modifier.width(8.dp))
             Text(ReplayHud.speed(speed) + "×", color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
             TextButton("−", { ReplayPlayback.stepSpeed(-1) }, style = ControlStyle.Ghost)
             TextButton("+", { ReplayPlayback.stepSpeed(1) }, style = ControlStyle.Ghost)
+        }
+    }
+
+    /** Splits the clip under the playhead (video time). */
+    private fun splitAt(videoMs: Long) {
+        if (ReplayEditor.editClips({ it.split(videoMs) })) version++
+    }
+
+    private fun deleteClip() {
+        val i = selectedClip
+        if (ReplayEditor.editClips({ it.delete(i) })) {
+            selectedClip = -1
+            version++
         }
     }
 
@@ -252,6 +274,11 @@ class ComposeTimelineScreen(private val parent: Screen?) :
 
     /** The selected camera keyframes, by replay time. */
     private val selection = mutableStateListOf<Long>()
+
+    /** The selected clip (index in play order), or -1. */
+    private var selectedClip by mutableIntStateOf(-1)
+
+    private enum class Drag { SEEK, KEYFRAMES, CLIP, TRIM_IN, TRIM_OUT }
 
     /** Bumped on every edit so that the editor reads the project again. */
     private var version by mutableIntStateOf(0)
@@ -290,6 +317,25 @@ class ComposeTimelineScreen(private val parent: Screen?) :
 
     private var lastDensity = 1f
 
+    /**
+     * A point on a clip in window pixels, for tests: at [fraction] of its width (0 = its start
+     * edge, 1 = its end edge), or null without clips.
+     */
+    fun clipPoint(index: Int, fraction: Double): DoubleArray? {
+        val b = timelineBounds
+        val seq = ReplayEditor.sequence()
+        if (b.width <= 0f || seq.isEmpty || index !in 0 until seq.size()) return null
+        val ruler = RULER.value * lastDensity
+        val lane = (b.height - ruler - 8 * lastDensity) / 2
+        val d = videoDuration().toDouble()
+        val a = b.left + b.width * seq.startOf(index) / d
+        val e = b.left + b.width * (seq.startOf(index) + seq.clip(index).lengthMs()) / d
+        return doubleArrayOf(a + (e - a) * fraction, (b.top + ruler + 4 * lastDensity + lane / 2).toDouble())
+    }
+
+    /** The selected clip; for tests. */
+    fun selectedClip(): Int = selectedClip
+
     private fun toVideo(ms: Long): Long = ReplayEditor.sequence().let { if (it.isEmpty) ms else it.toVideo(ms) }
 
     /**
@@ -319,10 +365,14 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val hit = with(density) { 7.dp.toPx() }
         val rulerPx = with(density) { RULER.toPx() }
 
+        val dp = density.density
+        fun laneH(h: Float) = (h - rulerPx - 8 * dp) / 2
+        fun clipsTop() = rulerPx + 4 * dp
+        fun camTop(h: Float) = clipsTop() + laneH(h) + 4 * dp
+
         /** The keyframe (replay time) under a point in the camera lane, or null. */
         fun keyframeAt(p: Offset, w: Float, h: Float): Long? {
-            val camTop = rulerPx + 4 * density.density + (h - rulerPx - 8 * density.density) / 2 + 4 * density.density
-            if (p.y < camTop) return null
+            if (p.y < camTop(h)) return null
             val d = videoDuration()
             return ReplayEditor.path().keyframes()
                 .map { it.timeMs() to toVideo(it.timeMs()) }
@@ -330,6 +380,24 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 .minByOrNull { kotlin.math.abs(w * it.second / d - p.x) }
                 ?.takeIf { kotlin.math.abs(w * it.second / d - p.x) <= hit }
                 ?.first
+        }
+        /** The clip under a point in the video lane and whether an edge was hit, or null. */
+        fun clipAt(p: Offset, w: Float, h: Float): Pair<Int, Drag>? {
+            val sq = ReplayEditor.sequence()
+            if (sq.isEmpty || p.y < clipsTop() || p.y > clipsTop() + laneH(h)) return null
+            val d = videoDuration()
+            for (i in 0 until sq.size()) {
+                val a = w * sq.startOf(i) / d
+                val b = w * (sq.startOf(i) + sq.clip(i).lengthMs()) / d
+                if (p.x < a - hit / 2 || p.x > b + hit / 2) continue
+                val edge = minOf(hit, (b - a) / 4)
+                return i to when {
+                    p.x - a <= edge -> Drag.TRIM_IN
+                    b - p.x <= edge -> Drag.TRIM_OUT
+                    else -> Drag.CLIP
+                }
+            }
+            return null
         }
         fun seekAt(x: Float, w: Float) {
             val d = videoDuration()
@@ -342,39 +410,99 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 .onGloballyPositioned { timelineBounds = it.boundsInWindow() }
                 .pointerInput(Unit) {
                     detectTapGestures { p ->
-                        val k = keyframeAt(p, size.width.toFloat(), size.height.toFloat())
+                        val w = size.width.toFloat()
+                        val h = size.height.toFloat()
+                        val k = keyframeAt(p, w, h)
                         selection.clear()
                         if (k != null) {
                             selection.add(k)
                             ReplayPlayback.seekTo(k)
-                        } else {
-                            seekAt(p.x, size.width.toFloat())
+                            return@detectTapGestures
                         }
+                        val clip = clipAt(p, w, h)
+                        if (clip != null) selectedClip = clip.first else if (p.y > clipsTop()) selectedClip = -1
+                        seekAt(p.x, w)
                     }
                 }
                 .pointerInput(Unit) {
-                    var moving = false
+                    var mode = Drag.SEEK
                     var startX = 0f
+                    var lastX = 0f
                     var applied = 0L
                     var recorded = false
+                    var clip = -1
+                    var clipIn = 0L
+                    var clipOut = 0L
+                    fun finish() {
+                        val w = size.width.toFloat()
+                        if (mode == Drag.CLIP && kotlin.math.abs(lastX - startX) >= 4 * dp) {
+                            val sq = ReplayEditor.sequence()
+                            val t = (lastX / w * videoDuration()).toLong().coerceIn(0, maxOf(0L, sq.durationMs() - 1))
+                            val to = sq.indexAt(t).coerceIn(0, sq.size() - 1)
+                            val from = clip
+                            if (to != from && ReplayEditor.editClips({ it.move(from, to) })) selectedClip = to
+                            version++
+                        } else if (recorded) {
+                            edited()
+                        }
+                        mode = Drag.SEEK
+                    }
                     detectDragGestures(
                         onDragStart = { p ->
-                            val k = keyframeAt(p, size.width.toFloat(), size.height.toFloat())
-                            moving = k != null
+                            val w = size.width.toFloat()
+                            val h = size.height.toFloat()
                             startX = p.x
+                            lastX = p.x
                             applied = 0
                             recorded = false
+                            val k = keyframeAt(p, w, h)
+                            val c = if (k == null) clipAt(p, w, h) else null
+                            mode = when {
+                                k != null -> Drag.KEYFRAMES
+                                c != null -> c.second
+                                else -> Drag.SEEK
+                            }
                             if (k != null && k !in selection) {
                                 selection.clear()
                                 selection.add(k)
                             }
+                            if (c != null) {
+                                clip = c.first
+                                selectedClip = c.first
+                                clipIn = ReplayEditor.sequence().clip(clip).inMs()
+                                clipOut = ReplayEditor.sequence().clip(clip).outMs()
+                                if (c.second != Drag.CLIP) {
+                                    ReplayEditor.recordUndo()
+                                    recorded = true
+                                }
+                            }
                         },
-                        onDragEnd = { if (recorded) edited() },
-                        onDragCancel = { if (recorded) edited() },
+                        onDragEnd = { finish() },
+                        onDragCancel = { finish() },
                     ) { change, _ ->
-                        if (!moving) {
-                            seekAt(change.position.x, size.width.toFloat())
-                            return@detectDragGestures
+                        lastX = change.position.x
+                        val w = size.width.toFloat()
+                        when (mode) {
+                            Drag.SEEK -> {
+                                seekAt(lastX, w)
+                                return@detectDragGestures
+                            }
+                            Drag.CLIP -> return@detectDragGestures
+                            Drag.TRIM_IN, Drag.TRIM_OUT -> {
+                                val delta = ((lastX - startX) / w * videoDuration()).toLong()
+                                val replay = replayDuration()
+                                val i = clip
+                                if (mode == Drag.TRIM_IN) {
+                                    val inMs = maxOf(0L, clipIn + delta)
+                                    ReplayEditor.editClips({ it.trimStart(i, inMs) }, false)
+                                } else {
+                                    val outMs = minOf(replay, clipOut + delta)
+                                    ReplayEditor.editClips({ it.trimEnd(i, outMs, replay) }, false)
+                                }
+                                version++
+                                return@detectDragGestures
+                            }
+                            Drag.KEYFRAMES -> {}
                         }
                         val delta = ((change.position.x - startX) / size.width * videoDuration()).toLong()
                         val step = delta - applied
@@ -413,13 +541,24 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             }
             // Video lane: one rounded block per clip, in play order.
             val gap = if (clips.size > 1) 1.dp.toPx() else 0f
-            for ((a, b) in clips) {
+            for ((i, c) in clips.withIndex()) {
+                val (a, b) = c
+                val selected = i == selectedClip && !seq.isEmpty
                 drawRoundRect(
-                    accent.copy(alpha = 0.35f),
+                    accent.copy(alpha = if (selected) 0.6f else 0.35f),
                     Offset(x(a) + gap, clipsY),
                     Size(x(b) - x(a) - 2 * gap, laneH - 2f),
                     CornerRadius(6.dp.toPx()),
                 )
+                if (selected) {
+                    drawRoundRect(
+                        text,
+                        Offset(x(a) + gap, clipsY),
+                        Size(x(b) - x(a) - 2 * gap, laneH - 2f),
+                        CornerRadius(6.dp.toPx()),
+                        style = Stroke(1.5f.dp.toPx()),
+                    )
+                }
             }
             // Camera lane.
             drawRoundRect(track, Offset(0f, camY), Size(w, laneH - 2f), CornerRadius(6.dp.toPx()))
