@@ -21,10 +21,6 @@ final class ComposeScreens {
     return new ComposeBrowserScreen(parent);
   }
 
-  static Screen settings(Screen parent) {
-    return new ComposeSettingsScreen(parent);
-  }
-
   static Screen timeline(Screen parent) {
     return new ComposeTimelineScreen(parent);
   }

@@ -14,8 +14,8 @@ import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.network.chat.Component;
 
 /**
- * Reizo's own settings screen. It edits the same {@link ClientConfig} values that the optional
- * OneConfig page shows, so both stay in sync.
+ * Reizo's own settings screen, used without OneConfig; with it, Reizo's OneConfig page is the
+ * settings screen. Both edit the same {@link ClientConfig} values.
  */
 public final class SettingsScreen extends KitScreen {
   private final Screen parent;
@@ -24,19 +24,21 @@ public final class SettingsScreen extends KitScreen {
   private int replayY;
 
   /**
-   * Reizo's settings: OneConfig's Compose screen when OneConfig is installed (ADR 0017), else this
-   * kit screen.
+   * Opens Reizo's settings: its page in OneConfig when OneConfig is installed (OneClient), else this
+   * screen, returning to {@code parent}.
    */
-  public static Screen create(Screen parent) {
-    if (ExportSettingsScreen.composeScreens()) {
+  public static void open(Screen parent) {
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
       try {
-        return ComposeScreens.settings(parent);
+        io.github.thexykril.reizo.fabric.compat.OneConfigIntegration.openPage();
+        return;
       } catch (Throwable t) {
         org.slf4j.LoggerFactory.getLogger("Reizo/Settings")
-            .warn("OneConfig's Compose UI is not usable; using Reizo's own screen", t);
+            .warn("Could not open Reizo's OneConfig page; using Reizo's own screen", t);
       }
     }
-    return new SettingsScreen(parent);
+    net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+    mc.setScreen(new SettingsScreen(parent));
   }
 
   public SettingsScreen(Screen parent) {
