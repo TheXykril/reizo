@@ -189,9 +189,12 @@ public final class EffectRenderer {
     encoder.copyTextureToTexture(
         main.getColorTexture(), copy.getColorTexture(), 0, 0, 0, 0, 0, w, h);
     //? if >=26.2 {
-    /*// 26.2+ renders with reversed depth: depth 0 is the far plane and depth 1 the near one.
-    float depth0 = mc.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.depthFar;
-    float depth1 = 0.05f;
+    /*// 26.2+ renders with reversed depth: depth 0 is the far plane and depth 1 the near one. Iris
+    // turns that back to the usual order while a shader pack draws the world.
+    float far = mc.gameRenderer.gameRenderState().levelRenderState.cameraRenderState.depthFar;
+    boolean reversed = !io.github.thexykril.reizo.fabric.compat.ShaderPacks.inUse();
+    float depth0 = reversed ? far : 0.05f;
+    float depth1 = reversed ? 0.05f : far;
     try (GpuBufferSlice.MappedView view = ubo.currentBuffer().map(false, true)) {
     *///?} else if >=26.1 {
     /*float depth0 = 0.05f;
