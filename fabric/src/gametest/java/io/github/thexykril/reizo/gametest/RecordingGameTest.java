@@ -1794,6 +1794,58 @@ public final class RecordingGameTest implements FabricClientGameTest {
     LOGGER.info("composeMusic OK: moved to {} ms, mixed peak {} dB", moved.get(0).startMs(), max.group(1));
   }
 
+  /** Zooms the Compose timeline with the wheel, fits it again, and switches camera views. */
+  private static void composeZoomAndViews(ClientGameTestContext context) {
+    var screen =
+        context.computeOnClient(
+            mc -> (io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen);
+    long[] whole = context.computeOnClient(mc -> screen.visibleRange());
+    double[] p = composePoint(context, 0, 0.5);
+    context.getInput().setCursorPos(p[0], p[1]);
+    context.waitTicks(1);
+    for (int i = 0; i < 3; i++) {
+      context.getInput().scroll(1); // wheel up zooms in
+      context.waitTicks(1);
+    }
+    context.waitTicks(2);
+    long[] zoomed = context.computeOnClient(mc -> screen.visibleRange());
+    check(
+        zoomed[1] - zoomed[0] < whole[1] - whole[0],
+        "wheel did not zoom the timeline: "
+            + java.util.Arrays.toString(whole)
+            + " -> "
+            + java.util.Arrays.toString(zoomed));
+    // Clip edits still land where the zoomed timeline draws them.
+    double[] q = composePoint(context, 0, 0.5);
+    context.getInput().setCursorPos(q[0], q[1]);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> screen.selectedClip()) == 0,
+        "clicking a clip on the zoomed timeline missed it");
+    // The click seeks, which may restart the replay; the editor comes back afterwards.
+    context.waitFor(
+        mc ->
+            mc.screen instanceof io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen
+                && mc.level != null,
+        20 * 30);
+    context.runOnClient(
+        mc -> {
+          io.github.thexykril.reizo.fabric.ui.TimelineScreen.setView("follow");
+        });
+    check(
+        context.computeOnClient(
+            mc ->
+                io.github.thexykril.reizo.fabric.playback.ReplayCamera.mode()
+                    == io.github.thexykril.reizo.fabric.playback.ReplayCamera.Mode.FOLLOW),
+        "follow view not set");
+    context.runOnClient(mc -> io.github.thexykril.reizo.fabric.ui.TimelineScreen.setView("free"));
+    LOGGER.info(
+        "composeZoomAndViews OK: {} -> {}",
+        java.util.Arrays.toString(whole),
+        java.util.Arrays.toString(zoomed));
+  }
+
   private static double[] composePoint(ClientGameTestContext context, int clip, double fraction) {
     double[] p =
         context.computeOnClient(
@@ -2066,6 +2118,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
       composeKeyframeDrag(context);
       composeClipEdits(context);
       composeMusic(context);
+      composeZoomAndViews(context);
     }
     context.runOnClient(
         mc -> {

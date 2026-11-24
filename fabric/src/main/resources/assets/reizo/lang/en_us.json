@@ -136,6 +136,8 @@
   "reizo.timeline.properties": "Properties",
   "reizo.timeline.export_tab": "Export",
   "reizo.timeline.media": "Media",
+  "reizo.timeline.in_short": "In",
+  "reizo.timeline.out_short": "Out",
   "reizo.timeline.classic_editor": "Classic editor",
   "reizo.timeline.new_editor": "New editor",
   "reizo.timeline.music": "Music",
