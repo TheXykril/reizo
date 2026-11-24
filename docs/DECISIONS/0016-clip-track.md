@@ -1,6 +1,6 @@
 # 0016: A clip track that maps video time to replay time
 
-Status: Proposed (2026-11-23), waiting for the owner's review.
+Status: Accepted (2026-11-24, by the owner).
 
 ## Context
 
