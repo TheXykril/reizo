@@ -1,6 +1,6 @@
 # 0008: Playback through a loopback replay server
 
-Status: Accepted (2026-11-22). First slice of issue #7.
+Status: Accepted (2026-11-22). First slice of issue #7. The transport and the join are replaced by ADR 0020 (in memory).
 
 ## Context
 

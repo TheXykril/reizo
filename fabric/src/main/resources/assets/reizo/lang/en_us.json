@@ -38,6 +38,7 @@
   "reizo.replay.camera.pov": "Camera: player view",
   "reizo.replay.camera.follow": "Camera: follow player",
   "reizo.replay.paused": "Replay paused",
+  "reizo.replay.loading": "Loading replay",
   "reizo.replay.playing": "Replay playing",
   "reizo.replay.speed": "Speed: %sx",
   "reizo.menu.replays": "Replays",

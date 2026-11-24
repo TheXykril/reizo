@@ -13,6 +13,7 @@ import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -47,7 +48,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Plays a recording back to the local client over a loopback socket (ADR 0008).
+ * Plays a recording back to the local client (ADR 0008), in memory (ADR 0020) or over a loopback
+ * socket.
  *
  * <p>The client connects to it like to any server. The replay server answers the login itself, then
  * writes the recorded configuration packets and, once the client has switched to the play protocol,
@@ -57,8 +59,9 @@ import org.slf4j.LoggerFactory;
  * switch.
  *
  * <p>No compression and no encryption are negotiated, so a frame is {@code varint(length)} followed
- * by the packet id and body. The socket listens on the loopback address only and accepts a single
- * connection.
+ * by the packet id and body. Either end accepts a single connection: by default a Netty local
+ * channel ({@link ReplayChannel}), so no network port is opened; with {@link #SOCKET} set, a socket
+ * on the loopback address.
  */
 public final class ReplayServer implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Replay");
@@ -67,12 +70,20 @@ public final class ReplayServer implements AutoCloseable {
   private static final int MAX_SERVERBOUND_FRAME = 2 * 1024 * 1024;
   private static final AtomicInteger THREAD_IDS = new AtomicInteger();
 
+  /**
+   * Plays over a loopback socket instead of in memory: the transport before ADR 0020, kept for a
+   * while to compare. Set with {@code -Dreizo.replay.socket=true} or {@code REIZO_REPLAY_SOCKET=1}.
+   */
+  public static final boolean SOCKET =
+      Boolean.getBoolean("reizo.replay.socket") || "1".equals(System.getenv("REIZO_REPLAY_SOCKET"));
+
   private final ReplayScript script;
   private final GameProfile profile;
   private final PlaybackClock clock;
   private final Supplier<RegistryAccess> registries;
   private final Runnable onClosed;
   private final ServerSocket listener;
+  private final ReplayChannel.Server memory;
   private final CountDownLatch loginAcknowledged = new CountDownLatch(1);
   private final AtomicInteger configurationsFinished = new AtomicInteger();
   private final AtomicInteger configurationAcks = new AtomicInteger();
@@ -102,7 +113,7 @@ public final class ReplayServer implements AutoCloseable {
   private volatile io.github.thexykril.reizo.core.format.PlayerScreenState screen;
 
   /**
-   * Opens the listening socket. Call {@link #start()} afterwards.
+   * Opens the listening end ({@link #SOCKET} picks which). Call {@link #start()} afterwards.
    *
    * @param profile the camera's profile (the client's own player in the replay)
    * @param recordedPlayerUuid the recorded player, shown as a separate entity
@@ -126,11 +137,28 @@ public final class ReplayServer implements AutoCloseable {
     this.clock = clock;
     this.registries = registries;
     this.onClosed = onClosed;
-    this.listener = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+    if (SOCKET) {
+      this.listener = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
+      this.memory = null;
+    } else {
+      this.listener = null;
+      this.memory = new ReplayChannel.Server();
+    }
   }
 
+  /** Whether the client must connect to {@link #port()} instead of {@link #memoryAddress()}. */
+  public boolean usesSocket() {
+    return listener != null;
+  }
+
+  /** The loopback port in socket mode. */
   public int port() {
     return listener.getLocalPort();
+  }
+
+  /** The in-memory address to connect to, for {@link ReplayChannel#connect}. */
+  java.net.SocketAddress memoryAddress() {
+    return memory.address();
   }
 
   public PlaybackClock clock() {
@@ -174,23 +202,35 @@ public final class ReplayServer implements AutoCloseable {
   @Override
   public void close() {
     closed = true;
-    closeQuietly(listener);
+    if (listener != null) {
+      closeQuietly(listener);
+    }
     Socket s = socket;
     if (s != null) {
       closeQuietly(s);
+    }
+    if (memory != null) {
+      memory.close();
     }
   }
 
   private void run() {
     try {
+      if (memory != null) {
+        io.netty.channel.Channel client = memory.accept(ACCEPT_TIMEOUT_MS);
+        if (client == null) {
+          throw new SocketTimeoutException();
+        }
+        startReader(memory.input());
+        serve(memory.output(client));
+        return;
+      }
       listener.setSoTimeout(ACCEPT_TIMEOUT_MS);
       try (Socket s = listener.accept()) {
         closeQuietly(listener);
         socket = s;
         s.setTcpNoDelay(true);
-        Thread reader = new Thread(() -> readClient(s), Thread.currentThread().getName() + "-in");
-        reader.setDaemon(true);
-        reader.start();
+        startReader(s.getInputStream());
         OutputStream out = new BufferedOutputStream(s.getOutputStream());
         serve(out);
       }
@@ -565,10 +605,16 @@ public final class ReplayServer implements AutoCloseable {
     PLAY
   }
 
+  private void startReader(InputStream raw) {
+    Thread reader = new Thread(() -> readClient(raw), Thread.currentThread().getName() + "-in");
+    reader.setDaemon(true);
+    reader.start();
+  }
+
   /** Reads the client's packets. Only protocol switches matter; everything else is dropped. */
-  private void readClient(Socket s) {
+  private void readClient(InputStream raw) {
     Phase phase = Phase.HANDSHAKE;
-    try (DataInputStream in = new DataInputStream(s.getInputStream())) {
+    try (DataInputStream in = new DataInputStream(raw)) {
       while (!closed) {
         byte[] frame = readFrame(in);
         switch (phase) {
