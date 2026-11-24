@@ -15,7 +15,8 @@ import net.minecraft.world.entity.player.Player;
  * <ul>
  *   <li>{@link Mode#FREE}: the spectator camera, flown with the normal movement keys.
  *   <li>{@link Mode#POV}: the recorded player's own view (first person).
- *   <li>{@link Mode#FOLLOW}: behind the recorded player (third person).
+ *   <li>{@link Mode#FOLLOW}: a camera that glides behind the recorded player ({@link
+ *       FollowCamera}).
  * </ul>
  */
 public final class ReplayCamera {
@@ -54,6 +55,7 @@ public final class ReplayCamera {
         mc.options.setCameraType(CameraType.FIRST_PERSON);
       }
       case FOLLOW -> {
+        FollowCamera.reset();
         mc.setCameraEntity(target);
         mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
       }
@@ -82,6 +84,7 @@ public final class ReplayCamera {
   /** Back to the default when a replay ends or starts. */
   public static void reset() {
     mode = Mode.FREE;
+    FollowCamera.reset();
   }
 
   private static Entity recordedPlayer(Minecraft mc) {

@@ -30,7 +30,7 @@ abstract class CameraMixin {
 
   //? if >=26.1 {
   /*@Inject(method = "alignWithEntity", at = @At("TAIL"))
-  private void reizo$applyCameraPath(float partialTicks, CallbackInfo ci) {
+  private void reizo$applyCameraPath(float partialTick, CallbackInfo ci) {
   *///?} else {
   @Inject(method = "setup", at = @At("TAIL"))
   private void reizo$applyCameraPath(
@@ -49,6 +49,15 @@ abstract class CameraMixin {
     if (k != null) {
       setRotation(k.yaw(), k.pitch());
       setPosition(k.x(), k.y(), k.z());
+    } else if (io.github.thexykril.reizo.fabric.playback.ReplayCamera.mode()
+        == io.github.thexykril.reizo.fabric.playback.ReplayCamera.Mode.FOLLOW) {
+      double[] f =
+          io.github.thexykril.reizo.fabric.playback.FollowCamera.poseNow(
+              net.minecraft.client.Minecraft.getInstance().getCameraEntity(), partialTick);
+      if (f != null) {
+        setRotation((float) f[3], (float) f[4]);
+        setPosition(f[0], f[1], f[2]);
+      }
     }
   }
 
