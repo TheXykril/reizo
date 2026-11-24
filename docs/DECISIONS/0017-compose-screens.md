@@ -1,6 +1,6 @@
 # 0017: Reizo screens on OneConfig's Compose components
 
-Status: Proposed (2026-11-24), waiting for the owner's review.
+Status: Accepted (2026-11-24, by the owner).
 
 ## Context
 
