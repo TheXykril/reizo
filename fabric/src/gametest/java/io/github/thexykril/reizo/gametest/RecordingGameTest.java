@@ -16,7 +16,9 @@ import io.github.thexykril.reizo.core.format.ProtocolPhase;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.recording.RecordingSession;
 import io.github.thexykril.reizo.core.storage.RecordingArchive;
+import io.github.thexykril.reizo.core.timeline.Sequence;
 import io.github.thexykril.reizo.fabric.RecorderClient;
+import io.github.thexykril.reizo.core.timeline.Sequence;
 import io.github.thexykril.reizo.fabric.export.ExportControls;
 import io.github.thexykril.reizo.fabric.export.ExportSession;
 import io.github.thexykril.reizo.fabric.playback.EffectRenderer;
@@ -856,6 +858,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> ReplayPlayback.current().script().finished(), 20 * 10);
     checkCameraPath(context);
     checkTimeline(context);
+    checkClips(context);
     checkFreeCamera(context);
     checkEffects(context);
     checkKeyframedSettings(context);
@@ -1643,6 +1646,9 @@ public final class RecordingGameTest implements FabricClientGameTest {
         },
         20 * 30);
     context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> mc.screen instanceof TimelineScreen),
+        "the editor did not come back after a backwards seek");
     var cameraAfter = context.computeOnClient(mc -> mc.player.position());
     check(
         cameraAfter.distanceTo(cameraBefore) < 0.5,
@@ -1669,6 +1675,126 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(1);
     LOGGER.info(
         "checkTimeline OK: keyframe dragged {} -> {}, ruler seek to {}", middle, moved, now);
+  }
+
+  /**
+   * Clips on the Video lane with real input: S splits at the playhead, a click selects a clip and
+   * Delete removes it, Ctrl+Z brings it back, dragging an end trims, dragging a clip reorders.
+   */
+  private void checkClips(ClientGameTestContext context) {
+    long duration = ReplayPlayback.current().script().durationMs();
+    long middle = duration / 2;
+    context.runOnClient(mc -> ReplayPlayback.current().setPaused(true));
+    context.getInput().pressKey(InputConstants.KEY_Y);
+    context.waitTicks(2);
+    check(
+        context.computeOnClient(mc -> mc.screen instanceof TimelineScreen),
+        "Y did not open the timeline for clips");
+    check(ReplayEditor.sequence().isEmpty(), "clips before any edit: " + ReplayEditor.sequence());
+    int seeks = ReplayPlayback.current().seeksDone();
+    context.runOnClient(mc -> ReplayEditor.seekVideo(middle));
+    waitSeek(context, seeks);
+    context.getInput().pressKey(InputConstants.KEY_S);
+    context.waitTicks(1);
+    Sequence split = ReplayEditor.sequence();
+    check(split.size() == 2, "S did not split the replay in two: " + split);
+    long cut = split.clip(0).outMs();
+    check(
+        Math.abs(cut - Math.max(middle, ReplayPlayback.current().script().startMs())) < 250,
+        "split at " + cut + ", expected about " + middle);
+
+    double scale = context.computeOnClient(mc -> (double) mc.getWindow().getGuiScale());
+    int y = context.computeOnClient(mc -> ((TimelineScreen) mc.screen).videoTrackY());
+    // Click the first clip and delete it; undo brings it back.
+    int first = context.computeOnClient(mc -> ((TimelineScreen) mc.screen).clipX(0, 0));
+    context.getInput().setCursorPos((first + 0.5) * scale, (y + 0.5) * scale);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    // The click seeks back into the first clip, which rebuilds the world; the editor comes back.
+    context.waitFor(
+        mc ->
+            !ReplayPlayback.current().isReconfiguring()
+                && mc.level != null
+                && mc.screen instanceof TimelineScreen,
+        20 * 30);
+    String picked =
+        context.computeOnClient(
+            mc ->
+                mc.screen instanceof TimelineScreen s
+                    ? s.selectedClip() + " x=" + first + " y=" + y
+                    : String.valueOf(mc.screen));
+    check(picked.startsWith("0 "), "click did not select the first clip: " + picked);
+    context.getInput().pressKey(InputConstants.KEY_DELETE);
+    context.waitTicks(1);
+    check(
+        ReplayEditor.sequence().size() == 1 && ReplayEditor.sequence().clip(0).inMs() == cut,
+        "Delete did not remove the first clip: " + ReplayEditor.sequence());
+    context.getInput().holdControl();
+    context.getInput().pressKey(InputConstants.KEY_Z);
+    context.getInput().releaseControl();
+    context.waitTicks(1);
+    check(ReplayEditor.sequence().equals(split), "Ctrl+Z did not restore the clip");
+
+    // Drag the end of the second clip 20 GUI pixels to the left: a shorter clip.
+    int end = context.computeOnClient(mc -> ((TimelineScreen) mc.screen).clipX(1, 1));
+    dragMouse(context, scale, end - 1, y, -20);
+    Sequence trimmed = ReplayEditor.sequence();
+    check(
+        trimmed.size() == 2 && trimmed.clip(1).outMs() < split.clip(1).outMs() - 100,
+        "dragging the clip end did not trim it: " + split + " -> " + trimmed);
+
+    // Drag the second clip onto the first: they swap places.
+    int[] xs =
+        context.computeOnClient(
+            mc -> {
+              TimelineScreen s = (TimelineScreen) mc.screen;
+              return new int[] {s.clipX(1, 0), s.clipX(0, -1) + 4};
+            });
+    dragMouse(context, scale, xs[0], y, xs[1] - xs[0]);
+    Sequence moved = ReplayEditor.sequence();
+    check(
+        moved.size() == 2 && moved.clip(0).equals(trimmed.clip(1)),
+        "dragging a clip did not reorder: " + trimmed + " -> " + moved);
+    var saved =
+        context.computeOnClient(
+            mc -> {
+              try {
+                return ReplayEditor.store().load(ReplayEditor.project().id);
+              } catch (java.io.IOException e) {
+                throw new AssertionError(e);
+              }
+            });
+    check(saved.sequence().equals(moved), "clips not saved: " + saved.sequence());
+    context.takeScreenshot("reizo-clips");
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.clearClips();
+          mc.setScreen(null);
+        });
+    context.waitTicks(1);
+    LOGGER.info("checkClips OK: split at {}, trimmed and reordered to {}", cut, moved);
+  }
+
+  private static void waitSeek(ClientGameTestContext context, int seeksBefore) {
+    context.waitFor(
+        mc -> {
+          ReplayServer r = ReplayPlayback.current();
+          return r.seeksDone() > seeksBefore && !r.isReconfiguring() && mc.level != null;
+        },
+        20 * 30);
+    context.waitTicks(2);
+  }
+
+  /** Holds the left button at (x, y) in GUI pixels and moves it {@code dx} in steps. */
+  private static void dragMouse(ClientGameTestContext context, double scale, int x, int y, int dx) {
+    context.getInput().setCursorPos((x + 0.5) * scale, (y + 0.5) * scale);
+    context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(1);
+    for (int i = 1; i <= 4; i++) {
+      context.getInput().moveCursor(dx * scale / 4, 0);
+      context.waitTicks(1);
+    }
+    context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
   }
 
   /**
@@ -1933,6 +2059,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
         "video has " + frames.strip() + " frames, expected " + expected);
     LOGGER.info("exportVideo OK: {} frames in {}", expected, s.output());
     exportRegionVp9(context, duration);
+    exportClips(context, duration);
   }
 
   /** A second export: VP9 in WebM, only the middle half (the timeline's In/Out), at 10 fps. */
@@ -2019,6 +2146,69 @@ public final class RecordingGameTest implements FabricClientGameTest {
           ReplayEditor.project().render.motionBlur = 1;
         });
     LOGGER.info("exportRegionVp9 OK: {} frames of {}..{} ms in {}", expected, in, out, s.output());
+  }
+
+  /**
+   * Exports two clips in reverse replay order: one file, as many frames as both clips, in clip
+   * order, with no part files left behind.
+   */
+  private void exportClips(ClientGameTestContext context, long duration) {
+    Sequence clips =
+        Sequence.of(
+            List.of(
+                new Sequence.Clip(duration / 2, duration * 3 / 4),
+                new Sequence.Clip(duration / 8, duration / 4)));
+    java.util.concurrent.atomic.AtomicReference<ExportSession> result =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.editClips(s -> clips);
+          var render = ReplayEditor.project().render;
+          render.fps = 10;
+          render.codec = "libx264";
+          render.crf = 35;
+          render.output = "gametest-clips.mp4";
+          check(ExportControls.exportCurrent(mc, result::set), "clip export did not start");
+        });
+    context.waitFor(mc -> result.get() != null, 20 * 240);
+    context.waitTicks(2);
+    ExportSession s = result.get();
+    check(
+        s.state() == ExportSession.State.DONE, "clip export ended " + s.state() + ": " + s.error());
+    Path output = ExportControls.exportsDir().resolve("gametest-clips.mp4");
+    int expected = 0;
+    for (Sequence.Clip c : clips.clips()) {
+      expected += new io.github.thexykril.reizo.core.export.ExportPlan(c.inMs(), c.outMs(), 10)
+          .frameCount();
+    }
+    String frames =
+        run(
+            "ffprobe",
+            "-v",
+            "error",
+            "-count_frames",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=nb_read_frames",
+            "-of",
+            "csv=p=0",
+            output.toString());
+    check(
+        frames.strip().equals(String.valueOf(expected)),
+        "clip export has " + frames.strip() + " frames, expected " + expected);
+    try (var files = java.nio.file.Files.list(output.getParent())) {
+      List<String> left =
+          files
+              .map(p -> p.getFileName().toString())
+              .filter(n -> n.startsWith("gametest-clips.mp4."))
+              .toList();
+      check(left.isEmpty(), "clip export left part files: " + left);
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+    context.runOnClient(mc -> ReplayEditor.clearClips());
+    LOGGER.info("exportClips OK: {} frames from {} in {}", expected, clips, output);
   }
 
   private static byte[] runBytes(String... command) {

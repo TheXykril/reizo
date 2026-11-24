@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (docked editor UI, branch `feat/editor-ui`, PR #69).
+Last updated: 2026-11-23 by Claude (clips, branch `feat/clips` on top of `feat/editor-ui`).
 
 ## 1. Current project phase
 
@@ -14,6 +14,15 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
+- **Clips (ADR 0016, Proposed), branch `feat/clips`, stacked on `feat/editor-ui` (PR #69).**
+  `core/timeline/Sequence` (clips are replay ranges in play order; keyframes stay on replay time),
+  saved as `Project.clips`, in the editor's undo state. `ReplayEditor.editClips` (the first edit
+  seeds one clip from In/Out), `followClips` keeps editor playback in clip order. The timeline's
+  Video track and its time axis show video time (`TimelineScreen.toVideo/toReplay`, `xOf` maps
+  replay times). Export with more than one clip chains one `ExportSession` per clip into part files
+  and joins them with `ffmpeg -f concat -c copy` (`ExportControls.join`). `ReplayPlayback` reopens a
+  Reizo screen that a backwards seek closed. 24/24 gametests on 1.21.11; all five versions compile.
+  Untested: editor playback across clip boundaries, clips with audio in the joined file.
 - **Docked editor UI (ADR 0015, Proposed), PR #69, waiting for the owner's review.** Kit in
   `fabric/ui/kit` (Theme, Draw, Icons, FlatButton, DragField, PopupMenu); `TimelineScreen` is now the whole
   editor (top bar, rail, Scene outliner, Inspector tabs with drag fields and folding sections, menu bar, context menus, floating/docking panels, six timeline tracks). Widgets draw opaque pieces (no stacked translucent fills). Side panels need

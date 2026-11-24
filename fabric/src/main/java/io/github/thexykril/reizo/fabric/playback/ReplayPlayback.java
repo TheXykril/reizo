@@ -244,6 +244,33 @@ public final class ReplayPlayback {
     }
   }
 
+  /** The Reizo screen open on the last tick, kept to reopen it after a backwards seek. */
+  private static net.minecraft.client.gui.screens.Screen lastReizoScreen;
+
+  private static net.minecraft.client.gui.screens.Screen screenBeforeRestart;
+
+  /** Ticks left to wait for the world's loading screen to close before reopening. */
+  private static int reopenTicks;
+
+  private static void reopenScreen(Minecraft mc) {
+    if (reopenTicks > 0) {
+      reopenTicks--;
+      if (mc.screen == null) {
+        mc.setScreen(screenBeforeRestart);
+        reopenTicks = 0;
+      }
+      if (reopenTicks == 0) {
+        screenBeforeRestart = null;
+      }
+      return;
+    }
+    lastReizoScreen =
+        mc.screen != null
+                && mc.screen.getClass().getName().startsWith("io.github.thexykril.reizo.")
+            ? mc.screen
+            : null;
+  }
+
   /**
    * Called every client tick. Ends the replay once the client has left the replay world, whichever
    * way it left (the disconnect events above do not always fire promptly for a socket connection).
@@ -257,6 +284,9 @@ public final class ReplayPlayback {
     if (server.isReconfiguring()) {
       // A backwards seek rebuilds the world: it is gone until the new login packet arrives.
       if (levelBeforeRestart == null) {
+        // The editor (or a Reizo panel) open before the seek comes back after it.
+        screenBeforeRestart = lastReizoScreen;
+        reopenTicks = 0;
         // First tick of the restart: remember where the free camera was in the old world, so the
         // seek does not move it. A recorded server switch goes to
         // another world, so the camera is not carried over.
@@ -275,6 +305,7 @@ public final class ReplayPlayback {
                 : "Replay world rebuilt after a backwards seek");
         server.restartDone();
         ReplayCamera.reset();
+        reopenTicks = screenBeforeRestart == null ? 0 : 100;
         // Recorded respawns can replace the camera player shortly after: keep the camera where it
         // was for a second, re-applying it to each new player entity.
         cameraRestoreTicks = cameraBeforeRestart == null ? 0 : 20;
@@ -283,6 +314,7 @@ public final class ReplayPlayback {
       return;
     }
     levelBeforeRestart = null;
+    reopenScreen(mc);
     if (cameraRestoreTicks > 0) {
       cameraRestoreTicks--;
       if (mc.player != null && mc.player != cameraRestoredTo) {
@@ -298,6 +330,7 @@ public final class ReplayPlayback {
     if (inWorld) {
       enteredWorld = true;
       ReplayCamera.tick(mc);
+      ReplayEditor.followClips(server);
       ReplayEditor.tick(mc);
     } else if (enteredWorld) {
       server.close();
@@ -335,6 +368,9 @@ public final class ReplayPlayback {
   private static void onServerClosed() {
     current = null;
     metadata = null;
+    lastReizoScreen = null;
+    screenBeforeRestart = null;
+    reopenTicks = 0;
     ReplayEditor.close();
     playListener = null;
     ReplayCamera.reset();

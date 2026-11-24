@@ -13,47 +13,62 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 public final class Icons {
   private static final Map<String, String[]> MASKS =
-      Map.of(
-          "eye",
-          new String[] {
+      Map.ofEntries(
+          Map.entry(
+              "eye",
+              new String[] {
             ".......", "..###..", ".#...#.", "#..#..#", ".#...#.", "..###..", "......."
-          },
-          "sliders",
-          new String[] {
+          }),
+          Map.entry(
+              "sliders",
+              new String[] {
             ".#.....", "#######", ".#.....", "....#..", "#######", "....#..", "......."
-          },
-          "panels",
-          new String[] {
+          }),
+          Map.entry(
+              "panels",
+              new String[] {
             "#######", "#.#...#", "#.#...#", "#.#...#", "#.#...#", "#.#...#", "#######"
-          },
-          "wave",
-          new String[] {
+          }),
+          Map.entry(
+              "wave",
+              new String[] {
             ".......", ".......", ".##...#", "#..#.#.", "....#..", ".......", "......."
-          },
-          "undo",
-          new String[] {
+          }),
+          Map.entry(
+              "undo",
+              new String[] {
             "..#....", ".##....", "######.", ".##...#", "..#...#", "......#", "..####."
-          },
-          "redo",
-          new String[] {
+          }),
+          Map.entry(
+              "redo",
+              new String[] {
             "....#..", "....##.", ".######", "#...##.", "#...#..", "#......", ".####.."
-          },
-          "fit",
-          new String[] {
+          }),
+          Map.entry(
+              "fit",
+              new String[] {
             "###.###", "#.....#", "#.....#", ".......", "#.....#", "#.....#", "###.###"
-          },
-          "open",
-          new String[] {
+          }),
+          Map.entry(
+              "open",
+              new String[] {
             ".......", ".......", "#######", ".#####.", "..###..", "...#...", "......."
-          },
-          "closed",
-          new String[] {
+          }),
+          Map.entry(
+              "closed",
+              new String[] {
             ".#.....", ".##....", ".###...", ".####..", ".###...", ".##....", ".#....."
-          },
-          "sparkle",
-          new String[] {
+          }),
+          Map.entry(
+              "sparkle",
+              new String[] {
             "...#...", "...#...", "..###..", "#######", "..###..", "...#...", "...#..."
-          });
+          }),
+          Map.entry(
+              "cut",
+              new String[] {
+            "#.....#", ".#...#.", "..#.#..", "...#...", ".##.##.", "#..#..#", ".##.##."
+          }));
 
   private Icons() {}
 

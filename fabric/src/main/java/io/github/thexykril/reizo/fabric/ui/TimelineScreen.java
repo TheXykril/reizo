@@ -10,6 +10,7 @@ import io.github.thexykril.reizo.core.effects.Grade;
 import io.github.thexykril.reizo.core.effects.PropertyTracks;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits;
+import io.github.thexykril.reizo.core.timeline.Sequence;
 import io.github.thexykril.reizo.core.timeline.TimelineView;
 import io.github.thexykril.reizo.fabric.compat.Compat;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
@@ -85,7 +86,10 @@ public final class TimelineScreen extends Screen {
     KEYFRAMES,
     BOX,
     OVERVIEW,
-    PANEL
+    PANEL,
+    CLIP,
+    TRIM_IN,
+    TRIM_OUT
   }
 
   private enum Tab {
@@ -102,6 +106,7 @@ public final class TimelineScreen extends Screen {
 
   /** Timeline tracks, in display order. */
   private enum Track {
+    VIDEO("reizo.track.video", Theme.TRACK_CAMERA),
     MARKERS("reizo.timeline.markers", Theme.TRACK_MARKER),
     CAMERA("reizo.timeline.camera", Theme.TRACK_CAMERA),
     LOOK("reizo.track.look", Theme.TRACK_LOOK),
@@ -132,6 +137,20 @@ public final class TimelineScreen extends Screen {
   private long dragAppliedDelta;
   private boolean dragRecorded;
   private double dragX;
+
+  /** The clip being moved or trimmed, or -1. */
+  private int clipDragging = -1;
+
+  /** The selected clip (Delete removes it), or -1. */
+  private int selectedClip = -1;
+
+  /** Replay range of the trimmed clip when its drag started. */
+  private long clipStartIn;
+
+  private long clipStartOut;
+
+  /** Last video time shown, while the playhead is in a cut-out moment. */
+  private long lastVideoHead;
 
   private FlatButton playButton;
   private FlatButton speedButton;
@@ -201,9 +220,11 @@ public final class TimelineScreen extends Screen {
   protected void init() {
     fitGuiScale();
     ReplayServer server = ReplayPlayback.current();
-    long duration = server == null ? 1 : server.script().durationMs();
-    if (view == null || view.durationMs() != Math.max(1, duration)) {
+    long duration = server == null ? 1 : videoDuration();
+    if (view == null) {
       view = new TimelineView(duration);
+    } else if (view.durationMs() != Math.max(1, duration)) {
+      view = view.withDuration(duration);
     }
     showLeft = panels && width >= 560;
     showRight = panels && width >= 440;
@@ -405,6 +426,7 @@ public final class TimelineScreen extends Screen {
       {"reizo.timeline.smooth", "wave"},
       {"reizo.timeline.in", "["},
       {"reizo.timeline.out", "]"},
+      {"reizo.timeline.split", "cut"},
     };
     int x = left;
     for (String[] t : tools) {
@@ -731,7 +753,7 @@ public final class TimelineScreen extends Screen {
   private void layoutLanes() {
     lanes.clear();
     int room = Math.max(2, (overviewY - 2 - lanesY) / LANE_H);
-    List<Track> shown = new ArrayList<>(List.of(Track.MARKERS, Track.CAMERA));
+    List<Track> shown = new ArrayList<>(List.of(Track.VIDEO, Track.MARKERS, Track.CAMERA));
     List<Track> rest = new ArrayList<>(List.of(Track.LOOK, Track.WORLD, Track.ENTITIES, Track.SETTINGS));
     rest.sort(Comparator.comparing((Track t) -> keyCount(t) == 0));
     for (Track t : rest) {
@@ -836,8 +858,14 @@ public final class TimelineScreen extends Screen {
     if (!builtInspector.equals(inspectorState()) && drag == Drag.NONE) {
       rebuildWidgets();
     }
+    if (view.durationMs() != Math.max(1, videoDuration())
+        && drag != Drag.TRIM_IN
+        && drag != Drag.TRIM_OUT) {
+      // Clips changed the video's length; a trim keeps its scale until the mouse is let go.
+      view = view.withDuration(videoDuration());
+    }
     if (drag == Drag.NONE && server.clock().isRunning()) {
-      view.ensureVisible(playhead());
+      view.ensureVisible(videoHead());
     }
     layoutLanes();
 
@@ -919,7 +947,7 @@ public final class TimelineScreen extends Screen {
     if (showTitle) {
       Draw.label(g, font, "Reizo", 21, 6, Theme.TEXT);
     }
-    long head = drag == Drag.SEEK ? clampTime(view.xToTime(lastMouseX - left)) : playhead();
+    long head = drag == Drag.SEEK ? clampTime(view.xToTime(lastMouseX - left)) : videoHead();
     String time = ReplayHud.time(head) + " / " + ReplayHud.time(view.durationMs());
     Draw.label(g, font, time, timeTextX, 6, Theme.TEXT);
   }
@@ -1076,7 +1104,7 @@ public final class TimelineScreen extends Screen {
 
   private void renderTimeline(GuiGraphics g, int mouseX) {
     lastMouseX = mouseX;
-    long head = drag == Drag.SEEK ? clampTime(view.xToTime(mouseX - left)) : playhead();
+    long head = drag == Drag.SEEK ? clampTime(view.xToTime(mouseX - left)) : videoHead();
     String t = ReplayHud.time(head) + "." + (head % 1000) / 100;
     Draw.label(g, font, t, 6, headerY + 3, Theme.TEXT);
 
@@ -1099,16 +1127,22 @@ public final class TimelineScreen extends Screen {
 
     g.enableScissor(left, rulerY, right, bottom + 1);
     renderRuler(g);
-    renderRegion(g, rulerY, bottom);
+    if (ReplayEditor.sequence().isEmpty()) {
+      renderRegion(g, rulerY, bottom);
+    }
+    renderClips(g, mouseX);
     renderMarkers(g);
     renderPropertyKeys(g);
     renderKeyframes(g);
     int cy = laneY(Track.CAMERA);
     if (drag == Drag.BOX && cy >= 0) {
-      int a = (int) (left + view.timeToX(dragStartTime));
+      int a = xOf(dragStartTime);
       g.fill(Math.min(a, mouseX), cy, Math.max(a, mouseX), cy + LANE_H - 1, Theme.ACCENT_WASH);
     }
     int hx = (int) Math.round(left + view.timeToX(head));
+    if (drag == Drag.CLIP && clipDragging >= 0) {
+      renderClipDrop(g, mouseX);
+    }
     g.fill(hx, rulerY, hx + 1, bottom, Theme.PLAYHEAD);
     Draw.round(g, hx - 3, rulerY, hx + 4, rulerY + 6, 2, Theme.PLAYHEAD);
     g.disableScissor();
@@ -1158,7 +1192,7 @@ public final class TimelineScreen extends Screen {
       return;
     }
     for (RecordingMetadata.Marker m : meta.markers) {
-      int x = (int) Math.round(left + view.timeToX(m.timeMs));
+      int x = xOf(m.timeMs);
       g.fill(x, y + 1, x + 1, y + LANE_H - 2, Theme.TRACK_MARKER);
       g.fill(x + 1, y + 1, x + 5, y + 5, Theme.TRACK_MARKER);
     }
@@ -1229,7 +1263,7 @@ public final class TimelineScreen extends Screen {
     int a = x0 + (int) (view.startMs() * scale);
     int b = Math.max(a + 4, x0 + (int) (view.endMs() * scale));
     Draw.round(g, a, overviewY, b, overviewY + 6, 2, Theme.FAINT);
-    int h = x0 + (int) (playhead() * scale);
+    int h = x0 + (int) (videoHead() * scale);
     g.fill(h, overviewY, h + 1, overviewY + 6, Theme.PLAYHEAD);
   }
 
@@ -1272,7 +1306,8 @@ public final class TimelineScreen extends Screen {
       return false;
     }
     layoutLanes();
-    long t = clampTime(view.xToTime(mx - left));
+    long videoT = clampTime(view.xToTime(mx - left));
+    long t = toReplay(videoT);
     boolean shift = event.hasShiftDown() || Minecraft.getInstance().hasShiftDown();
     if (my >= rulerY && my < rulerY + RULER_H) {
       drag = Drag.SEEK;
@@ -1284,6 +1319,9 @@ public final class TimelineScreen extends Screen {
       }
       if (l.track == Track.CAMERA) {
         return clickCamera(mx, t, shift, doubleClick);
+      }
+      if (l.track == Track.VIDEO) {
+        return clickClips(mx, videoT, doubleClick);
       }
       long key = keyAt(l.track, mx);
       if (key >= 0) {
@@ -1450,7 +1488,7 @@ public final class TimelineScreen extends Screen {
           }
           long before = selection.stream().mapToLong(Long::longValue).min().orElse(0);
           Set<Long> moved =
-              KeyframeEdits.move(ReplayEditor.path(), selection, step, view.durationMs());
+              KeyframeEdits.move(ReplayEditor.path(), selection, step, replayDuration());
           if (!moved.isEmpty()) {
             long actual = moved.stream().mapToLong(Long::longValue).min().orElse(0) - before;
             dragAppliedDelta += actual;
@@ -1464,7 +1502,11 @@ public final class TimelineScreen extends Screen {
         centerOverview(event.x());
         return true;
       }
-      case SEEK, BOX, PANEL -> {
+      case SEEK, BOX, PANEL, CLIP -> {
+        return true;
+      }
+      case TRIM_IN, TRIM_OUT -> {
+        dragClipTrim(event.x());
         return true;
       }
       default -> {
@@ -1479,7 +1521,9 @@ public final class TimelineScreen extends Screen {
     drag = Drag.NONE;
     switch (was) {
       case PANEL -> dropPanel(event.x(), event.y());
-      case SEEK -> ReplayPlayback.seekTo(clampTime(view.xToTime(event.x() - left)));
+      case SEEK -> ReplayEditor.seekVideo(clampTime(view.xToTime(event.x() - left)));
+      case CLIP -> dropClip(event.x());
+      case TRIM_IN, TRIM_OUT -> endClipTrim();
       case KEYFRAMES -> {
         if (dragRecorded) {
           ReplayEditor.changed();
@@ -1488,7 +1532,7 @@ public final class TimelineScreen extends Screen {
       case BOX ->
           selection.addAll(
               KeyframeEdits.between(
-                  ReplayEditor.path(), dragStartTime, view.xToTime(event.x() - left)));
+                  ReplayEditor.path(), dragStartTime, toReplay(view.xToTime(event.x() - left))));
       default -> {
         return super.mouseReleased(event);
       }
@@ -1541,7 +1585,7 @@ public final class TimelineScreen extends Screen {
     CameraKeyframe best = null;
     double bestD = HIT_PX + 1;
     for (CameraKeyframe k : ReplayEditor.path().keyframes()) {
-      double d = Math.abs(left + view.timeToX(k.timeMs()) - mx);
+      double d = Math.abs(xOf(k.timeMs()) - mx);
       if (d <= HIT_PX && d < bestD) {
         best = k;
         bestD = d;
@@ -1574,7 +1618,7 @@ public final class TimelineScreen extends Screen {
     long best = -1;
     double bestD = HIT_PX + 1;
     for (long t : times) {
-      double d = Math.abs(left + view.timeToX(t) - mx);
+      double d = Math.abs(xOf(t) - mx);
       if (d <= HIT_PX && d < bestD) {
         best = t;
         bestD = d;
@@ -1642,9 +1686,35 @@ public final class TimelineScreen extends Screen {
               () -> ReplayEntityHider.toggle(e, playhead()));
     } else if (mx >= left && mx <= right) {
       layoutLanes();
-      long time = clampTime(view.xToTime(mx - left));
+      long time = toReplay(clampTime(view.xToTime(mx - left)));
       int cy = laneY(Track.CAMERA);
-      if (my >= rulerY && my < rulerY + RULER_H) {
+      int vy = laneY(Track.VIDEO);
+      if (vy >= 0 && my >= vy && my < vy + LANE_H) {
+        long videoT = clampTime(view.xToTime(mx - left));
+        int clip = clipAtX(mx);
+        if (clip >= 0) {
+          selectedClip = clip;
+        }
+        Sequence seq = ReplayEditor.sequence();
+        m.add(t("reizo.menu_bar.split_here"), "S", () -> split(videoT));
+        if (clip >= 0 && seq.size() > 1) {
+          m.add(t("reizo.menu_bar.delete_clip"), "Del", () -> deleteClip(clip))
+              .add(t("reizo.menu_bar.clip_left"), "", () -> moveClip(clip, clip - 1), () -> clip > 0)
+              .add(
+                  t("reizo.menu_bar.clip_right"),
+                  "",
+                  () -> moveClip(clip, clip + 1),
+                  () -> clip + 1 < ReplayEditor.sequence().size());
+        }
+        m.add(
+            t("reizo.menu_bar.reset_clips"),
+            "",
+            () -> {
+              selectedClip = -1;
+              ReplayEditor.clearClips();
+            },
+            () -> !ReplayEditor.sequence().isEmpty());
+      } else if (my >= rulerY && my < rulerY + RULER_H) {
         m.add(t("reizo.menu_bar.seek_here"), "", () -> ReplayPlayback.seekTo(time))
             .add(t("reizo.menu_bar.in_here"), "", () -> ReplayEditor.setRegion(true, time))
             .add(t("reizo.menu_bar.out_here"), "", () -> ReplayEditor.setRegion(false, time));
@@ -1729,6 +1799,7 @@ public final class TimelineScreen extends Screen {
     switch (key) {
       case InputConstants.KEY_SPACE -> togglePlay();
       case InputConstants.KEY_N -> addKeyframe();
+      case InputConstants.KEY_S -> splitAtPlayhead();
       case InputConstants.KEY_DELETE, InputConstants.KEY_BACKSPACE -> deleteSelection();
       case InputConstants.KEY_I -> ReplayEditor.setRegion(true, shift ? -1 : playhead());
       case InputConstants.KEY_O -> ReplayEditor.setRegion(false, shift ? -1 : playhead());
@@ -1773,6 +1844,7 @@ public final class TimelineScreen extends Screen {
     switch (keyOf(b)) {
       case "reizo.timeline.add" -> addKeyframe();
       case "reizo.timeline.delete" -> deleteSelection();
+      case "reizo.timeline.split" -> splitAtPlayhead();
       case "reizo.timeline.smooth" -> ReplayEditor.cycleSmoothing();
       case "reizo.timeline.in" -> ReplayEditor.setRegion(true, playhead());
       case "reizo.timeline.out" -> ReplayEditor.setRegion(false, playhead());
@@ -1848,6 +1920,10 @@ public final class TimelineScreen extends Screen {
   }
 
   void deleteSelection() {
+    if (selection.isEmpty() && selectedClip >= 0) {
+      deleteClip(selectedClip);
+      return;
+    }
     if (selection.isEmpty()) {
       ReplayEditor.removeNearestKeyframe();
       return;
@@ -1871,7 +1947,7 @@ public final class TimelineScreen extends Screen {
     }
     ReplayEditor.recordUndo();
     Set<Long> pasted =
-        KeyframeEdits.paste(ReplayEditor.path(), clipboard, playhead(), view.durationMs());
+        KeyframeEdits.paste(ReplayEditor.path(), clipboard, playhead(), replayDuration());
     selection.clear();
     selection.addAll(pasted);
     ReplayEditor.changed();
@@ -1893,9 +1969,258 @@ public final class TimelineScreen extends Screen {
     return view;
   }
 
+  // --- Clips (ADR 0016) ------------------------------------------------------------------
+
+  /** Length of the edited video: the clips' total, or the whole replay when there are none. */
+  private long videoDuration() {
+    Sequence seq = ReplayEditor.sequence();
+    return seq.isEmpty() ? replayDuration() : seq.durationMs();
+  }
+
+  private long replayDuration() {
+    ReplayServer server = ReplayPlayback.current();
+    return server == null ? 1 : Math.max(1, server.script().durationMs());
+  }
+
+  private static long toVideo(long replayMs) {
+    Sequence seq = ReplayEditor.sequence();
+    return seq.isEmpty() ? replayMs : seq.toVideo(replayMs);
+  }
+
+  private static long toReplay(long videoMs) {
+    Sequence seq = ReplayEditor.sequence();
+    return seq.isEmpty() ? videoMs : seq.toReplay(videoMs);
+  }
+
+  /** The playhead in video time; while it shows a cut-out moment, the last time shown. */
+  long videoHead() {
+    long v = toVideo(playhead());
+    if (v >= 0) {
+      lastVideoHead = v;
+    }
+    return Math.min(lastVideoHead, videoDuration());
+  }
+
+  /** Splits the clip under the playhead. */
+  void splitAtPlayhead() {
+    split(videoHead());
+  }
+
+  private void split(long videoMs) {
+    ReplayEditor.editClips(s -> s.split(videoMs));
+  }
+
+  void deleteClip(int index) {
+    if (ReplayEditor.editClips(s -> s.delete(index))) {
+      selectedClip = -1;
+    }
+  }
+
+  private void moveClip(int from, int to) {
+    if (ReplayEditor.editClips(s -> s.move(from, to))) {
+      selectedClip = to;
+    }
+  }
+
+  /** Index of the clip drawn under {@code mx}, or -1. */
+  private int clipAtX(double mx) {
+    Sequence seq = ReplayEditor.sequence();
+    if (seq.isEmpty()) {
+      return -1;
+    }
+    long t = view.xToTime(mx - left);
+    return t < 0 || t > seq.durationMs() ? -1 : seq.indexAt(t);
+  }
+
+  private int clipX0(Sequence seq, int i) {
+    return (int) Math.round(left + view.timeToX(seq.startOf(i)));
+  }
+
+  private int clipX1(Sequence seq, int i) {
+    return (int) Math.round(left + view.timeToX(seq.startOf(i) + seq.clip(i).lengthMs()));
+  }
+
+  private boolean clickClips(double mx, long videoT, boolean doubleClick) {
+    Sequence seq = ReplayEditor.sequence();
+    if (seq.isEmpty()) {
+      // One clip over the whole video: the first split or trim turns it into a real clip.
+      if (doubleClick) {
+        split(videoT);
+      } else {
+        ReplayEditor.seekVideo(videoT);
+      }
+      return true;
+    }
+    for (int i = 0; i < seq.size(); i++) {
+      int x0 = clipX0(seq, i);
+      int x1 = clipX1(seq, i);
+      boolean nearIn = Math.abs(mx - x0) <= 3;
+      boolean nearOut = Math.abs(mx - x1) <= 3;
+      if (nearIn || nearOut) {
+        // Between two touching clips, the edge nearer the mouse's side wins.
+        boolean in = nearIn && (!nearOut || mx >= x0);
+        selectedClip = i;
+        clipDragging = i;
+        clipStartIn = seq.clip(i).inMs();
+        clipStartOut = seq.clip(i).outMs();
+        dragX = mx;
+        ReplayEditor.recordUndo();
+        drag = in ? Drag.TRIM_IN : Drag.TRIM_OUT;
+        return true;
+      }
+    }
+    int i = clipAtX(mx);
+    if (i < 0) {
+      selectedClip = -1;
+      return true;
+    }
+    selectedClip = i;
+    if (doubleClick) {
+      split(videoT);
+      return true;
+    }
+    ReplayEditor.seekVideo(videoT);
+    clipDragging = i;
+    dragX = mx;
+    drag = Drag.CLIP;
+    return true;
+  }
+
+  private void dragClipTrim(double x) {
+    int i = clipDragging;
+    if (i < 0 || i >= ReplayEditor.sequence().size()) {
+      return;
+    }
+    long delta = Math.round((x - dragX) * view.msPerPixel());
+    long replay = replayDuration();
+    if (drag == Drag.TRIM_IN) {
+      long in = Math.max(0, clipStartIn + delta);
+      ReplayEditor.editClips(s -> s.trimStart(i, in), false);
+    } else {
+      long out = Math.min(replay, clipStartOut + delta);
+      ReplayEditor.editClips(s -> s.trimEnd(i, out, replay), false);
+    }
+  }
+
+  private void endClipTrim() {
+    clipDragging = -1;
+    ReplayEditor.changed();
+  }
+
+  /** The place a dragged clip would go if dropped at {@code x}. */
+  private int clipDropIndex(double x) {
+    Sequence seq = ReplayEditor.sequence();
+    long t = clampTime(view.xToTime(x - left));
+    int at = seq.indexAt(Math.min(t, Math.max(0, seq.durationMs() - 1)));
+    return Math.max(0, Math.min(seq.size() - 1, at));
+  }
+
+  private void dropClip(double x) {
+    int from = clipDragging;
+    clipDragging = -1;
+    if (from < 0 || Math.abs(x - dragX) < 4) {
+      return;
+    }
+    int to = clipDropIndex(x);
+    if (to != from) {
+      moveClip(from, to);
+    }
+  }
+
+  /** The Video lane: one block per clip, in play order. */
+  private void renderClips(GuiGraphics g, int mouseX) {
+    int y = laneY(Track.VIDEO);
+    if (y < 0) {
+      return;
+    }
+    Sequence seq = ReplayEditor.sequence();
+    int y0 = y + 1;
+    int y1 = y + LANE_H - 2;
+    if (seq.isEmpty()) {
+      int x0 = (int) Math.round(left + view.timeToX(0));
+      int x1 = (int) Math.round(left + view.timeToX(view.durationMs()));
+      Draw.round(g, x0, y0, x1, y1, 2, Theme.alpha(Theme.ACCENT, 0x40));
+      Draw.label(
+          g,
+          font,
+          Draw.fit(font, Component.translatable("reizo.timeline.whole_replay").getString(), x1 - x0 - 8),
+          Math.max(left, x0) + 4,
+          y + 2,
+          Theme.DIM);
+      return;
+    }
+    for (int i = 0; i < seq.size(); i++) {
+      int x0 = clipX0(seq, i);
+      int x1 = clipX1(seq, i);
+      if (x1 < left || x0 > right) {
+        continue;
+      }
+      boolean sel = i == selectedClip;
+      boolean hot = hoverY >= y && hoverY < y + LANE_H && mouseX >= x0 && mouseX < x1;
+      int fill = sel ? Theme.ACCENT : Theme.alpha(Theme.ACCENT, hot ? 0x90 : 0x60);
+      Draw.round(g, x0 + 1, y0, x1 - 1, y1, 2, fill);
+      // Trim handles at both ends.
+      int handle = sel ? Theme.TEXT : Theme.alpha(Theme.TEXT, 0x80);
+      g.fill(x0 + 1, y0 + 2, x0 + 2, y1 - 2, handle);
+      g.fill(x1 - 2, y0 + 2, x1 - 1, y1 - 2, handle);
+      String name =
+          Component.translatable("reizo.timeline.clip", i + 1).getString()
+              + "  "
+              + ReplayHud.time(seq.clip(i).inMs());
+      Draw.label(
+          g,
+          font,
+          Draw.fit(font, name, x1 - x0 - 8),
+          Math.max(left, x0) + 4,
+          y + 2,
+          sel ? Theme.GROUND : Theme.TEXT);
+    }
+  }
+
+  /** While a clip is dragged: where it would land. */
+  private void renderClipDrop(GuiGraphics g, int mouseX) {
+    Sequence seq = ReplayEditor.sequence();
+    int y = laneY(Track.VIDEO);
+    if (y < 0 || seq.isEmpty() || Math.abs(mouseX - dragX) < 4) {
+      return;
+    }
+    int to = clipDropIndex(mouseX);
+    int from = clipDragging;
+    int x = to > from ? clipX1(seq, to) : clipX0(seq, to);
+    g.fill(x - 1, y - 1, x + 1, y + LANE_H, Theme.TEXT);
+  }
+
+  /** Clips of the project, for tests. */
+  public Sequence clips() {
+    return ReplayEditor.sequence();
+  }
+
+  /** The selected clip, or -1, for tests. */
+  public int selectedClip() {
+    return selectedClip;
+  }
+
+  /** GUI x of a clip's start, end or middle (edge -1, 1 or 0), for tests. */
+  public int clipX(int index, int edge) {
+    Sequence seq = ReplayEditor.sequence();
+    int x0 = clipX0(seq, index);
+    int x1 = clipX1(seq, index);
+    return edge < 0 ? x0 : edge > 0 ? x1 : (x0 + x1) / 2;
+  }
+
+  /** GUI y of the middle of the video track, for tests. */
+  public int videoTrackY() {
+    layoutLanes();
+    return laneY(Track.VIDEO) + 6;
+  }
+
   /** GUI x of a time on the timeline, for tests. */
   public int xOf(long timeMs) {
-    return (int) Math.round(left + view.timeToX(timeMs));
+    long v = toVideo(timeMs);
+    if (v < 0) {
+      return -100_000; // cut out: off the timeline
+    }
+    return (int) Math.round(left + view.timeToX(v));
   }
 
   /** GUI y of the middle of the camera track, for tests. */

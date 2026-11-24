@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * An immutable snapshot of everything the timeline edits, for undo and redo: the camera path, the
- * effect keyframes, the setting keyframes and the export region.
+ * effect keyframes, the setting keyframes, the export region and the clips.
  *
  * @param inMs start of the export region, -1 for the start of the recording
  * @param outMs end of the export region, -1 for the end of the recording
@@ -24,11 +24,13 @@ public record TimelineState(
     long inMs,
     long outMs,
     List<EffectTrack.Keyframe> effects,
-    List<PropertyTracks.Keyframe> settings) {
+    List<PropertyTracks.Keyframe> settings,
+    Sequence clips) {
   public TimelineState {
     keyframes = List.copyOf(keyframes);
     effects = List.copyOf(effects);
     settings = List.copyOf(settings);
+    clips = clips == null ? Sequence.empty() : clips;
   }
 
   public static TimelineState of(CameraPath path, long inMs, long outMs) {
@@ -41,6 +43,16 @@ public record TimelineState(
 
   public static TimelineState of(
       CameraPath path, EffectTrack effects, PropertyTracks settings, long inMs, long outMs) {
+    return of(path, effects, settings, inMs, outMs, Sequence.empty());
+  }
+
+  public static TimelineState of(
+      CameraPath path,
+      EffectTrack effects,
+      PropertyTracks settings,
+      long inMs,
+      long outMs,
+      Sequence clips) {
     return new TimelineState(
         path.keyframes(),
         path.interpolation(),
@@ -48,7 +60,8 @@ public record TimelineState(
         inMs,
         outMs,
         effects.keyframes(),
-        settings.keyframes());
+        settings.keyframes(),
+        clips);
   }
 
   /** Writes the snapshot's setting keyframes into {@code tracks}. */

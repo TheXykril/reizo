@@ -12,7 +12,13 @@ import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
+import io.github.thexykril.reizo.core.timeline.Sequence;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -64,8 +70,25 @@ public final class ExportControls {
                 ? r.output.strip()
                 : safe(project.name) + "_" + LocalDateTime.now().format(FILE_DATE));
     Path output = exportsDir().resolve(name);
+    partsProgress = 0;
+    partCount = 1;
     FfmpegCommand.Settings settings =
         new FfmpegCommand.Settings(format.encoder(), r.crf, "medium", r.width, r.height, "yuv420p");
+    Sequence clips = ReplayEditor.sequence();
+    if (clips.size() > 1) {
+      // One frame-exact export per clip, joined without re-encoding (ADR 0016).
+      List<Path> parts = new ArrayList<>();
+      for (int i = 0; i < clips.size(); i++) {
+        parts.add(output.resolveSibling(output.getFileName() + ".part" + i + "." + format.extension()));
+      }
+      exportPart(mc, clips, 0, parts, output, settings, ffmpeg.get(), r, onEnd);
+      startedToast(output);
+      return true;
+    }
+    if (clips.size() == 1) {
+      in = clips.clip(0).inMs();
+      out = Math.min(clips.clip(0).outMs(), duration);
+    }
     ExportSession.start(
         mc,
         new ExportPlan(in, out, r.fps, Math.max(1, Math.min(16, r.motionBlur)), 0.5),
@@ -91,6 +114,141 @@ public final class ExportControls {
             onEnd.accept(session);
           }
         });
+    startedToast(output);
+    return true;
+  }
+
+  /** Overall progress of a clip export: parts done plus the running part's share. */
+  private static double partsProgress;
+
+  private static int partCount = 1;
+
+  private static double progress() {
+    ExportSession s = ExportSession.current();
+    double part = s == null ? 1 : s.progress();
+    return Math.min(1, (partsProgress + part) / partCount);
+  }
+
+  private static void exportPart(
+      Minecraft mc,
+      Sequence clips,
+      int index,
+      List<Path> parts,
+      Path output,
+      FfmpegCommand.Settings settings,
+      String ffmpeg,
+      Project.Render r,
+      Consumer<ExportSession> onEnd) {
+    partsProgress = index;
+    partCount = clips.size();
+    Sequence.Clip clip = clips.clip(index);
+    long duration = ReplayPlayback.current() == null ? clip.outMs() : ReplayPlayback.current().script().durationMs();
+    ExportSession.start(
+        mc,
+        new ExportPlan(
+            clip.inMs(),
+            Math.min(clip.outMs(), duration),
+            r.fps,
+            Math.max(1, Math.min(16, r.motionBlur)),
+            0.5),
+        parts.get(index),
+        settings,
+        ffmpeg,
+        r.audio,
+        Math.max(0, Math.min(100, r.soundVolume)) / 100f,
+        Math.max(0, Math.min(100, r.musicVolume)) / 100f,
+        session -> {
+          if (session.state() == ExportSession.State.DONE && index + 1 < clips.size()) {
+            exportPart(mc, clips, index + 1, parts, output, settings, ffmpeg, r, onEnd);
+            return;
+          }
+          if (session.state() != ExportSession.State.DONE) {
+            dismissProgress();
+            deleteAll(parts);
+            if (session.state() == ExportSession.State.CANCELLED) {
+              RecorderClient.toast("reizo.export.cancelled", null);
+            } else {
+              RecorderClient.toast(
+                  "reizo.export.failed", Component.literal(String.valueOf(session.error())));
+            }
+            if (onEnd != null) {
+              onEnd.accept(session);
+            }
+            return;
+          }
+          partsProgress = partCount;
+          Thread joiner =
+              new Thread(
+                  () -> {
+                    String error = join(ffmpeg, parts, output);
+                    deleteAll(parts);
+                    mc.execute(
+                        () -> {
+                          dismissProgress();
+                          if (error == null) {
+                            RecorderClient.toast(
+                                "reizo.export.done",
+                                Component.literal(output.getFileName().toString()));
+                          } else {
+                            RecorderClient.toast("reizo.export.failed", Component.literal(error));
+                          }
+                          if (onEnd != null) {
+                            onEnd.accept(session);
+                          }
+                        });
+                  },
+                  "Reizo export join");
+          joiner.setDaemon(true);
+          joiner.start();
+        });
+  }
+
+  /** Joins the parts with FFmpeg's concat demuxer, copying the streams. Null on success. */
+  static String join(String ffmpeg, List<Path> parts, Path output) {
+    Path list = output.resolveSibling(output.getFileName() + ".parts.txt");
+    try {
+      StringBuilder sb = new StringBuilder();
+      for (Path p : parts) {
+        sb.append("file '")
+            .append(p.toAbsolutePath().toString().replace("'", "'\\''"))
+            .append("'\n");
+      }
+      Files.writeString(list, sb.toString());
+      Process p =
+          new ProcessBuilder(
+                  ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
+                  "-i", list.toString(), "-c", "copy", output.toString())
+              .redirectErrorStream(true)
+              .start();
+      p.getOutputStream().close();
+      String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      int code = p.waitFor();
+      return code == 0 ? null : "FFmpeg could not join the clips: " + out.strip();
+    } catch (IOException e) {
+      return "could not join the clips: " + e.getMessage();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return "interrupted";
+    } finally {
+      try {
+        Files.deleteIfExists(list);
+      } catch (IOException ignored) {
+        // a leftover list file
+      }
+    }
+  }
+
+  private static void deleteAll(List<Path> parts) {
+    for (Path p : parts) {
+      try {
+        Files.deleteIfExists(p);
+      } catch (IOException ignored) {
+        // a leftover part
+      }
+    }
+  }
+
+  private static void startedToast(Path output) {
     if (RecorderClient.useOneConfigNotifications()) {
       // In OneClient: one notification with a progress bar instead of a start toast.
       try {
@@ -98,17 +256,13 @@ public final class ExportControls {
             io.github.thexykril.reizo.fabric.compat.OneConfigNotifications.progress(
                 Component.translatable("reizo.export.started").getString(),
                 output.getFileName().toString(),
-                () -> {
-                  ExportSession s = ExportSession.current();
-                  return s == null ? 1 : s.progress();
-                });
-        return true;
+                ExportControls::progress);
+        return;
       } catch (Throwable t) {
         RecorderClient.oneConfigNotificationsFailed(t);
       }
     }
     RecorderClient.toast("reizo.export.started", null);
-    return true;
   }
 
   /** The OneConfig progress notification of the running export, or null. */

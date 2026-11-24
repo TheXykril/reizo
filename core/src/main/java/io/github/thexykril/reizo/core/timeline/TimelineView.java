@@ -103,6 +103,21 @@ public final class TimelineView {
     clamp();
   }
 
+  /**
+   * The same view over a recording of another length: keeps the zoom and scroll where they still
+   * fit, and shows everything when the view showed everything.
+   */
+  public TimelineView withDuration(long newDurationMs) {
+    TimelineView v = new TimelineView(newDurationMs);
+    v.widthPx = widthPx;
+    if (spanMs < durationMs) {
+      v.startMs = startMs;
+      v.spanMs = spanMs;
+      v.clamp();
+    }
+    return v;
+  }
+
   /** The smallest tick spacing that keeps ticks at least {@code minPx} apart. */
   public long tickStepMs(int minPx) {
     for (long step : TICK_STEPS) {

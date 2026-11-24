@@ -143,8 +143,15 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
     double-click a keyframe to go to it, wheel zooms around the cursor, Shift+wheel scrolls.
   - Keys: Space, N, Delete, Ctrl+Z/Y, Ctrl+C/V (paste at the playhead), Ctrl+A, I/O, F, H, Tab, ← →.
   - Every change autosaves to the project; undo covers keyframes, smoothing and the export region.
-- Effect, video and sound tracks, trim/split, per-keyframe interpolation and fades, text/image
-  overlays, media library: **planned**.
+- **Clips (Video track, ADR 0016 proposed):** **implemented**, evidence UT (`SequenceTest`: split,
+  delete, move, trim, video/replay time mapping, project save/load; `TimelineTest`: the view keeps
+  its zoom when the video's length changes) and GT (`checkClips`: S splits at the playhead, a click
+  selects a clip and Delete removes it, Ctrl+Z restores it, dragging a clip's end trims it, dragging
+  a clip reorders, the clips are saved, screenshot `reizo-clips`; `exportClips`: two clips in
+  reverse replay order export to one MP4 with exactly both clips' frames and no part files left).
+  Playback in the editor following the clip order is not covered by a test yet.
+- Effect and sound tracks, transitions between clips, per-keyframe interpolation and fades,
+  text/image overlays, media library: **planned**.
 
 ## Visual effects (M5)
 
@@ -217,6 +224,7 @@ options per encoder, VAAPI upload chain, encoder list parsing).
 | NVENC / VAAPI / QSV hardware encode | NVENC + libx264 | partial: offered when FFmpeg has them; command options unit tested; never run on a GPU (needs a check on Hyperion: VAAPI/QSV) |
 | Resolution, frame rate, quality | ✓ | implemented: settings screen (GT opens it); the game renders at the output size during an export (GT: 640×360 from a 320×240 window), falling back to window size plus FFmpeg scaling past the GPU's texture limit. While exporting, the window shows the bottom-left part of each frame |
 | Render region (in/out) | ✓ (Jul 2026) | implemented (GT): I and O in the timeline; `exportRegionVp9` exports only that range |
+| Several clips in one video | ? | implemented (GT): `exportClips`, one frame-exact export per clip joined by FFmpeg's concat demuxer without re-encoding (ADR 0016) |
 | Progress, cancel | ? | implemented: progress in the window title, Esc cancels |
 | Audio on/off, stereo/mono, 22.05–96 kHz | ✓ | planned (M6) |
 | Frame sequence, screenshot export, render queue, presets | ? | planned |

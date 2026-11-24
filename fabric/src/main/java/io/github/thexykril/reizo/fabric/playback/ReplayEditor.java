@@ -38,6 +38,14 @@ public final class ReplayEditor {
   private static io.github.thexykril.reizo.core.effects.PropertyTracks settings =
       new io.github.thexykril.reizo.core.effects.PropertyTracks();
   private static boolean pathPlaying;
+  private static io.github.thexykril.reizo.core.timeline.Sequence sequence =
+      io.github.thexykril.reizo.core.timeline.Sequence.empty();
+
+  /** The clip playback is in, for following the clip order (-1 = not known yet). */
+  private static int playingClip = -1;
+
+  /** Seeks done when clip following last seeked; it waits until the server has carried it out. */
+  private static int seeksBefore = -1;
 
   /** Roll (degrees) and FOV of the free camera while the path does not drive it; NaN = none. */
   private static float freeRoll;
@@ -79,6 +87,8 @@ public final class ReplayEditor {
     path = project.cameraPath();
     effects = project.effects();
     settings = project.settings();
+    sequence = project.sequence();
+    playingClip = -1;
     history.clear();
     resetFreeCamera();
   }
@@ -90,6 +100,8 @@ public final class ReplayEditor {
     path = new CameraPath();
     effects = new io.github.thexykril.reizo.core.effects.EffectTrack();
     settings = new io.github.thexykril.reizo.core.effects.PropertyTracks();
+    sequence = io.github.thexykril.reizo.core.timeline.Sequence.empty();
+    playingClip = -1;
     // The settings are put back by the next frame's applySettings() on the render thread: close()
     // can run on the replay server's thread.
     pathPlaying = false;
@@ -332,8 +344,8 @@ public final class ReplayEditor {
   /** Everything the timeline edits, as an immutable snapshot. */
   public static TimelineState state() {
     return project == null
-        ? TimelineState.of(path, effects, settings, -1, -1)
-        : TimelineState.of(path, effects, settings, project.inMs, project.outMs);
+        ? TimelineState.of(path, effects, settings, -1, -1, sequence)
+        : TimelineState.of(path, effects, settings, project.inMs, project.outMs, sequence);
   }
 
   /**
@@ -381,6 +393,7 @@ public final class ReplayEditor {
       project.outMs = s.outMs();
       project.setEffects(effects);
     }
+    sequence = s.clips();
     changed();
     return true;
   }
@@ -418,11 +431,150 @@ public final class ReplayEditor {
     changed();
   }
 
+  // --- Clips (ADR 0016) ---------------------------------------------------------------------
+
+  /** The clips in play order; empty when the project plays its In/Out range. */
+  public static io.github.thexykril.reizo.core.timeline.Sequence sequence() {
+    return sequence;
+  }
+
+  /**
+   * Applies a clip edit, undoable. The first edit starts from one clip over the In/Out range (or
+   * the whole replay).
+   */
+  public static boolean editClips(
+      java.util.function.UnaryOperator<io.github.thexykril.reizo.core.timeline.Sequence> edit) {
+    return editClips(edit, true);
+  }
+
+  /**
+   * Applies a clip edit. With {@code record} false it neither records undo nor saves: for the moves
+   * of a drag, which records undo once when it starts and calls {@link #changed()} when it ends.
+   */
+  public static boolean editClips(
+      java.util.function.UnaryOperator<io.github.thexykril.reizo.core.timeline.Sequence> edit,
+      boolean record) {
+    ReplayServer server = ReplayPlayback.current();
+    if (project == null || server == null) {
+      return false;
+    }
+    io.github.thexykril.reizo.core.timeline.Sequence before = sequence;
+    io.github.thexykril.reizo.core.timeline.Sequence base = sequence;
+    if (base.isEmpty()) {
+      long duration = Math.max(1, server.script().durationMs());
+      long in = project.inMs >= 0 ? Math.min(project.inMs, duration - 1) : 0;
+      long out = project.outMs >= 0 ? Math.min(project.outMs, duration) : duration;
+      base = io.github.thexykril.reizo.core.timeline.Sequence.of(in, Math.max(in + 1, out));
+    }
+    io.github.thexykril.reizo.core.timeline.Sequence after = edit.apply(base);
+    if (after.equals(before)) {
+      return false;
+    }
+    if (record) {
+      recordUndo();
+    }
+    sequence = after;
+    playingClip = -1;
+    seeksBefore = -1;
+    if (record) {
+      changed();
+    }
+    return true;
+  }
+
+  /** Removes all clips: the project plays its In/Out range again. */
+  public static void clearClips() {
+    if (!sequence.isEmpty()) {
+      recordUndo();
+      sequence = io.github.thexykril.reizo.core.timeline.Sequence.empty();
+      changed();
+    }
+  }
+
+  /** Seeks to a video time (a replay time when there are no clips). */
+  public static void seekVideo(long videoMs) {
+    if (sequence.isEmpty()) {
+      ReplayPlayback.seekTo(videoMs);
+      return;
+    }
+    playingClip = sequence.indexAt(videoMs);
+    seekClip(sequence.toReplay(videoMs));
+  }
+
+  /**
+   * Keeps playback in clip order: at the end of a clip it jumps to the next clip's start, and it
+   * stops at the end of the last clip. Called every client tick.
+   */
+  static void followClips(ReplayServer server) {
+    if (sequence.isEmpty() || server.isManual() || server.isReconfiguring()) {
+      return;
+    }
+    if (seeksBefore >= 0) {
+      if (server.seeksDone() <= seeksBefore) {
+        return;
+      }
+      seeksBefore = -1;
+    }
+    long now = server.replayTimeMs();
+    int at = sequence.clipOfReplay(now);
+    if (playingClip < 0 || playingClip >= sequence.size()) {
+      playingClip = at >= 0 ? at : 0;
+      if (at < 0) {
+        seekClip(sequence.clip(0).inMs());
+        return;
+      }
+    }
+    var clip = sequence.clip(playingClip);
+    if (now < clip.inMs() - 250 || now > clip.outMs() + 1000) {
+      // Seeked elsewhere (keys, markers): follow the clip that shows that moment, if any.
+      if (at >= 0) {
+        playingClip = at;
+        return;
+      }
+      int next = firstClipAfter(now);
+      playingClip = next;
+      seekClip(sequence.clip(next).inMs());
+      return;
+    }
+    if (now >= clip.outMs() && server.clock().isRunning()) {
+      if (playingClip + 1 < sequence.size()) {
+        playingClip++;
+        seekClip(sequence.clip(playingClip).inMs());
+      } else {
+        server.setPaused(true);
+        seekClip(clip.outMs());
+      }
+    }
+  }
+
+  private static void seekClip(long replayMs) {
+    ReplayServer server = ReplayPlayback.current();
+    if (server != null) {
+      seeksBefore = server.seeksDone();
+    }
+    ReplayPlayback.seekTo(replayMs);
+  }
+
+  /** The clip (in play order) whose replay range starts first after {@code replayMs}. */
+  private static int firstClipAfter(long replayMs) {
+    int best = 0;
+    long bestIn = Long.MAX_VALUE;
+    for (int i = 0; i < sequence.size(); i++) {
+      long in = sequence.clip(i).inMs();
+      if (in >= replayMs && in < bestIn) {
+        bestIn = in;
+        best = i;
+      }
+    }
+    return best;
+  }
+
   private static void save() {
     if (project == null || store == null) {
       return;
     }
     project.setCameraPath(path);
+    project.setSequence(sequence);
     try {
       store.save(project, System.currentTimeMillis());
     } catch (IOException e) {

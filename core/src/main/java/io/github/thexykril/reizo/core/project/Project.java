@@ -12,6 +12,7 @@ import io.github.thexykril.reizo.core.camera.CameraPath;
 import io.github.thexykril.reizo.core.effects.EffectTrack;
 import io.github.thexykril.reizo.core.effects.Grade;
 import io.github.thexykril.reizo.core.effects.PropertyTracks;
+import io.github.thexykril.reizo.core.timeline.Sequence;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,6 +51,15 @@ public final class Project {
 
   /** Export settings. */
   public Render render = new Render();
+
+  /** The clips in play order (ADR 0016); empty plays the In/Out range. */
+  public List<ClipRange> clips = new ArrayList<>();
+
+  /** JSON form of a clip: a replay range. */
+  public static final class ClipRange {
+    public long in;
+    public long out;
+  }
 
   /** Effect keyframes (image grade over time); empty when the project has none. */
   public List<Effect> effects = new ArrayList<>();
@@ -131,6 +141,28 @@ public final class Project {
     p.createdAtEpochMs = now;
     p.modifiedAtEpochMs = now;
     return p;
+  }
+
+  /** The clips described by this project. */
+  public Sequence sequence() {
+    List<Sequence.Clip> list = new ArrayList<>();
+    for (ClipRange c : clips) {
+      if (c != null && c.in >= 0 && c.out > c.in) {
+        list.add(new Sequence.Clip(c.in, c.out));
+      }
+    }
+    return Sequence.of(list);
+  }
+
+  /** Replaces the stored clips. */
+  public void setSequence(Sequence sequence) {
+    clips = new ArrayList<>();
+    for (Sequence.Clip c : sequence.clips()) {
+      ClipRange r = new ClipRange();
+      r.in = c.inMs();
+      r.out = c.outMs();
+      clips.add(r);
+    }
   }
 
   /** The camera path described by this project. */
@@ -266,6 +298,9 @@ public final class Project {
     }
     if (p.settings == null) {
       p.settings = new ArrayList<>();
+    }
+    if (p.clips == null) {
+      p.clips = new ArrayList<>();
     }
     if (p.render == null) {
       p.render = new Render();
