@@ -132,6 +132,7 @@
   "reizo.settings_track.between": "%s: a change adds a keyframe here (%s for this setting). Your own value comes back when the replay closes.",
   "reizo.timeline.markers": "Markers",
   "reizo.timeline.camera": "Camera",
+  "reizo.timeline.video": "Video",
   "reizo.timeline.yaw": "Yaw",
   "reizo.timeline.pitch": "Pitch",
   "reizo.timeline.roll": "Roll",

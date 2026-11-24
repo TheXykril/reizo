@@ -34,6 +34,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor
@@ -99,7 +101,10 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Transport(now, duration, server.clock().isRunning, server.clock().speed())
-                Timeline(now, duration, Modifier.fillMaxWidth().weight(1f))
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TrackLabels(Modifier.width(56.dp).fillMaxHeight())
+                    Timeline(now, duration, Modifier.weight(1f).fillMaxHeight())
+                }
             }
         }
     }
@@ -219,6 +224,19 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
+    /** Names of the lanes, lined up with [Timeline]'s ruler and two lanes. */
+    @Composable
+    private fun TrackLabels(modifier: Modifier) {
+        val dim = OneConfigTheme.current.textColorSecondary
+        Column(modifier.padding(top = RULER + 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            for (name in listOf(t("reizo.timeline.video"), t("reizo.timeline.camera"))) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+                    Text(name, color = dim, style = OneConfigTheme.typography.small)
+                }
+            }
+        }
+    }
+
     /** Ruler, clips, camera keyframes and markers over replay time; click or drag to seek. */
     @Composable
     private fun Timeline(now: Long, duration: Long, modifier: Modifier) {
@@ -231,6 +249,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val markers = ReplayPlayback.metadata()?.markers?.map { it.timeMs.toLong() } ?: listOf()
         val keyframes = ReplayEditor.path().keyframes().map { it.timeMs() }
         val clips = ReplayEditor.sequence()?.clips()?.map { it.inMs() to it.outMs() } ?: listOf(0L to duration)
+        val measurer = rememberTextMeasurer()
+        val labelStyle = OneConfigTheme.typography.caption.copy(color = dim)
         fun seekAt(x: Float, width: Float) {
             val ms = (x / width * duration).toLong().coerceIn(0, duration)
             ReplayPlayback.seekTo(ms)
@@ -242,16 +262,20 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         ) {
             val w = size.width
             fun x(ms: Long) = w * ms / duration
-            val rulerH = 14.dp.toPx()
+            val rulerH = RULER.toPx()
             val laneH = (size.height - rulerH - 8.dp.toPx()) / 2
             val clipsY = rulerH + 4.dp.toPx()
             val camY = clipsY + laneH + 4.dp.toPx()
-            // Ruler: a tick every second, taller every five.
+            // Ruler: a tick every second, a time label every five (or more when long).
+            val labelEvery = if (duration > 120_000) 30_000L else if (duration > 30_000) 10_000L else 5_000L
             var s = 0L
             while (s <= duration) {
-                val tall = (s / 1000) % 5 == 0L
-                drawLine(line, Offset(x(s), if (tall) 0f else rulerH * 0.5f), Offset(x(s), rulerH), 1f)
-                s += 1000
+                val labelled = s % labelEvery == 0L
+                drawLine(line, Offset(x(s), if (labelled) rulerH * 0.35f else rulerH * 0.65f), Offset(x(s), rulerH), 1f)
+                if (labelled && s < duration) {
+                    drawText(measurer, ReplayHud.time(s), Offset(x(s) + 3.dp.toPx(), -2.dp.toPx()), labelStyle)
+                }
+                s += if (duration > 120_000) 5000 else 1000
             }
             // Video lane: one rounded block per clip.
             for ((a, b) in clips) {
@@ -266,6 +290,10 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             drawLine(accent, Offset(px, 0f), Offset(px, size.height), 2.dp.toPx())
             drawCircle(accent, 4.dp.toPx(), Offset(px, 4.dp.toPx()))
         }
+    }
+
+    private companion object {
+        val RULER = 16.dp
     }
 
     private fun DrawScope.diamond(c: Offset, r: Float, color: Color) {
