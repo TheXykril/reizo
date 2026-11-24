@@ -1637,7 +1637,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
     var seq = context.computeOnClient(mc -> ReplayEditor.sequence());
     check(seq.size() >= 2, "need two clips for the Compose clip edits: " + seq);
     // Trim: drag the first clip's end to the left.
-    double[] end = composePoint(context, 0, 0.98);
+    double[] end = composePoint(context, 0, 1.0);
+    end[0] -= 2;
     composeDrag(context, end, -24);
     var trimmed = context.computeOnClient(mc -> ReplayEditor.sequence());
     check(

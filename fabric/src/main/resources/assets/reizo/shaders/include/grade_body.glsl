@@ -7,7 +7,12 @@ layout(std140) uniform ReizoGrade {
     vec4 Frame;  // vignette, letterbox bar (fraction of height), aspect (width / height), unused
     vec4 Lens;   // bloom, depth of field strength, focus distance (blocks), unused
     vec4 Screen; // texel width, texel height, depth-0 plane, depth-1 plane (26.x swaps near and far)
+    vec4 View;   // where the picture goes on screen: x, y (from the bottom), width, height; 0..1
+    vec4 Backdrop; // color around the picture when View is smaller than the screen
 };
+
+// The point of the world picture this pixel shows (texCoord mapped through View).
+vec2 uv0;
 
 const vec3 Luma = vec3(0.2126, 0.7152, 0.0722);
 const float GoldenAngle = 2.39996323;
@@ -27,7 +32,7 @@ float blurRadius(float depth) {
 }
 
 vec3 depthOfField(vec3 sharp) {
-    float centre = blurRadius(linearDepth(texCoord));
+    float centre = blurRadius(linearDepth(uv0));
     if (centre < 0.5) {
         return sharp;
     }
@@ -36,7 +41,7 @@ vec3 depthOfField(vec3 sharp) {
     for (int i = 1; i <= DofTaps; i++) {
         float r = centre * sqrt(float(i) / float(DofTaps));
         float a = float(i) * GoldenAngle;
-        vec2 uv = texCoord + vec2(cos(a), sin(a)) * r * Screen.xy;
+        vec2 uv = uv0 + vec2(cos(a), sin(a)) * r * Screen.xy;
         // A sharper sample in front would bleed into the blur; count it less.
         float w = clamp(blurRadius(linearDepth(uv)) / centre, 0.1, 1.0);
         sum += texture(InSampler, uv).rgb * w;
@@ -58,7 +63,7 @@ vec3 bloom() {
         float w = 1.0 / float(ring);
         for (int i = 0; i < 8; i++) {
             float a = turn + (float(i) + 0.5 * float(ring)) * 0.78539816;
-            vec3 s = texture(InSampler, texCoord + vec2(cos(a), sin(a)) * r * Screen.xy).rgb;
+            vec3 s = texture(InSampler, uv0 + vec2(cos(a), sin(a)) * r * Screen.xy).rgb;
             float l = dot(s, Luma);
             float knee = smoothstep(0.75, 1.0, l);
             sum += s * knee * w;
@@ -69,11 +74,16 @@ vec3 bloom() {
 }
 
 void main() {
-    if (texCoord.y < Frame.y || texCoord.y > 1.0 - Frame.y) {
+    uv0 = (texCoord - View.xy) / View.zw;
+    if (any(lessThan(uv0, vec2(0.0))) || any(greaterThan(uv0, vec2(1.0)))) {
+        fragColor = Backdrop;
+        return;
+    }
+    if (uv0.y < Frame.y || uv0.y > 1.0 - Frame.y) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    vec3 c = texture(InSampler, texCoord).rgb;
+    vec3 c = texture(InSampler, uv0).rgb;
     if (Lens.y > 0.0) {
         c = depthOfField(c);
     }
@@ -87,7 +97,7 @@ void main() {
     float l = dot(c, Luma);
     c = mix(vec3(l), c, Tone.z);
     if (Frame.x > 0.0) {
-        vec2 d = (texCoord - 0.5) * vec2(Frame.z, 1.0);
+        vec2 d = (uv0 - 0.5) * vec2(Frame.z, 1.0);
         float r = length(d) / length(vec2(Frame.z, 1.0) * 0.5);
         c *= 1.0 - Frame.x * smoothstep(0.45, 1.0, r);
     }
