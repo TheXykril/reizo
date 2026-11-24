@@ -23,6 +23,7 @@ public final class FollowCamera {
 
   private static long lastMs = Long.MIN_VALUE;
   private static int lastTarget = Integer.MIN_VALUE;
+  private static float subjectDistance;
 
   private FollowCamera() {}
 
@@ -30,6 +31,16 @@ public final class FollowCamera {
   public static void reset() {
     RIG.reset();
     lastMs = Long.MIN_VALUE;
+    subjectDistance = 0;
+  }
+
+  /**
+   * Distance in blocks from the camera to the middle of the followed player on the last frame, or 0
+   * when unknown. Automatic depth of field focuses here, so the subject stays sharp even when the
+   * centre of the picture looks past them.
+   */
+  public static float subjectDistance() {
+    return subjectDistance;
   }
 
   /**
@@ -68,6 +79,8 @@ public final class FollowCamera {
       double keep = Math.max(0.3, eye.distanceTo(hit.getLocation()) - 0.25);
       cam = len < 1e-6 ? cam : eye.add(back.scale(Math.min(1, keep / len)));
     }
+    subjectDistance =
+        (float) cam.distanceTo(eye.add(0, -0.5 * target.getEyeHeight(), 0));
     double[] look = RIG.lookPoint();
     double dx = look[0] - cam.x;
     double dy = look[1] - cam.y;

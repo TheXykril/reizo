@@ -28,6 +28,28 @@ abstract class GameRendererMixin {
   }
   *///?}
 
+  // Minecraft clears the depth before it draws the hand, so depth of field reads a copy taken
+  // just before.
+  //? if >=26.3 {
+  /*@Inject(method = "render3dHud", at = @At("HEAD"))
+  private void reizo$keepDepth(CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.playback.EffectRenderer.keepDepth(
+        net.minecraft.client.Minecraft.getInstance());
+  }
+  *///?} else {
+  @Inject(
+      method = "renderLevel",
+      at =
+          @At(
+              value = "INVOKE",
+              target =
+                  "Lcom/mojang/blaze3d/systems/CommandEncoder;clearDepthTexture(Lcom/mojang/blaze3d/textures/GpuTexture;D)V"))
+  private void reizo$keepDepth(CallbackInfo ci) {
+    io.github.thexykril.reizo.fabric.playback.EffectRenderer.keepDepth(
+        net.minecraft.client.Minecraft.getInstance());
+  }
+  //?}
+
   //? if >=26.3 {
   /*@Inject(
       method = "render()V",

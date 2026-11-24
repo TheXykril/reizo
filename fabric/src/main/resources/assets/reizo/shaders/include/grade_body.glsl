@@ -25,13 +25,13 @@ float linearDepth(vec2 uv) {
     return 2.0 * n * f / (f + n - d * (f - n));
 }
 
-// Autofocus: the distance to what is at the centre of the picture, weighted towards the very
-// centre so that a subject there stays sharp.
+// Autofocus: the distance at the centre of the picture. When a sample next to the centre is much
+// nearer (a subject the centre just misses, with the distance behind it), focus on that instead.
 float autoFocus() {
-    float d = 4.0 * linearDepth(vec2(0.5));
-    d += linearDepth(vec2(0.47, 0.5)) + linearDepth(vec2(0.53, 0.5));
-    d += linearDepth(vec2(0.5, 0.46)) + linearDepth(vec2(0.5, 0.54));
-    return d / 8.0;
+    float c = linearDepth(vec2(0.5));
+    float m = min(min(linearDepth(vec2(0.47, 0.5)), linearDepth(vec2(0.53, 0.5))),
+                  min(linearDepth(vec2(0.5, 0.46)), linearDepth(vec2(0.5, 0.54))));
+    return m < 0.5 * c ? m : c;
 }
 
 // Blur radius in pixels: 0 in focus, up to 1/60 of the height at full strength.
