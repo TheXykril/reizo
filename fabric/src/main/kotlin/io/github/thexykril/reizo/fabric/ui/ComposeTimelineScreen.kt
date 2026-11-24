@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -25,6 +26,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import io.github.thexykril.reizo.core.audio.MusicItem
+import io.github.thexykril.reizo.fabric.export.MusicFiles
+import io.github.thexykril.reizo.fabric.RecorderClient
 import org.polyfrost.oneconfig.api.ui.v1.components.SegmentedChips
 import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import androidx.compose.runtime.LaunchedEffect
@@ -123,7 +127,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val backdrop = OneConfigTheme.current.pageBackground.toArgb()
         if (!wide) EditorViewport.clear()
         // Slim lanes like a video editor; the transport moves into the panel on small windows.
-        val timelineHeight = if (wide) RULER + LANE * 2 + 36.dp else (maxHeight * 0.55f)
+        val timelineHeight = if (wide) RULER + LANE * LANES + 40.dp else (maxHeight * 0.55f)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TopBar()
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -148,7 +152,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             ) {
                 if (!wide) Transport(maxOf(0L, toVideo(now)), videoDuration(), server.clock().isRunning, server.clock().speed())
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TrackLabels(Modifier.width(56.dp).fillMaxHeight())
+                    TrackLabels(maxOf(0L, toVideo(now)), ::edited, Modifier.width(96.dp).fillMaxHeight())
                     Timeline(now, ::edited, Modifier.weight(1f).fillMaxHeight())
                 }
             }
@@ -184,7 +188,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
-    private enum class Tab { PROPERTIES, EXPORT }
+    private enum class Tab { PROPERTIES, MEDIA, EXPORT }
 
     private var tab by mutableStateOf(Tab.PROPERTIES)
 
@@ -203,7 +207,13 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 tab,
                 { tab = it },
                 Modifier.fillMaxWidth(),
-                { if (it == Tab.PROPERTIES) t("reizo.timeline.properties") else t("reizo.timeline.export_tab") },
+                {
+                    when (it) {
+                        Tab.PROPERTIES -> t("reizo.timeline.properties")
+                        Tab.MEDIA -> t("reizo.timeline.media")
+                        Tab.EXPORT -> t("reizo.timeline.export_tab")
+                    }
+                },
             )
             Column(
                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -214,6 +224,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                         CameraGroup(now, edited)
                         LookGroup()
                     }
+                    Tab.MEDIA -> MediaTab(maxOf(0L, toVideo(now)))
                     Tab.EXPORT -> ExportTab()
                 }
             }
@@ -318,6 +329,151 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
+    /** The selected music item (index), or -1. */
+    private var selectedMusic by mutableIntStateOf(-1)
+
+    /** When a music setting last changed, so that one slider drag is one undo step. */
+    private var lastMusicEdit = 0L
+
+    /** How long an item plays in the video; 0 while its file is read. */
+    private fun playedMs(item: MusicItem): Long = MusicFiles.info(item.path())?.let { item.playedMs(it.lengthMs()) } ?: 0L
+
+    /** Asks for a sound file and adds it at the playhead. */
+    private fun importMusic(videoNow: Long) {
+        MusicFiles.pick(t("reizo.timeline.import_music"), { path -> addMusic(path, videoNow) }) {
+            // No file dialog on this system: the music folder is the way in.
+            tab = Tab.MEDIA
+            RecorderClient.toast("reizo.timeline.no_file_dialog", null)
+            MusicFiles.openFolder()
+        }
+    }
+
+    /** Adds a sound file at a video time and selects it. */
+    fun addMusic(path: String, videoMs: Long) {
+        ReplayEditor.setMusic(ReplayEditor.music() + MusicItem.of(path, videoMs), true)
+        MusicFiles.info(path)
+        selectedMusic = ReplayEditor.music().size - 1
+        tab = Tab.MEDIA
+        version++
+    }
+
+    private fun editMusic(i: Int, change: (MusicItem) -> MusicItem) {
+        val items = ReplayEditor.music()
+        if (i !in items.indices) return
+        val now = System.currentTimeMillis()
+        if (now - lastMusicEdit > 700) ReplayEditor.recordUndo()
+        lastMusicEdit = now
+        ReplayEditor.setMusic(items.toMutableList().also { it[i] = change(it[i]) }, false)
+        ReplayEditor.changed()
+        version++
+    }
+
+    /** The Media tab: import music, then set each item's volume and fades. */
+    @Composable
+    private fun MediaTab(videoNow: Long) {
+        val theme = OneConfigTheme.current
+        TextButton(
+            t("reizo.timeline.import_music"),
+            { importMusic(videoNow) },
+            Modifier.fillMaxWidth(),
+            style = ControlStyle.Primary,
+            fillWidth = true,
+        )
+        // The music folder: files put there are one click away.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(t("reizo.timeline.music_folder"), Modifier.weight(1f), style = OneConfigTheme.typography.small)
+            TextButton(
+                t("reizo.timeline.open_folder"),
+                { MusicFiles.openFolder() },
+                style = ControlStyle.Ghost,
+            )
+        }
+        val library = remember(version) { MusicFiles.library() }
+        if (library.isEmpty()) {
+            Text(t("reizo.timeline.music_folder_empty"), color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
+        }
+        for (file in library) {
+            TextButton(
+                "+ " + file.fileName.toString(),
+                { addMusic(file.toString(), videoNow) },
+                Modifier.fillMaxWidth(),
+                style = ControlStyle.Ghost,
+            )
+        }
+        val items = ReplayEditor.music()
+        if (items.isEmpty()) {
+            Text(t("reizo.timeline.music_hint"), color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
+            return
+        }
+        Text(t("reizo.timeline.music"), style = OneConfigTheme.typography.small)
+        for ((i, item) in items.withIndex()) {
+            val info = MusicFiles.info(item.path())
+            val selected = i == selectedMusic
+            Column(
+                Modifier.fillMaxWidth().themedSurface(if (selected) SurfaceKind.Card else SurfaceKind.Panel).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        java.nio.file.Path.of(item.path()).fileName.toString(),
+                        { selectedMusic = i; ReplayEditor.seekVideo(item.startMs()) },
+                        Modifier.weight(1f),
+                        style = ControlStyle.Ghost,
+                    )
+                    TextButton("✕", {
+                        ReplayEditor.setMusic(items.filterIndexed { j, _ -> j != i }, true)
+                        selectedMusic = -1
+                        version++
+                    }, style = ControlStyle.Ghost)
+                }
+                Text(
+                    when {
+                        info == null -> t("reizo.timeline.music_reading")
+                        info.lengthMs() <= 0 -> t("reizo.timeline.music_unreadable")
+                        else -> t("reizo.timeline.music_at", ReplayHud.time(item.startMs()), ReplayHud.time(item.playedMs(info.lengthMs())))
+                    },
+                    color = theme.textColorSecondary,
+                    style = OneConfigTheme.typography.small,
+                )
+                MusicSlider("reizo.timeline.volume", item.volume(), 0f, 2f, "%.0f%%".format(item.volume() * 100)) { v ->
+                    editMusic(i) { it.withVolume(v) }
+                }
+                MusicSlider("reizo.timeline.fade_in", item.fadeInMs() / 1000f, 0f, 10f, "%.1fs".format(item.fadeInMs() / 1000f)) { v ->
+                    editMusic(i) { it.withFades((v * 1000).toLong(), it.fadeOutMs()) }
+                }
+                MusicSlider("reizo.timeline.fade_out", item.fadeOutMs() / 1000f, 0f, 10f, "%.1fs".format(item.fadeOutMs() / 1000f)) { v ->
+                    editMusic(i) { it.withFades(it.fadeInMs(), (v * 1000).toLong()) }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun MusicSlider(key: String, value: Float, min: Float, max: Float, label: String, set: (Float) -> Unit) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(t(key), Modifier.width(64.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.typography.small, maxLines = 1)
+            Slider(value, set, Modifier.weight(1f), min..max)
+            Text(label, Modifier.width(40.dp), style = OneConfigTheme.typography.small)
+        }
+    }
+
+    /** The centre of a music item in window pixels, or null; for tests. */
+    fun musicPoint(index: Int): DoubleArray? {
+        val b = timelineBounds
+        val items = ReplayEditor.music()
+        if (b.width <= 0f || index !in items.indices) return null
+        val ruler = RULER.value * lastDensity
+        val lane = (b.height - ruler - 4 * LANES * lastDensity) / LANES
+        val d = videoDuration().toDouble()
+        val a = b.left + b.width * items[index].startMs() / d
+        val e = b.left + b.width * (items[index].startMs() + playedMs(items[index])) / d
+        val y = b.top + ruler + 4 * lastDensity + 2 * (lane + 4 * lastDensity) + lane / 2
+        return doubleArrayOf(a + minOf(e - a, 40.0 * lastDensity) / 2, y.toDouble())
+    }
+
+    /** The selected music item; for tests. */
+    fun selectedMusic(): Int = selectedMusic
+
     @Composable
     private fun ExportTab() {
         Text(
@@ -390,14 +546,32 @@ class ComposeTimelineScreen(private val parent: Screen?) :
 
     /** Names of the lanes, lined up with [Timeline]'s ruler and two lanes. */
     @Composable
-    private fun TrackLabels(modifier: Modifier) {
-        val dim = OneConfigTheme.current.textColorSecondary
+    private fun TrackLabels(videoNow: Long, edited: () -> Unit, modifier: Modifier) {
         Column(modifier.padding(top = RULER + 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            for (name in listOf(t("reizo.timeline.video"), t("reizo.timeline.camera"))) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                    Text(name, color = dim, style = OneConfigTheme.typography.small)
-                }
+            // Each lane's header: its name and a quick action at the playhead.
+            TrackHeader(t("reizo.timeline.video")) { splitAt(videoNow) }
+            TrackHeader(t("reizo.timeline.camera")) {
+                ReplayEditor.addKeyframe(Minecraft.getInstance())
+                edited()
             }
+            TrackHeader(t("reizo.timeline.music")) { importMusic(videoNow) }
+        }
+    }
+
+    @Composable
+    private fun ColumnScope.TrackHeader(name: String, onAction: () -> Unit) {
+        Row(
+            Modifier.weight(1f).fillMaxWidth().themedSurface(SurfaceKind.Panel).padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                name,
+                Modifier.weight(1f),
+                color = OneConfigTheme.current.textColorSecondary,
+                style = OneConfigTheme.typography.small,
+                maxLines = 1,
+            )
+            TextButton("+", onAction, style = ControlStyle.Ghost)
         }
     }
 
@@ -438,7 +612,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     /** The selected clip (index in play order), or -1. */
     private var selectedClip by mutableIntStateOf(-1)
 
-    private enum class Drag { SEEK, KEYFRAMES, CLIP, TRIM_IN, TRIM_OUT }
+    private enum class Drag { SEEK, KEYFRAMES, CLIP, TRIM_IN, TRIM_OUT, MUSIC }
 
     /** Bumped on every edit so that the editor reads the project again. */
     private var version by mutableIntStateOf(0)
@@ -470,7 +644,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         if (b.width <= 0f || v < 0) return null
         val density = lastDensity
         val ruler = RULER.value * density
-        val lane = (b.height - ruler - 8 * density) / 2
+        val lane = (b.height - ruler - 4 * LANES * density) / LANES
         val y = b.top + ruler + 4 * density + lane + 4 * density + lane / 2
         return doubleArrayOf((b.left + b.width * v / videoDuration()).toDouble(), y.toDouble())
     }
@@ -486,7 +660,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val seq = ReplayEditor.sequence()
         if (b.width <= 0f || seq.isEmpty || index !in 0 until seq.size()) return null
         val ruler = RULER.value * lastDensity
-        val lane = (b.height - ruler - 8 * lastDensity) / 2
+        val lane = (b.height - ruler - 4 * LANES * lastDensity) / LANES
         val d = videoDuration().toDouble()
         val a = b.left + b.width * seq.startOf(index) / d
         val e = b.left + b.width * (seq.startOf(index) + seq.clip(index).lengthMs()) / d
@@ -519,6 +693,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             if (seq.isEmpty) listOf(0L to duration)
             else seq.clips().indices.map { seq.startOf(it) to seq.startOf(it) + seq.clip(it).lengthMs() }
         val head = toVideo(now)
+        val music = ReplayEditor.music()
+        val musicColor = Color(0xFF3FB984)
         val measurer = rememberTextMeasurer()
         val labelStyle = OneConfigTheme.typography.caption.copy(color = dim)
         val density = LocalDensity.current
@@ -526,13 +702,27 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val rulerPx = with(density) { RULER.toPx() }
 
         val dp = density.density
-        fun laneH(h: Float) = (h - rulerPx - 8 * dp) / 2
+        fun laneH(h: Float) = (h - rulerPx - 4 * LANES * dp) / LANES
         fun clipsTop() = rulerPx + 4 * dp
         fun camTop(h: Float) = clipsTop() + laneH(h) + 4 * dp
+        fun musicTop(h: Float) = camTop(h) + laneH(h) + 4 * dp
+
+        /** The music item under a point in the music lane, or null. */
+        fun musicAt(p: Offset, w: Float, h: Float): Int? {
+            if (p.y < musicTop(h)) return null
+            val d = videoDuration()
+            val items = ReplayEditor.music()
+            for (i in items.indices.reversed()) {
+                val a = w * items[i].startMs() / d
+                val b = w * (items[i].startMs() + playedMs(items[i])) / d
+                if (p.x >= a - hit / 2 && p.x <= maxOf(b, a + hit) + hit / 2) return i
+            }
+            return null
+        }
 
         /** The keyframe (replay time) under a point in the camera lane, or null. */
         fun keyframeAt(p: Offset, w: Float, h: Float): Long? {
-            if (p.y < camTop(h)) return null
+            if (p.y < camTop(h) || p.y >= musicTop(h)) return null
             val d = videoDuration()
             return ReplayEditor.path().keyframes()
                 .map { it.timeMs() to toVideo(it.timeMs()) }
@@ -579,6 +769,9 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                             ReplayPlayback.seekTo(k)
                             return@detectTapGestures
                         }
+                        val m = musicAt(p, w, h)
+                        selectedMusic = m ?: -1
+                        if (m != null) tab = Tab.MEDIA
                         val clip = clipAt(p, w, h)
                         if (clip != null) selectedClip = clip.first else if (p.y > clipsTop()) selectedClip = -1
                         seekAt(p.x, w)
@@ -593,8 +786,10 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                     var clip = -1
                     var clipIn = 0L
                     var clipOut = 0L
+                    var musicStart = 0L
                     fun finish() {
                         val w = size.width.toFloat()
+                        if (mode == Drag.MUSIC && recorded) ReplayEditor.changed()
                         if (mode == Drag.CLIP && kotlin.math.abs(lastX - startX) >= 4 * dp) {
                             val sq = ReplayEditor.sequence()
                             val t = (lastX / w * videoDuration()).toLong().coerceIn(0, maxOf(0L, sq.durationMs() - 1))
@@ -617,10 +812,16 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                             recorded = false
                             val k = keyframeAt(p, w, h)
                             val c = if (k == null) clipAt(p, w, h) else null
+                            val m = if (k == null && c == null) musicAt(p, w, h) else null
                             mode = when {
                                 k != null -> Drag.KEYFRAMES
                                 c != null -> c.second
+                                m != null -> Drag.MUSIC
                                 else -> Drag.SEEK
+                            }
+                            if (m != null) {
+                                selectedMusic = m
+                                musicStart = ReplayEditor.music()[m].startMs()
                             }
                             if (k != null && k !in selection) {
                                 selection.clear()
@@ -648,6 +849,21 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                                 return@detectDragGestures
                             }
                             Drag.CLIP -> return@detectDragGestures
+                            Drag.MUSIC -> {
+                                val i = selectedMusic
+                                val items = ReplayEditor.music()
+                                if (i !in items.indices) return@detectDragGestures
+                                val delta = ((lastX - startX) / w * videoDuration()).toLong()
+                                val start = (musicStart + delta).coerceIn(0L, videoDuration())
+                                if (start == items[i].startMs()) return@detectDragGestures
+                                if (!recorded) {
+                                    ReplayEditor.recordUndo()
+                                    recorded = true
+                                }
+                                ReplayEditor.setMusic(items.toMutableList().also { it[i] = it[i].withStart(start) }, false)
+                                version++
+                                return@detectDragGestures
+                            }
                             Drag.TRIM_IN, Drag.TRIM_OUT -> {
                                 val delta = ((lastX - startX) / w * videoDuration()).toLong()
                                 val replay = replayDuration()
@@ -685,9 +901,10 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             val w = size.width
             fun x(ms: Long) = w * ms / duration
             val rulerH = RULER.toPx()
-            val laneH = (size.height - rulerH - 8.dp.toPx()) / 2
+            val laneH = (size.height - rulerH - 4.dp.toPx() * LANES) / LANES
             val clipsY = rulerH + 4.dp.toPx()
             val camY = clipsY + laneH + 4.dp.toPx()
+            val musicY = camY + laneH + 4.dp.toPx()
             // Ruler: ticks, with a time label every few seconds.
             val labelEvery = if (duration > 120_000) 30_000L else if (duration > 30_000) 10_000L else 5_000L
             var s = 0L
@@ -733,7 +950,39 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                     diamond(c, 5.dp.toPx(), text)
                 }
             }
-            for (m in markers) drawLine(dim, Offset(x(m), clipsY), Offset(x(m), camY + laneH), 2f)
+            // Music lane: each item as a block with its waveform.
+            drawRoundRect(track, Offset(0f, musicY), Size(w, laneH - 2f), CornerRadius(6.dp.toPx()))
+            for ((i, item) in music.withIndex()) {
+                val a = x(item.startMs())
+                val played = playedMs(item)
+                val b = maxOf(a + 6.dp.toPx(), x(item.startMs() + played))
+                val selected = i == selectedMusic
+                drawRoundRect(
+                    musicColor.copy(alpha = if (selected) 0.55f else 0.35f),
+                    Offset(a, musicY),
+                    Size(b - a, laneH - 2f),
+                    CornerRadius(6.dp.toPx()),
+                )
+                val info = MusicFiles.info(item.path())
+                if (info != null && info.lengthMs() > 0 && played > 0) {
+                    val peaks = info.peaks()
+                    val mid = musicY + (laneH - 2f) / 2
+                    val half = (laneH - 2f) / 2 - 3.dp.toPx()
+                    val step = 2.dp.toPx()
+                    var px = a
+                    while (px < b) {
+                        val fileMs = item.trimMs() + ((px - a) / (b - a) * played).toLong()
+                        val peak = peaks[(fileMs * peaks.size / info.lengthMs()).toInt().coerceIn(0, peaks.size - 1)]
+                        val v = maxOf(0.5f, peak * minOf(1f, item.volume()) * half)
+                        drawLine(text.copy(alpha = 0.7f), Offset(px, mid - v), Offset(px, mid + v), 1.dp.toPx())
+                        px += step
+                    }
+                }
+                if (selected) {
+                    drawRoundRect(text, Offset(a, musicY), Size(b - a, laneH - 2f), CornerRadius(6.dp.toPx()), style = Stroke(1.5f.dp.toPx()))
+                }
+            }
+            for (m in markers) drawLine(dim, Offset(x(m), clipsY), Offset(x(m), musicY + laneH), 2f)
             // Playhead (hidden while the replay shows a moment cut out of the video).
             if (head >= 0) {
                 val px = x(head)
@@ -746,6 +995,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     private companion object {
         val RULER = 16.dp
         val LANE = 40.dp
+        const val LANES = 3
     }
 
     private fun DrawScope.diamond(c: Offset, r: Float, color: Color) {

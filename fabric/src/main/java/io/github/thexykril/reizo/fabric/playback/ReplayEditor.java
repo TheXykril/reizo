@@ -88,6 +88,7 @@ public final class ReplayEditor {
     effects = project.effects();
     settings = project.settings();
     sequence = project.sequence();
+    music = project.musicItems();
     playingClip = -1;
     history.clear();
     resetFreeCamera();
@@ -101,6 +102,7 @@ public final class ReplayEditor {
     effects = new io.github.thexykril.reizo.core.effects.EffectTrack();
     settings = new io.github.thexykril.reizo.core.effects.PropertyTracks();
     sequence = io.github.thexykril.reizo.core.timeline.Sequence.empty();
+    music = java.util.List.of();
     playingClip = -1;
     // The settings are put back by the next frame's applySettings() on the render thread: close()
     // can run on the replay server's thread.
@@ -344,8 +346,8 @@ public final class ReplayEditor {
   /** Everything the timeline edits, as an immutable snapshot. */
   public static TimelineState state() {
     return project == null
-        ? TimelineState.of(path, effects, settings, -1, -1, sequence)
-        : TimelineState.of(path, effects, settings, project.inMs, project.outMs, sequence);
+        ? TimelineState.of(path, effects, settings, -1, -1, sequence, music)
+        : TimelineState.of(path, effects, settings, project.inMs, project.outMs, sequence, music);
   }
 
   /**
@@ -394,6 +396,7 @@ public final class ReplayEditor {
       project.setEffects(effects);
     }
     sequence = s.clips();
+    music = s.music();
     changed();
     return true;
   }
@@ -480,6 +483,34 @@ public final class ReplayEditor {
       changed();
     }
     return true;
+  }
+
+  // --- Music (ADR 0018) ---------------------------------------------------------------------
+
+  private static java.util.List<io.github.thexykril.reizo.core.audio.MusicItem> music =
+      java.util.List.of();
+
+  /** The imported music, in the order it was added. */
+  public static java.util.List<io.github.thexykril.reizo.core.audio.MusicItem> music() {
+    return music;
+  }
+
+  /**
+   * Replaces the music, undoable. With {@code record} false it neither records undo nor saves:
+   * for the moves of a drag.
+   */
+  public static void setMusic(
+      java.util.List<io.github.thexykril.reizo.core.audio.MusicItem> items, boolean record) {
+    if (project == null || items.equals(music)) {
+      return;
+    }
+    if (record) {
+      recordUndo();
+    }
+    music = java.util.List.copyOf(items);
+    if (record) {
+      changed();
+    }
   }
 
   /** Removes all clips: the project plays its In/Out range again. */
@@ -575,6 +606,7 @@ public final class ReplayEditor {
     }
     project.setCameraPath(path);
     project.setSequence(sequence);
+    project.setMusic(music);
     try {
       store.save(project, System.currentTimeMillis());
     } catch (IOException e) {

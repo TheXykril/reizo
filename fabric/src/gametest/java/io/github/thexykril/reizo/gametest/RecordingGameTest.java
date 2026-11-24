@@ -1721,6 +1721,79 @@ public final class RecordingGameTest implements FabricClientGameTest {
     LOGGER.info("composeClipEdits OK: trimmed to {}, moved to {}", trimmed, moved);
   }
 
+  /**
+   * Imports a sound file into the Compose editor's music lane, drags it later, undoes that, and adds
+   * it to a short video with the export's music pass (ADR 0018). Skipped without FFmpeg.
+   */
+  private static void composeMusic(ClientGameTestContext context) {
+    if (io.github.thexykril.reizo.core.export.FfmpegCommand.locate(null, System.getenv("PATH"))
+        .isEmpty()) {
+      LOGGER.warn("composeMusic SKIPPED: ffmpeg not on PATH");
+      return;
+    }
+    java.nio.file.Path dir;
+    try {
+      dir = java.nio.file.Files.createTempDirectory("reizo-music");
+    } catch (java.io.IOException e) {
+      throw new AssertionError(e);
+    }
+    java.nio.file.Path song = dir.resolve("tone.wav");
+    run("ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "sine=frequency=440:duration=2", "-ac", "2", "-ar", "48000", song.toString());
+    var screen =
+        context.computeOnClient(
+            mc -> (io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen);
+    context.runOnClient(mc -> screen.addMusic(song.toString(), 0));
+    context.waitFor(
+        mc -> {
+          var info = io.github.thexykril.reizo.fabric.export.MusicFiles.info(song.toString());
+          return info != null;
+        },
+        20 * 10);
+    var info = io.github.thexykril.reizo.fabric.export.MusicFiles.info(song.toString());
+    check(
+        Math.abs(info.lengthMs() - 2000) <= 50 && info.peaks().length > 0,
+        "music length not read: " + info.lengthMs());
+    context.waitTicks(2);
+    context.takeScreenshot("reizo-compose-music");
+    var before = context.computeOnClient(mc -> ReplayEditor.music());
+    check(before.size() == 1 && before.get(0).startMs() == 0, "music not added: " + before);
+    double[] p = context.computeOnClient(mc -> screen.musicPoint(0));
+    check(p != null, "music not on the timeline: " + screen.timelineArea());
+    composeDrag(context, p, 30);
+    var moved = context.computeOnClient(mc -> ReplayEditor.music());
+    check(
+        moved.get(0).startMs() > 0 && context.computeOnClient(mc -> screen.selectedMusic()) == 0,
+        "dragging the music did not move it: " + moved);
+    context.runOnClient(mc -> ReplayEditor.undo());
+    check(
+        context.computeOnClient(mc -> ReplayEditor.music()).equals(before),
+        "undo did not restore the music: " + ReplayEditor.music());
+    // The export's music pass on a silent 2 s video: afterwards it has the tone.
+    java.nio.file.Path video = dir.resolve("video.mp4");
+    run("ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i",
+        "color=c=black:s=64x64:d=2:r=10", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        video.toString());
+    String error =
+        io.github.thexykril.reizo.fabric.export.MusicPass.apply(
+            "ffmpeg",
+            video,
+            List.of(
+                io.github.thexykril.reizo.core.audio.MusicItem.of(song.toString(), 500)
+                    .withVolume(0.5f)),
+            2000);
+    check(error == null, "music pass failed: " + error);
+    String volume =
+        run("ffmpeg", "-hide_banner", "-i", video.toString(), "-map", "0:a", "-af",
+            "volumedetect", "-f", "null", "-");
+    var max = java.util.regex.Pattern.compile("max_volume: (-?[0-9.]+) dB").matcher(volume);
+    check(
+        max.find() && Double.parseDouble(max.group(1)) > -40,
+        "music pass left the video silent: " + volume);
+    context.runOnClient(mc -> ReplayEditor.setMusic(List.of(), true));
+    LOGGER.info("composeMusic OK: moved to {} ms, mixed peak {} dB", moved.get(0).startMs(), max.group(1));
+  }
+
   private static double[] composePoint(ClientGameTestContext context, int clip, double fraction) {
     double[] p =
         context.computeOnClient(
@@ -1974,6 +2047,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           "Compose timeline did not stay open");
       composeKeyframeDrag(context);
       composeClipEdits(context);
+      composeMusic(context);
     }
     context.runOnClient(
         mc -> {
