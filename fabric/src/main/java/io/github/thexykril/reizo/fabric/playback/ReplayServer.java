@@ -247,6 +247,12 @@ public final class ReplayServer implements AutoCloseable {
         seeks.incrementAndGet();
         LOGGER.debug("Replay seeked to {} ms", seek);
       }
+      if (!manual && clock.isRunning() && clock.timeMs() >= script.durationMs()) {
+        // The end of the recording: stop there instead of counting on past it.
+        clock.pause();
+        clock.seek(script.durationMs());
+        tickStateChanged.set(true);
+      }
       long frameTarget = manualTarget.getAndSet(-1);
       if (frameTarget >= 0) {
         manualTime = frameTarget;
