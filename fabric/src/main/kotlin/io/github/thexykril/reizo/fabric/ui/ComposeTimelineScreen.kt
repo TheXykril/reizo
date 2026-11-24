@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
@@ -36,8 +38,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thexykril.reizo.core.timeline.KeyframeEdits
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback
 import net.minecraft.client.Minecraft
@@ -77,7 +85,6 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
         // Replay time moves on its own; read it every frame.
         var now by remember { mutableLongStateOf(0L) }
-        var version by remember { mutableIntStateOf(0) }
         LaunchedEffect(Unit) {
             while (true) {
                 withFrameMillis { now = server.replayTimeMs() }
@@ -88,24 +95,28 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             version++
         }
         version.let { }
-        val duration = maxOf(1L, server.script().durationMs())
 
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+        // The timeline takes about a third of the height, more on small windows.
+        val wide = maxWidth >= 560.dp
+        val timelineHeight = if (maxHeight < 400.dp) maxHeight * 0.55f else (maxHeight * 0.32f).coerceIn(170.dp, 260.dp)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TopBar()
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Spacer(Modifier.weight(1f))
-                Inspector(now, ::edited)
+                if (wide) Inspector(now, ::edited)
             }
             Column(
-                Modifier.fillMaxWidth().height(170.dp).themedSurface(SurfaceKind.Panel).padding(12.dp),
+                Modifier.fillMaxWidth().height(timelineHeight).themedSurface(SurfaceKind.Panel).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Transport(now, duration, server.clock().isRunning, server.clock().speed())
+                Transport(maxOf(0L, toVideo(now)), videoDuration(), server.clock().isRunning, server.clock().speed())
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TrackLabels(Modifier.width(56.dp).fillMaxHeight())
-                    Timeline(now, duration, Modifier.weight(1f).fillMaxHeight())
+                    Timeline(now, ::edited, Modifier.weight(1f).fillMaxHeight())
                 }
             }
+        }
         }
     }
 
@@ -123,9 +134,11 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 Modifier.weight(1f),
                 color = theme.textColorSecondary,
                 style = OneConfigTheme.typography.small,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            TextButton(t("reizo.timeline.undo_short"), { ReplayEditor.undo() }, style = ControlStyle.Ghost, enabled = ReplayEditor.canUndo())
-            TextButton(t("reizo.timeline.redo_short"), { ReplayEditor.redo() }, style = ControlStyle.Ghost, enabled = ReplayEditor.canRedo())
+            TextButton(t("reizo.timeline.undo_short"), { ReplayEditor.undo(); version++ }, style = ControlStyle.Ghost, enabled = ReplayEditor.canUndo())
+            TextButton(t("reizo.timeline.redo_short"), { ReplayEditor.redo(); version++ }, style = ControlStyle.Ghost, enabled = ReplayEditor.canRedo())
             TextButton(
                 t("reizo.export.title"),
                 { Minecraft.getInstance().setScreen(ExportSettingsScreen.create(this@ComposeTimelineScreen)) },
@@ -237,28 +250,149 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
-    /** Ruler, clips, camera keyframes and markers over replay time; click or drag to seek. */
+    /** The selected camera keyframes, by replay time. */
+    private val selection = mutableStateListOf<Long>()
+
+    /** Bumped on every edit so that the editor reads the project again. */
+    private var version by mutableIntStateOf(0)
+
+    private fun replayDuration(): Long = maxOf(1L, ReplayPlayback.current()?.script()?.durationMs() ?: 1L)
+
+    /** Length of the edited video: the clips' total, or the whole replay without clips. */
+    private fun videoDuration(): Long {
+        val seq = ReplayEditor.sequence()
+        return if (seq.isEmpty) replayDuration() else maxOf(1L, seq.durationMs())
+    }
+
+    /** Where the timeline canvas is, in window pixels; for tests. */
+    private var timelineBounds = Rect.Zero
+
+    /** The timeline canvas's bounds and density, for test messages. */
+    fun timelineArea(): String = "$timelineBounds at density $lastDensity"
+
+    /** The selected keyframe times; for tests. */
+    fun selectedTimes(): Set<Long> = selection.toSet()
+
+    /**
+     * The centre of a camera keyframe in window pixels, or null when it is not on the timeline; for
+     * tests. Follows the layout in [Timeline].
+     */
+    fun keyframePoint(timeMs: Long): DoubleArray? {
+        val b = timelineBounds
+        val v = toVideo(timeMs)
+        if (b.width <= 0f || v < 0) return null
+        val density = lastDensity
+        val ruler = RULER.value * density
+        val lane = (b.height - ruler - 8 * density) / 2
+        val y = b.top + ruler + 4 * density + lane + 4 * density + lane / 2
+        return doubleArrayOf((b.left + b.width * v / videoDuration()).toDouble(), y.toDouble())
+    }
+
+    private var lastDensity = 1f
+
+    private fun toVideo(ms: Long): Long = ReplayEditor.sequence().let { if (it.isEmpty) ms else it.toVideo(ms) }
+
+    /**
+     * Ruler, clips, camera keyframes and markers over video time (the clips in play order, or the
+     * whole replay without clips). Click or drag to seek; click a keyframe to select it, drag it to
+     * move the selection.
+     */
     @Composable
-    private fun Timeline(now: Long, duration: Long, modifier: Modifier) {
+    private fun Timeline(now: Long, edited: () -> Unit, modifier: Modifier) {
         val theme = OneConfigTheme.current
         val accent = OneConfigTheme.accent
         val track = theme.componentBackground
         val line = theme.borderColor
         val text = theme.textColor
         val dim = theme.textColorSecondary
-        val markers = ReplayPlayback.metadata()?.markers?.map { it.timeMs.toLong() } ?: listOf()
+        val seq = ReplayEditor.sequence()
+        val duration = videoDuration()
+        val markers = ReplayPlayback.metadata()?.markers?.map { toVideo(it.timeMs.toLong()) }?.filter { it >= 0 } ?: listOf()
         val keyframes = ReplayEditor.path().keyframes().map { it.timeMs() }
-        val clips = ReplayEditor.sequence()?.clips()?.map { it.inMs() to it.outMs() } ?: listOf(0L to duration)
+        val clips =
+            if (seq.isEmpty) listOf(0L to duration)
+            else seq.clips().indices.map { seq.startOf(it) to seq.startOf(it) + seq.clip(it).lengthMs() }
+        val head = toVideo(now)
         val measurer = rememberTextMeasurer()
         val labelStyle = OneConfigTheme.typography.caption.copy(color = dim)
-        fun seekAt(x: Float, width: Float) {
-            val ms = (x / width * duration).toLong().coerceIn(0, duration)
-            ReplayPlayback.seekTo(ms)
+        val density = LocalDensity.current
+        val hit = with(density) { 7.dp.toPx() }
+        val rulerPx = with(density) { RULER.toPx() }
+
+        /** The keyframe (replay time) under a point in the camera lane, or null. */
+        fun keyframeAt(p: Offset, w: Float, h: Float): Long? {
+            val camTop = rulerPx + 4 * density.density + (h - rulerPx - 8 * density.density) / 2 + 4 * density.density
+            if (p.y < camTop) return null
+            val d = videoDuration()
+            return ReplayEditor.path().keyframes()
+                .map { it.timeMs() to toVideo(it.timeMs()) }
+                .filter { it.second >= 0 }
+                .minByOrNull { kotlin.math.abs(w * it.second / d - p.x) }
+                ?.takeIf { kotlin.math.abs(w * it.second / d - p.x) <= hit }
+                ?.first
         }
+        fun seekAt(x: Float, w: Float) {
+            val d = videoDuration()
+            ReplayEditor.seekVideo((x / w * d).toLong().coerceIn(0, d))
+        }
+
+        lastDensity = density.density
         Canvas(
             modifier
-                .pointerInput(duration) { detectTapGestures { seekAt(it.x, size.width.toFloat()) } }
-                .pointerInput(duration) { detectDragGestures { change, _ -> seekAt(change.position.x, size.width.toFloat()) } },
+                .onGloballyPositioned { timelineBounds = it.boundsInWindow() }
+                .pointerInput(Unit) {
+                    detectTapGestures { p ->
+                        val k = keyframeAt(p, size.width.toFloat(), size.height.toFloat())
+                        selection.clear()
+                        if (k != null) {
+                            selection.add(k)
+                            ReplayPlayback.seekTo(k)
+                        } else {
+                            seekAt(p.x, size.width.toFloat())
+                        }
+                    }
+                }
+                .pointerInput(Unit) {
+                    var moving = false
+                    var startX = 0f
+                    var applied = 0L
+                    var recorded = false
+                    detectDragGestures(
+                        onDragStart = { p ->
+                            val k = keyframeAt(p, size.width.toFloat(), size.height.toFloat())
+                            moving = k != null
+                            startX = p.x
+                            applied = 0
+                            recorded = false
+                            if (k != null && k !in selection) {
+                                selection.clear()
+                                selection.add(k)
+                            }
+                        },
+                        onDragEnd = { if (recorded) edited() },
+                        onDragCancel = { if (recorded) edited() },
+                    ) { change, _ ->
+                        if (!moving) {
+                            seekAt(change.position.x, size.width.toFloat())
+                            return@detectDragGestures
+                        }
+                        val delta = ((change.position.x - startX) / size.width * videoDuration()).toLong()
+                        val step = delta - applied
+                        if (step == 0L) return@detectDragGestures
+                        if (!recorded) {
+                            ReplayEditor.recordUndo()
+                            recorded = true
+                        }
+                        val before = selection.minOrNull() ?: 0L
+                        val moved = KeyframeEdits.move(ReplayEditor.path(), selection.toSet(), step, replayDuration())
+                        if (moved.isNotEmpty()) {
+                            applied += moved.min() - before
+                            selection.clear()
+                            selection.addAll(moved)
+                            version++
+                        }
+                    }
+                },
         ) {
             val w = size.width
             fun x(ms: Long) = w * ms / duration
@@ -266,7 +400,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             val laneH = (size.height - rulerH - 8.dp.toPx()) / 2
             val clipsY = rulerH + 4.dp.toPx()
             val camY = clipsY + laneH + 4.dp.toPx()
-            // Ruler: a tick every second, a time label every five (or more when long).
+            // Ruler: ticks, with a time label every few seconds.
             val labelEvery = if (duration > 120_000) 30_000L else if (duration > 30_000) 10_000L else 5_000L
             var s = 0L
             while (s <= duration) {
@@ -277,18 +411,36 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 }
                 s += if (duration > 120_000) 5000 else 1000
             }
-            // Video lane: one rounded block per clip.
+            // Video lane: one rounded block per clip, in play order.
+            val gap = if (clips.size > 1) 1.dp.toPx() else 0f
             for ((a, b) in clips) {
-                drawRoundRect(accent.copy(alpha = 0.35f), Offset(x(a), clipsY), Size(x(b) - x(a), laneH - 2f), CornerRadius(6.dp.toPx()))
+                drawRoundRect(
+                    accent.copy(alpha = 0.35f),
+                    Offset(x(a) + gap, clipsY),
+                    Size(x(b) - x(a) - 2 * gap, laneH - 2f),
+                    CornerRadius(6.dp.toPx()),
+                )
             }
             // Camera lane.
             drawRoundRect(track, Offset(0f, camY), Size(w, laneH - 2f), CornerRadius(6.dp.toPx()))
-            for (k in keyframes) diamond(Offset(x(k), camY + laneH / 2), 5.dp.toPx(), text)
+            for (k in keyframes) {
+                val v = toVideo(k)
+                if (v < 0) continue
+                val c = Offset(x(v), camY + laneH / 2)
+                if (k in selection) {
+                    diamond(c, 7.dp.toPx(), accent)
+                    diamond(c, 4.dp.toPx(), text)
+                } else {
+                    diamond(c, 5.dp.toPx(), text)
+                }
+            }
             for (m in markers) drawLine(dim, Offset(x(m), clipsY), Offset(x(m), camY + laneH), 2f)
-            // Playhead.
-            val px = x(now)
-            drawLine(accent, Offset(px, 0f), Offset(px, size.height), 2.dp.toPx())
-            drawCircle(accent, 4.dp.toPx(), Offset(px, 4.dp.toPx()))
+            // Playhead (hidden while the replay shows a moment cut out of the video).
+            if (head >= 0) {
+                val px = x(head)
+                drawLine(accent, Offset(px, 0f), Offset(px, size.height), 2.dp.toPx())
+                drawCircle(accent, 4.dp.toPx(), Offset(px, 4.dp.toPx()))
+            }
         }
     }
 

@@ -1587,6 +1587,51 @@ public final class RecordingGameTest implements FabricClientGameTest {
    * Opens the timeline editor with its key and edits with real mouse and key input: drag a
    * keyframe, undo and redo, set the export region, seek from the ruler.
    */
+  /** Drags a camera keyframe in the Compose editor and undoes it. */
+  private static void composeKeyframeDrag(ClientGameTestContext context) {
+    context.runOnClient(mc -> clearOneConfigNotifications());
+    context.waitTicks(2);
+    List<Long> before = keyframeTimes();
+    double[] at = null;
+    long picked = -1;
+    StringBuilder seen = new StringBuilder();
+    for (long t : before) {
+      double[] p =
+          context.computeOnClient(
+              mc -> ((io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen).keyframePoint(t));
+      seen.append(t).append('@').append(p == null ? "none" : p[0] + "," + p[1]).append(' ');
+      if (p != null && t > 0) {
+        at = p;
+        picked = t;
+        break;
+      }
+    }
+    check(at != null, "no keyframe visible in the Compose timeline: "
+            + seen
+            + context.computeOnClient(
+                mc -> ((io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen).timelineArea()));
+    context.getInput().setCursorPos(at[0], at[1]);
+    context.waitTicks(1);
+    context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(1);
+    for (int i = 0; i < 6; i++) {
+      context.getInput().moveCursor(-5, 0);
+      context.waitTicks(1);
+    }
+    context.getInput().releaseMouse(InputConstants.MOUSE_BUTTON_LEFT);
+    context.waitTicks(2);
+    List<Long> after = keyframeTimes();
+    Set<Long> selected =
+        context.computeOnClient(
+            mc -> ((io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen).selectedTimes());
+    check(!after.equals(before), "Compose drag did not move keyframe " + picked + ": " + after);
+    check(selected.size() == 1 && selected.iterator().next() < picked,
+        "dragged keyframe not selected or not moved left: " + picked + " -> " + selected);
+    context.runOnClient(mc -> ReplayEditor.undo());
+    check(keyframeTimes().equals(before), "undo did not restore the keyframes: " + keyframeTimes());
+    LOGGER.info("composeKeyframeDrag OK: {} -> {}", picked, selected);
+  }
+
   /** Dismisses every OneConfig notification on screen; does nothing without OneConfig. */
   private static void clearOneConfigNotifications() {
     if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
@@ -1809,6 +1854,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
           context.computeOnClient(
               mc -> mc.screen instanceof io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen),
           "Compose timeline did not stay open");
+      composeKeyframeDrag(context);
     }
     context.runOnClient(
         mc -> {
