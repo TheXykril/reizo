@@ -94,5 +94,7 @@ The shader test runs first and checks depth of field through the pack. The main 
 it, but its timing checks (roll keys, for example) fail at the low frame rate shaders give in
 software rendering, so read the result of the shader test only.
 
-**PolyPlus** (`checkPolyPlusReplays`, skipped without PolyPlus): add the PolyPlus jar to the mods
-folder.
+**PolyPlus** (`PolyPlusGameTest`, skipped without PolyPlus): add the PolyPlus jar to the mods
+folder. PolyPlus replaces the title screen with its lobby, and the framework expects each test to
+end on the title screen, so the run always stops with that error after the test's
+`checkPolyPlusReplays OK` line. Read that line, not the exit code.

@@ -84,53 +84,8 @@ public final class RecordingGameTest implements FabricClientGameTest {
     recordMidSessionWhileWalking(context);
     saveShadowAfterWalking(context);
     browseAndPlay(context);
-    checkPolyPlusReplays(context);
     recoverAfterCrash(context);
     measureRecordingCost(context);
-  }
-
-  /**
-   * OneClient's Replays page (ADR 0019). Runs only when PolyPlus is in the test's mods folder,
-   * which CI does not do: stage its jar with REIZO_EXTRA_MODS to check by hand (docs/TESTING.md).
-   */
-  private void checkPolyPlusReplays(ClientGameTestContext context) {
-    if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("polyplus")) {
-      LOGGER.info("checkPolyPlusReplays skipped: PolyPlus is not loaded");
-      return;
-    }
-    String result =
-        context.computeOnClient(
-            mc -> {
-              try {
-                Class<?> providers =
-                    Class.forName("org.polyfrost.polyplus.compat.replay.ReplayProviders");
-                Object instance = providers.getField("INSTANCE").get(null);
-                List<?> all = (List<?>) providers.getMethod("getAll").invoke(instance);
-                Object reizo = null;
-                for (Object p : all) {
-                  if ("reizo".equals(p.getClass().getMethod("getId").invoke(p))) {
-                    reizo = p;
-                  }
-                }
-                check(reizo != null, "Reizo is not in PolyPlus's providers: " + all);
-                java.lang.reflect.Method available = reizo.getClass().getMethod("getAvailable");
-                check((Boolean) available.invoke(reizo), "Reizo provider is not available");
-                List<?> entries = (List<?>) reizo.getClass().getMethod("list").invoke(reizo);
-                check(!entries.isEmpty(), "Reizo provider lists no recordings");
-                int withIcon = 0;
-                for (Object e : entries) {
-                  if (e.getClass().getMethod("readIcon").invoke(e) != null) {
-                    withIcon++;
-                  }
-                }
-                check(withIcon > 0, "no recording has a thumbnail in PolyPlus");
-                return all.size() + " providers, " + entries.size() + " recordings, " + withIcon
-                    + " with thumbnails";
-              } catch (ReflectiveOperationException e) {
-                throw new AssertionError("PolyPlus replay API changed", e);
-              }
-            });
-    LOGGER.info("checkPolyPlusReplays OK: {}", result);
   }
 
   /**
