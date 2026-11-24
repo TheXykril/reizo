@@ -114,6 +114,36 @@ public final class FfmpegCommand {
   }
 
   /**
+   * The command that decodes the sound of any file FFmpeg reads to raw 48 kHz stereo 32-bit floats
+   * (little-endian) on its standard output.
+   */
+  public static List<String> decodeAudio(String ffmpeg, Path input) {
+    return List.of(
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        input.toString(),
+        "-vn",
+        "-f",
+        "f32le",
+        "-ac",
+        "2",
+        "-ar",
+        "48000",
+        "-");
+  }
+
+  /**
+   * The command that replaces a video's sound with a WAV file, copying the picture. Like {@link
+   * #muxAudio} but from a finished video that may already have sound.
+   */
+  public static List<String> replaceAudio(String ffmpeg, Path video, Path wav, Path output) {
+    return muxAudio(ffmpeg, video, wav, output);
+  }
+
+  /**
    * Finds FFmpeg: the configured path if it is an executable file, else {@code ffmpeg} on the PATH.
    * Empty when neither exists.
    */

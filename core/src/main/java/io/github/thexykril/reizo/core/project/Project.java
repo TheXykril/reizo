@@ -64,6 +64,49 @@ public final class Project {
   /** Effect keyframes (image grade over time); empty when the project has none. */
   public List<Effect> effects = new ArrayList<>();
 
+  /** Imported music on the video (ADR 0018). */
+  public List<Music> music = new ArrayList<>();
+
+  /** JSON form of a {@link io.github.thexykril.reizo.core.audio.MusicItem}. */
+  public static final class Music {
+    public String path;
+    public long start;
+    public long trim;
+    public long length;
+    public float volume = 1;
+    public long fadeIn;
+    public long fadeOut;
+  }
+
+  /** The imported music, skipping entries without a file. */
+  public List<io.github.thexykril.reizo.core.audio.MusicItem> musicItems() {
+    List<io.github.thexykril.reizo.core.audio.MusicItem> list = new ArrayList<>();
+    for (Music m : music) {
+      if (m != null && m.path != null && !m.path.isBlank()) {
+        list.add(
+            new io.github.thexykril.reizo.core.audio.MusicItem(
+                m.path, m.start, m.trim, m.length, m.volume, m.fadeIn, m.fadeOut));
+      }
+    }
+    return list;
+  }
+
+  /** Replaces the stored music. */
+  public void setMusic(List<io.github.thexykril.reizo.core.audio.MusicItem> items) {
+    music = new ArrayList<>();
+    for (io.github.thexykril.reizo.core.audio.MusicItem i : items) {
+      Music m = new Music();
+      m.path = i.path();
+      m.start = i.startMs();
+      m.trim = i.trimMs();
+      m.length = i.lengthMs();
+      m.volume = i.volume();
+      m.fadeIn = i.fadeInMs();
+      m.fadeOut = i.fadeOutMs();
+      music.add(m);
+    }
+  }
+
   /** Keyframed game and mod settings (see {@link PropertyTracks}); empty when none. */
   public List<Setting> settings = new ArrayList<>();
 
@@ -301,6 +344,9 @@ public final class Project {
     }
     if (p.clips == null) {
       p.clips = new ArrayList<>();
+    }
+    if (p.music == null) {
+      p.music = new ArrayList<>();
     }
     if (p.render == null) {
       p.render = new Render();
