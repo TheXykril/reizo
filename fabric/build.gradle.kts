@@ -127,8 +127,11 @@ val oneClientMods: Configuration by configurations.creating { isTransitive = fal
 for ((run, dir) in listOf("runClient" to "run", "runClientGameTest" to "build/run/clientGameTest")) {
     val stage =
         tasks.register<Copy>("stageOneClientModsFor${run.removePrefix("run")}") {
-            from(oneClientMods)
-            into(layout.projectDirectory.dir("$dir/mods"))
+            into(layout.projectDirectory.dir(dir))
+            from(oneClientMods) { into("mods") }
+            // Manual checks: REIZO_EXTRA_RUN_FILES=/dir copies its files (config, shaderpacks...)
+            // into the run folder.
+            System.getenv("REIZO_EXTRA_RUN_FILES")?.let { extra -> from(extra) }
         }
     tasks.matching { it.name == run }.configureEach { dependsOn(stage) }
 }
@@ -146,6 +149,10 @@ dependencies {
     oneClientMods("maven.modrinth:oneconfig:${oneConfigModrinthIds.getValue(oneConfigPlatform)}")
     oneClientMods("org.polyfrost:polycompose-$oneConfigPlatform:$polyComposeVersion")
     oneClientMods("net.fabricmc:fabric-language-kotlin:1.14.1+kotlin.2.4.20")
+    // Manual checks with other mods (Iris, PolyPlus...): REIZO_EXTRA_MODS=/dir/with/jars.
+    System.getenv("REIZO_EXTRA_MODS")?.let { dir ->
+        oneClientMods(fileTree(dir) { include("*.jar") })
+    }
     if (remap) {
         "mappings"(loom.officialMojangMappings())
     }

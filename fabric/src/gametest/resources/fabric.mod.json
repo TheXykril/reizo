@@ -5,7 +5,10 @@
   "name": "Reizo client gametests",
   "environment": "client",
   "entrypoints": {
-    "fabric-client-gametest": ["io.github.thexykril.reizo.gametest.RecordingGameTest"]
+    "fabric-client-gametest": [
+      "io.github.thexykril.reizo.gametest.ShaderEffectsGameTest",
+      "io.github.thexykril.reizo.gametest.RecordingGameTest"
+    ]
   },
   "depends": { "reizo": "*", "fabric-client-gametest-api-v1": "*" }
 }

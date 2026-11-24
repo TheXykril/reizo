@@ -70,3 +70,29 @@ xvfb-run -a ./gradlew :fabric:runClientGameTest
 ```
 
 Gametest logs: `fabric/build/run/clientGameTest/logs/latest.log`.
+
+## Runs with other mods (manual, not in CI)
+
+The run folder is rebuilt for every in-game test run, so extra mods and files are staged through
+two environment variables:
+
+- `REIZO_EXTRA_MODS=/dir`: every `*.jar` in `/dir` goes into the run's `mods` folder.
+- `REIZO_EXTRA_RUN_FILES=/dir`: the contents of `/dir` (for example `config/iris.properties`
+  and `shaderpacks/Pack.zip`) are copied into the run folder.
+
+**Shaders** (`ShaderEffectsGameTest`, skipped without Iris): put Iris and Sodium for the
+Minecraft version in the mods folder, a shader pack in `shaderpacks/`, and
+`config/iris.properties` with `enableShaders=true` and `shaderPack=<file name>`. Iris needs
+OpenGL, and 26.x picks Vulkan under Xvfb, so give it a 24-bit GLX screen and let SDL use EGL:
+
+```sh
+SDL_VIDEO_FORCE_EGL=1 REIZO_EXTRA_MODS=... REIZO_EXTRA_RUN_FILES=... LIBGL_ALWAYS_SOFTWARE=1 \
+  xvfb-run -a -s "-screen 0 1280x1024x24 +extension GLX" ./gradlew :fabric:26.3:runClientGameTest
+```
+
+The shader test runs first and checks depth of field through the pack. The main suite runs after
+it, but its timing checks (roll keys, for example) fail at the low frame rate shaders give in
+software rendering, so read the result of the shader test only.
+
+**PolyPlus** (`checkPolyPlusReplays`, skipped without PolyPlus): add the PolyPlus jar to the mods
+folder.
