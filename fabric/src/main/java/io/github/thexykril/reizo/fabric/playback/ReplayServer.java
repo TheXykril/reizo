@@ -247,6 +247,10 @@ public final class ReplayServer implements AutoCloseable {
         seeks.incrementAndGet();
         LOGGER.debug("Replay seeked to {} ms", seek);
       }
+      if (!manual && clock.timeMs() > script.durationMs()) {
+        // The end of the recording: hold the clock there instead of counting on past it.
+        clock.seek(script.durationMs());
+      }
       long frameTarget = manualTarget.getAndSet(-1);
       if (frameTarget >= 0) {
         manualTime = frameTarget;
@@ -449,7 +453,7 @@ public final class ReplayServer implements AutoCloseable {
 
   /** The replay time the client is being shown: the frame time in manual mode, else the clock. */
   public long replayTimeMs() {
-    return manual ? manualTime : clock.timeMs();
+    return manual ? manualTime : Math.min(clock.timeMs(), script.durationMs());
   }
 
   public boolean isManual() {
