@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits
+import io.github.thexykril.reizo.fabric.compat.Compat
 import io.github.thexykril.reizo.fabric.playback.EditorViewport
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback
@@ -96,9 +97,9 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
         // The world shows in a box, so the HUD (sized for the whole window) stays hidden meanwhile.
         if (hudHidden == null) {
-            val options = Minecraft.getInstance().options
-            hudHidden = options.hideGui
-            options.hideGui = true
+            val mc = Minecraft.getInstance()
+            hudHidden = Compat.hudHidden(mc)
+            Compat.setHudHidden(mc, true)
         }
         // Replay time moves on its own; read it every frame.
         var now by remember { mutableLongStateOf(0L) }
@@ -419,7 +420,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     override fun removed() {
         super.removed()
         EditorViewport.clear()
-        hudHidden?.let { Minecraft.getInstance().options.hideGui = it }
+        hudHidden?.let { Compat.setHudHidden(Minecraft.getInstance(), it) }
         hudHidden = null
     }
 

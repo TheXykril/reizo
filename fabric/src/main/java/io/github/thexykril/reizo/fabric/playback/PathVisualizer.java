@@ -78,7 +78,9 @@ public final class PathVisualizer {
         || server == null
         || path.isEmpty()
         || ReplayEditor.isPathPlaying()
-        || Compat.hudHidden(mc)
+        // The editor hides the HUD for its framed view but still shows the path.
+        || (Compat.hudHidden(mc)
+            && !(mc.screen instanceof io.github.thexykril.reizo.fabric.ui.EditorView))
         || mc.level == null) {
       return;
     }
