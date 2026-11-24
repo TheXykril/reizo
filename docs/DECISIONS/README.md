@@ -23,3 +23,4 @@ in AGENTS.md needs an ADR.
 | [0015](0015-editor-ui-kit.md) | A docked editor built on a small Reizo UI kit | Accepted |
 | [0016](0016-clip-track.md) | A clip track that maps video time to replay time | Accepted |
 | [0017](0017-compose-screens.md) | Reizo screens on OneConfig's Compose components | Accepted |
+| [0018](0018-imported-music-track.md) | Imported music on its own track, mixed into the export | Proposed |

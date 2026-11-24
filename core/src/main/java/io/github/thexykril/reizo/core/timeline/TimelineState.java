@@ -25,8 +25,10 @@ public record TimelineState(
     long outMs,
     List<EffectTrack.Keyframe> effects,
     List<PropertyTracks.Keyframe> settings,
-    Sequence clips) {
+    Sequence clips,
+    List<io.github.thexykril.reizo.core.audio.MusicItem> music) {
   public TimelineState {
+    music = music == null ? List.of() : List.copyOf(music);
     keyframes = List.copyOf(keyframes);
     effects = List.copyOf(effects);
     settings = List.copyOf(settings);
@@ -53,6 +55,17 @@ public record TimelineState(
       long inMs,
       long outMs,
       Sequence clips) {
+    return of(path, effects, settings, inMs, outMs, clips, List.of());
+  }
+
+  public static TimelineState of(
+      CameraPath path,
+      EffectTrack effects,
+      PropertyTracks settings,
+      long inMs,
+      long outMs,
+      Sequence clips,
+      List<io.github.thexykril.reizo.core.audio.MusicItem> music) {
     return new TimelineState(
         path.keyframes(),
         path.interpolation(),
@@ -61,7 +74,8 @@ public record TimelineState(
         outMs,
         effects.keyframes(),
         settings.keyframes(),
-        clips);
+        clips,
+        music);
   }
 
   /** Writes the snapshot's setting keyframes into {@code tracks}. */

@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.fabric.export;
 
+import io.github.thexykril.reizo.core.audio.MusicItem;
 import io.github.thexykril.reizo.core.export.ExportFormat;
 import io.github.thexykril.reizo.core.export.ExportPlan;
 import io.github.thexykril.reizo.core.export.FfmpegCommand;
@@ -89,6 +90,8 @@ public final class ExportControls {
       in = clips.clip(0).inMs();
       out = Math.min(clips.clip(0).outMs(), duration);
     }
+    List<MusicItem> music = ReplayEditor.music();
+    long videoMs = out - in;
     ExportSession.start(
         mc,
         new ExportPlan(in, out, r.fps, Math.max(1, Math.min(16, r.motionBlur)), 0.5),
@@ -99,6 +102,10 @@ public final class ExportControls {
         Math.max(0, Math.min(100, r.soundVolume)) / 100f,
         Math.max(0, Math.min(100, r.musicVolume)) / 100f,
         session -> {
+          if (session.state() == ExportSession.State.DONE && !music.isEmpty()) {
+            addMusicThenFinish(mc, ffmpeg.get(), output, music, videoMs, session, onEnd);
+            return;
+          }
           dismissProgress();
           switch (session.state()) {
             case DONE ->
@@ -177,20 +184,26 @@ public final class ExportControls {
             return;
           }
           partsProgress = partCount;
+          List<MusicItem> music = ReplayEditor.music();
+          long videoMs = clipsLength(clips);
           Thread joiner =
               new Thread(
                   () -> {
                     String error = join(ffmpeg, parts, output);
                     deleteAll(parts);
+                    if (error == null && !music.isEmpty()) {
+                      error = MusicPass.apply(ffmpeg, output, music, videoMs);
+                    }
+                    String result = error;
                     mc.execute(
                         () -> {
                           dismissProgress();
-                          if (error == null) {
+                          if (result == null) {
                             RecorderClient.toast(
                                 "reizo.export.done",
                                 Component.literal(output.getFileName().toString()));
                           } else {
-                            RecorderClient.toast("reizo.export.failed", Component.literal(error));
+                            RecorderClient.toast("reizo.export.failed", Component.literal(result));
                           }
                           if (onEnd != null) {
                             onEnd.accept(session);
@@ -201,6 +214,50 @@ public final class ExportControls {
           joiner.setDaemon(true);
           joiner.start();
         });
+  }
+
+  /** Adds the imported music off the game thread, then reports the export's end. */
+  private static void addMusicThenFinish(
+      Minecraft mc,
+      String ffmpeg,
+      Path output,
+      List<MusicItem> music,
+      long videoMs,
+      ExportSession session,
+      Consumer<ExportSession> onEnd) {
+    Thread t =
+        new Thread(
+            () -> {
+              String error = MusicPass.apply(ffmpeg, output, music, videoMs);
+              mc.execute(
+                  () -> {
+                    dismissProgress();
+                    if (error == null) {
+                      RecorderClient.toast(
+                          "reizo.export.done", Component.literal(output.getFileName().toString()));
+                    } else {
+                      RecorderClient.toast("reizo.export.failed", Component.literal(error));
+                    }
+                    if (onEnd != null) {
+                      onEnd.accept(session);
+                    }
+                  });
+            },
+            "Reizo export music");
+    t.setDaemon(true);
+    t.start();
+  }
+
+  /** The joined video's length: the clips' lengths added up. */
+  private static long clipsLength(Sequence clips) {
+    long duration =
+        ReplayPlayback.current() == null ? Long.MAX_VALUE : ReplayPlayback.current().script().durationMs();
+    long total = 0;
+    for (int i = 0; i < clips.size(); i++) {
+      Sequence.Clip c = clips.clip(i);
+      total += Math.max(0, Math.min(c.outMs(), duration) - c.inMs());
+    }
+    return total;
   }
 
   /** Joins the parts with FFmpeg's concat demuxer, copying the streams. Null on success. */
