@@ -151,6 +151,47 @@ public final class EffectRenderer {
     return lastApplied;
   }
 
+  /** The world's depth, copied before Minecraft clears it for the hand; null until needed. */
+  private static TextureTarget depth;
+
+  /** Whether {@link #depth} holds this frame's world. */
+  private static boolean depthKept;
+
+  /**
+   * Called after the world is drawn and before Minecraft clears the depth to draw the hand: keeps a
+   * copy of the depth while depth of field is on.
+   */
+  public static void keepDepth(Minecraft mc) {
+    depthKept = false;
+    if (!ReplayPlayback.isActive() || ReplayEditor.gradeNow().dof() <= 0) {
+      return;
+    }
+    RenderTarget main = mc.getMainRenderTarget();
+    if (main.getDepthTexture() == null) {
+      return;
+    }
+    int w = main.width;
+    int h = main.height;
+    if (depth == null) {
+      //? if >=26.3 {
+      /*depth = new TextureTarget("Reizo depth", w, h, null, GpuFormat.D32_FLOAT);
+      *///?} else if >=26.2 {
+      /*depth = new TextureTarget("Reizo depth", w, h, true, GpuFormat.RGBA8_UNORM);
+      *///?} else {
+      depth = new TextureTarget("Reizo depth", w, h, true);
+      //?}
+    } else if (depth.width != w || depth.height != h) {
+      depth.resize(w, h);
+    }
+    depth.copyDepthFrom(main);
+    depthKept = true;
+  }
+
+  /** The target holding the world's depth for this frame: the kept copy, else the main one. */
+  private static RenderTarget depthSource(RenderTarget main) {
+    return depthKept ? depth : main;
+  }
+
   /** Called after the world is rendered, before the HUD. */
   public static void afterWorld(Minecraft mc) {
     Grade grade = ReplayEditor.gradeNow();
@@ -238,7 +279,7 @@ public final class EffectRenderer {
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
       pass.setUniform(
           "DepthSampler",
-          main.getDepthTextureView(),
+          depthSource(main).getDepthTextureView(),
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(3, 1, 0, 0);
     }
@@ -258,7 +299,7 @@ public final class EffectRenderer {
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR));
       pass.bindTexture(
           "DepthSampler",
-          main.getDepthTextureView(),
+          depthSource(main).getDepthTextureView(),
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(3, 1, 0, 0);
     }
@@ -276,14 +317,14 @@ public final class EffectRenderer {
       // The world's depth, for depth of field. The pass writes only color, so reading it is safe.
       pass.bindTexture(
           "DepthSampler",
-          main.getDepthTextureView(),
+          depthSource(main).getDepthTextureView(),
           RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
       pass.draw(0, 3);
     }
     //?} else {
     /*// 1.21.10 binds textures without a sampler object: the filter lives on the texture.
     copy.getColorTexture().setTextureFilter(FilterMode.LINEAR, false);
-    main.getDepthTexture().setTextureFilter(FilterMode.NEAREST, false);
+    depthSource(main).getDepthTexture().setTextureFilter(FilterMode.NEAREST, false);
     try (RenderPass pass =
         encoder.createRenderPass(
             () -> "Reizo effects", main.getColorTextureView(), OptionalInt.empty())) {
@@ -292,7 +333,7 @@ public final class EffectRenderer {
       pass.setUniform("ReizoGrade", ubo.currentBuffer());
       pass.bindSampler("InSampler", copy.getColorTextureView());
       // The world's depth, for depth of field. The pass writes only color, so reading it is safe.
-      pass.bindSampler("DepthSampler", main.getDepthTextureView());
+      pass.bindSampler("DepthSampler", depthSource(main).getDepthTextureView());
       pass.draw(0, 3);
     }
     *///?}
