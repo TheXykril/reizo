@@ -34,6 +34,10 @@ import io.github.thexykril.reizo.fabric.export.MusicFiles
 import io.github.thexykril.reizo.fabric.RecorderClient
 import org.polyfrost.oneconfig.api.ui.v1.components.SegmentedChips
 import org.polyfrost.oneconfig.api.ui.v1.components.Slider
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuAction
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuEntry
+import org.polyfrost.oneconfig.api.ui.v1.components.MenuSeparator
+import org.polyfrost.oneconfig.api.ui.v1.components.contextMenu
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -654,6 +658,85 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
+    /** The editor's keys, as in the classic editor. */
+    override fun handleKeyPressed(keyCode: Int, modifiers: Int): Boolean {
+        val ctrl = modifiers and 2 != 0 || Minecraft.getInstance().hasControlDown()
+        val shift = modifiers and 1 != 0 || Minecraft.getInstance().hasShiftDown()
+        val now = ReplayPlayback.current()?.replayTimeMs() ?: return super.handleKeyPressed(keyCode, modifiers)
+        val handled = if (ctrl) {
+            when (keyCode) {
+                KEY_Z -> { if (shift) ReplayEditor.redo() else ReplayEditor.undo(); true }
+                KEY_Y -> { ReplayEditor.redo(); true }
+                KEY_C -> { copyKeyframes(); true }
+                KEY_V -> { pasteKeyframes(); true }
+                KEY_A -> { selectAllKeyframes(); true }
+                else -> false
+            }
+        } else {
+            when (keyCode) {
+                KEY_SPACE -> { ReplayPlayback.togglePause(); true }
+                KEY_N -> { ReplayEditor.addKeyframe(Minecraft.getInstance()); true }
+                KEY_S -> { splitAt(toVideo(now)); true }
+                KEY_DELETE, KEY_BACKSPACE -> {
+                    if (selection.isNotEmpty()) deleteKeyframes() else if (selectedClip >= 0) deleteClip()
+                    true
+                }
+                KEY_I -> { ReplayEditor.setRegion(true, if (shift) -1 else now); true }
+                KEY_O -> { ReplayEditor.setRegion(false, if (shift) -1 else now); true }
+                KEY_LEFT -> { ReplayPlayback.seekBy(if (shift) -5000 else -1000); true }
+                KEY_RIGHT -> { ReplayPlayback.seekBy(if (shift) 5000 else 1000); true }
+                else -> false
+            }
+        }
+        if (handled) {
+            version++
+            return true
+        }
+        return super.handleKeyPressed(keyCode, modifiers)
+    }
+
+    /** Where the last button press on the timeline was, and the timeline's size then. */
+    private var menuPoint = Offset.Zero
+    private var menuArea = Size.Zero
+
+    /** Copied camera keyframes, pasted at the playhead. */
+    private var clipboard: List<io.github.thexykril.reizo.core.camera.CameraKeyframe> = listOf()
+
+    /** The replay time shown at a video time. */
+    private fun toReplayTime(videoMs: Long): Long = ReplayEditor.sequence().let { if (it.isEmpty) videoMs else it.toReplay(videoMs) }
+
+    private fun copyKeyframes() {
+        clipboard = KeyframeEdits.copy(ReplayEditor.path(), selection.toSet())
+    }
+
+    private fun pasteKeyframes() {
+        if (clipboard.isEmpty()) return
+        val server = ReplayPlayback.current() ?: return
+        ReplayEditor.recordUndo()
+        val pasted = KeyframeEdits.paste(ReplayEditor.path(), clipboard, server.replayTimeMs(), replayDuration())
+        selection.clear()
+        selection.addAll(pasted)
+        ReplayEditor.changed()
+    }
+
+    private fun deleteKeyframes() {
+        if (selection.isEmpty()) return
+        ReplayEditor.recordUndo()
+        KeyframeEdits.remove(ReplayEditor.path(), selection.toSet())
+        selection.clear()
+        ReplayEditor.changed()
+    }
+
+    private fun selectAllKeyframes() {
+        selection.clear()
+        selection.addAll(ReplayEditor.path().keyframes().map { it.timeMs() })
+    }
+
+    private fun smoothingName(): String {
+        val path = ReplayEditor.path()
+        return path.interpolation().name.lowercase().replace('_', '-') + if (path.easing().name.startsWith("EASE")) " + ease" else ""
+    }
+
     /** Splits the clip under the playhead (video time). */
     private fun splitAt(videoMs: Long) {
         if (ReplayEditor.editClips({ it.split(videoMs) })) version++
@@ -916,6 +999,68 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             modifier
                 .clipToBounds()
                 .onGloballyPositioned { timelineBounds = it.boundsInWindow() }
+                .pointerInput(Unit) {
+                    // Remembers where a button went down, for the right-click menu.
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                            if (e.type == PointerEventType.Press) {
+                                menuPoint = e.changes.first().position
+                                menuArea = Size(size.width.toFloat(), size.height.toFloat())
+                            }
+                        }
+                    }
+                }
+                .contextMenu {
+                    val p = menuPoint
+                    val w = menuArea.width
+                    val h = menuArea.height
+                    val k = keyframeAt(p, w, h)
+                    val c = clipAt(p, w, h)
+                    val at = msAt(p.x, w).coerceIn(0, videoDuration())
+                    fun item(label: String, shortcut: String? = null, enabled: Boolean = true, run: () -> Unit): MenuEntry =
+                        MenuAction(label, { run(); version++ }, enabled = enabled, shortcutHint = shortcut)
+                    when {
+                        p.y < clipsTop() -> listOf(
+                            item(t("reizo.menu_bar.seek_here")) { ReplayEditor.seekVideo(at) },
+                            item(t("reizo.menu_bar.in_here")) { ReplayEditor.setRegion(true, toReplayTime(at)) },
+                            item(t("reizo.menu_bar.out_here")) { ReplayEditor.setRegion(false, toReplayTime(at)) },
+                        )
+                        k != null -> {
+                            if (k !in selection) {
+                                selection.clear()
+                                selection.add(k)
+                            }
+                            listOf(
+                                item(t("reizo.inspector.goto")) { ReplayPlayback.seekTo(k) },
+                                item(t("reizo.menu_bar.copy"), "Ctrl+C") { copyKeyframes() },
+                                item(t("reizo.menu_bar.delete"), "Del") { deleteKeyframes() },
+                            )
+                        }
+                        p.y >= camTop(h) && p.y < musicTop(h) -> listOf(
+                            item(t("reizo.menu_bar.add_key"), "N") { ReplayEditor.addKeyframe(Minecraft.getInstance()) },
+                            item(t("reizo.menu_bar.paste"), "Ctrl+V", clipboard.isNotEmpty()) { pasteKeyframes() },
+                            item(t("reizo.menu_bar.select_all"), "Ctrl+A") { selectAllKeyframes() },
+                            MenuSeparator,
+                            item(t("reizo.inspector.smoothing", smoothingName())) { ReplayEditor.cycleSmoothing() },
+                        )
+                        p.y < camTop(h) -> {
+                            val clip = c?.first ?: -1
+                            if (clip >= 0) selectedClip = clip
+                            val sq = ReplayEditor.sequence()
+                            buildList {
+                                add(item(t("reizo.menu_bar.split_here"), "S") { splitAt(at) })
+                                if (clip >= 0 && sq.size() > 1) {
+                                    add(item(t("reizo.menu_bar.delete_clip"), "Del") { deleteClip() })
+                                    add(item(t("reizo.menu_bar.clip_left"), enabled = clip > 0) { if (ReplayEditor.editClips({ it.move(clip, clip - 1) })) selectedClip = clip - 1 })
+                                    add(item(t("reizo.menu_bar.clip_right"), enabled = clip + 1 < sq.size()) { if (ReplayEditor.editClips({ it.move(clip, clip + 1) })) selectedClip = clip + 1 })
+                                }
+                                add(item(t("reizo.menu_bar.reset_clips"), enabled = !sq.isEmpty) { selectedClip = -1; ReplayEditor.clearClips() })
+                            }
+                        }
+                        else -> listOf()
+                    }
+                }
                 .pointerInput(Unit) {
                     // Wheel zooms around the cursor; with Shift (or a sideways wheel) it scrolls.
                     awaitPointerEventScope {
@@ -1186,6 +1331,21 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     }
 
     private companion object {
+        // GLFW key codes.
+        const val KEY_SPACE = 32
+        const val KEY_A = 65
+        const val KEY_C = 67
+        const val KEY_I = 73
+        const val KEY_N = 78
+        const val KEY_O = 79
+        const val KEY_S = 83
+        const val KEY_V = 86
+        const val KEY_Y = 89
+        const val KEY_Z = 90
+        const val KEY_BACKSPACE = 259
+        const val KEY_DELETE = 261
+        const val KEY_RIGHT = 262
+        const val KEY_LEFT = 263
         val RULER = 16.dp
         val LANE = 40.dp
         const val MIN_SPAN = 1000L
