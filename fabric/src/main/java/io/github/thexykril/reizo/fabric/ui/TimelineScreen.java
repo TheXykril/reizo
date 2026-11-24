@@ -549,7 +549,7 @@ public final class TimelineScreen extends Screen {
           y = gradeField(x0, y, w, "vignette", 0, 1, 0, Grade::vignette, Grade::withVignette);
           y = gradeField(x0, y, w, "bloom", 0, 1, 0, Grade::bloom, Grade::withBloom);
           y = gradeField(x0, y, w, "dof", 0, 1, 0, Grade::dof, Grade::withDof);
-          y = gradeField(x0, y, w, "focus", 0.5f, 64, 8, Grade::focus, Grade::withFocus);
+          y = gradeField(x0, y, w, "focus", 0, 64, Grade.AUTO_FOCUS, Grade::focus, Grade::withFocus);
           letterboxButton =
               addRenderableWidget(
                   new FlatButton(

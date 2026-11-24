@@ -5,7 +5,7 @@
 layout(std140) uniform ReizoGrade {
     vec4 Tone;   // exposure (stops), contrast, saturation, temperature
     vec4 Frame;  // vignette, letterbox bar (fraction of height), aspect (width / height), unused
-    vec4 Lens;   // bloom, depth of field strength, focus distance (blocks), unused
+    vec4 Lens;   // bloom, depth of field strength, focus distance (blocks; 0 automatic), unused
     vec4 Screen; // texel width, texel height, depth-0 plane, depth-1 plane (26.x swaps near and far)
     vec4 View;   // where the picture goes on screen: x, y (from the bottom), width, height; 0..1
     vec4 Backdrop; // color around the picture when View is smaller than the screen
@@ -25,14 +25,25 @@ float linearDepth(vec2 uv) {
     return 2.0 * n * f / (f + n - d * (f - n));
 }
 
+// Autofocus: the distance to what is at the centre of the picture, weighted towards the very
+// centre so that a subject there stays sharp.
+float autoFocus() {
+    float d = 4.0 * linearDepth(vec2(0.5));
+    d += linearDepth(vec2(0.47, 0.5)) + linearDepth(vec2(0.53, 0.5));
+    d += linearDepth(vec2(0.5, 0.46)) + linearDepth(vec2(0.5, 0.54));
+    return d / 8.0;
+}
+
 // Blur radius in pixels: 0 in focus, up to 1/60 of the height at full strength.
-float blurRadius(float depth) {
+float blurRadius(float depth, float focus) {
     float maxRadius = Lens.y / (60.0 * Screen.y);
-    return maxRadius * clamp(abs(depth - Lens.z) / max(depth, 0.001), 0.0, 1.0);
+    return maxRadius * clamp(abs(depth - focus) / max(depth, 0.001), 0.0, 1.0);
 }
 
 vec3 depthOfField(vec3 sharp) {
-    float centre = blurRadius(linearDepth(uv0));
+    // A focus distance of 0 means automatic.
+    float focus = Lens.z > 0.0 ? Lens.z : autoFocus();
+    float centre = blurRadius(linearDepth(uv0), focus);
     if (centre < 0.5) {
         return sharp;
     }
@@ -43,7 +54,7 @@ vec3 depthOfField(vec3 sharp) {
         float a = float(i) * GoldenAngle;
         vec2 uv = uv0 + vec2(cos(a), sin(a)) * r * Screen.xy;
         // A sharper sample in front would bleed into the blur; count it less.
-        float w = clamp(blurRadius(linearDepth(uv)) / centre, 0.1, 1.0);
+        float w = clamp(blurRadius(linearDepth(uv), focus) / centre, 0.1, 1.0);
         sum += texture(InSampler, uv).rgb * w;
         weight += w;
     }
