@@ -16,6 +16,18 @@ val fabricApiVersion = property("fabric_api_version") as String
 
 // Obfuscated versions need the remapping Loom; 26.x is unobfuscated.
 apply(plugin = if (remap) "net.fabricmc.fabric-loom-remap" else "net.fabricmc.fabric-loom")
+// Compose screens on OneConfig's components (docs/DECISIONS/0017-compose-screens.md).
+apply(plugin = "org.jetbrains.kotlin.jvm")
+apply(plugin = "org.jetbrains.kotlin.plugin.compose")
+extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
+    compilerOptions {
+        jvmTarget.set(
+            org.jetbrains.kotlin.gradle.dsl.JvmTarget
+                .fromTarget(javaVersion),
+        )
+        optIn.add("org.polyfrost.oneconfig.api.ui.v1.ExperimentalOneConfigUiApi")
+    }
+}
 val loom = extensions.getByType<LoomGradleExtensionAPI>()
 val modImplementation = if (remap) "modImplementation" else "implementation"
 
@@ -25,9 +37,18 @@ base {
 
 repositories {
     mavenCentral()
-    // OneConfig API, compile-only: the integration is optional and loaded only by OneConfig.
-    maven("https://repo.polyfrost.org/releases") {
-        content { includeGroupAndSubgroups("org.polyfrost") }
+    // Only these repositories are asked for their groups (Loom adds other repositories too).
+    exclusiveContent {
+        forRepository { maven("https://repo.polyfrost.org/releases") }
+        filter { includeGroupAndSubgroups("org.polyfrost") }
+    }
+    exclusiveContent {
+        forRepository { maven("https://api.modrinth.com/maven") }
+        filter { includeGroup("maven.modrinth") }
+    }
+    exclusiveContent {
+        forRepository { maven("https://maven.fabricmc.net/") }
+        filter { includeModule("net.fabricmc", "fabric-language-kotlin") }
     }
 }
 
@@ -68,8 +89,63 @@ loom.runs.matching { it.name == "clientGameTest" }.configureEach {
     vmArgs("-Dfabric.client.gametest.disableNetworkSynchronizer=true")
 }
 
+// OneConfig and PolyCompose publish one build per Minecraft line ("26.1" covers 26.1.x).
+val oneConfigPlatform =
+    when {
+        minecraftVersion.startsWith("26.1") -> "26.1"
+        else -> minecraftVersion
+    } + "-fabric"
+val oneConfigVersion = "1.9.3"
+// Modrinth version ids of OneConfig 1.9.3, per platform.
+val oneConfigModrinthIds =
+    mapOf(
+        "1.21.10-fabric" to "hc5V8NXo",
+        "1.21.11-fabric" to "eU3r05VG",
+        "26.1-fabric" to "laQ3t4Pl",
+        "26.2-fabric" to "2snERtaI",
+        "26.3-fabric" to "wYYxyVB7",
+    )
+val polyComposeVersion = "3.0.6"
+val modCompileOnly = if (remap) "modCompileOnly" else "compileOnly"
+
+// PolyCompose ships Compose's jars nested inside its mod jar; Kotlin compiles against them.
+val polyCompose: Configuration by configurations.creating { isTransitive = false }
+val composeLibs =
+    tasks.register<Sync>("unpackComposeLibs") {
+        from(polyCompose.elements.map { files -> files.map { zipTree(it.asFile) } }) {
+            include("META-INF/jars/*.jar")
+            eachFile { path = name }
+            includeEmptyDirs = false
+        }
+        into(layout.buildDirectory.dir("compose-libs"))
+    }
+
+// These mods nest their libraries (Compose, Kotlin, OneConfig's modules) as jar-in-jar, which Loom
+// strips from remapped mod dependencies. Placing the release jars in the run's mods folder lets
+// Fabric Loader load them as OneClient does, nested jars included (it remaps them in dev).
+val oneClientMods: Configuration by configurations.creating { isTransitive = false }
+for ((run, dir) in listOf("runClient" to "run", "runClientGameTest" to "build/run/clientGameTest")) {
+    val stage =
+        tasks.register<Copy>("stageOneClientModsFor${run.removePrefix("run")}") {
+            from(oneClientMods)
+            into(layout.projectDirectory.dir("$dir/mods"))
+        }
+    tasks.matching { it.name == run }.configureEach { dependsOn(stage) }
+}
+
 dependencies {
     "minecraft"("com.mojang:minecraft:$minecraftVersion")
+    polyCompose("org.polyfrost:polycompose-$oneConfigPlatform:$polyComposeVersion")
+    modCompileOnly("org.polyfrost.oneconfig:$oneConfigPlatform:$oneConfigVersion") { isTransitive = false }
+    modCompileOnly("org.polyfrost:polycompose-$oneConfigPlatform:$polyComposeVersion") { isTransitive = false }
+    "compileOnly"(files(composeLibs.map { fileTree(it.destinationDir).matching { include("*.jar") } }).builtBy(composeLibs))
+    "compileOnly"("org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+    "compileOnly"("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0") { isTransitive = false }
+    // In the dev client and in-game tests: OneConfig with what it needs, as in OneClient.
+    // The Maven jar is a thin one; the Modrinth release nests OneConfig's modules, as OneClient ships it.
+    oneClientMods("maven.modrinth:oneconfig:${oneConfigModrinthIds.getValue(oneConfigPlatform)}")
+    oneClientMods("org.polyfrost:polycompose-$oneConfigPlatform:$polyComposeVersion")
+    oneClientMods("net.fabricmc:fabric-language-kotlin:1.14.1+kotlin.2.4.20")
     if (remap) {
         "mappings"(loom.officialMojangMappings())
     }
@@ -77,16 +153,15 @@ dependencies {
     modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
 
     // Optional OneConfig settings page (only its Minecraft-independent config API is needed).
-    compileOnly("org.polyfrost.oneconfig:config:${libs.versions.oneconfig.get()}") { isTransitive = false }
-    compileOnly("org.polyfrost.oneconfig:config-impl:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:config:$oneConfigVersion") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:config-impl:$oneConfigVersion") { isTransitive = false }
     // OneConfig HUD element (the recording indicator in OneConfig's HUD editor). Compile-only too:
     // these jars and the Kotlin standard library come with OneConfig at runtime.
-    compileOnly("org.polyfrost.oneconfig:hud:${libs.versions.oneconfig.get()}") { isTransitive = false }
-    compileOnly("org.polyfrost.oneconfig:ui:${libs.versions.oneconfig.get()}") { isTransitive = false }
-    compileOnly("org.polyfrost.oneconfig:utils:${libs.versions.oneconfig.get()}") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:hud:$oneConfigVersion") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:ui:$oneConfigVersion") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:utils:$oneConfigVersion") { isTransitive = false }
     // OneConfig notifications (Reizo's toasts and export progress inside OneClient).
-    compileOnly("org.polyfrost.oneconfig:notifications:${libs.versions.oneconfig.get()}") { isTransitive = false }
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.2.20") { isTransitive = false }
+    compileOnly("org.polyfrost.oneconfig:notifications:$oneConfigVersion") { isTransitive = false }
 
     implementation(project(":core"))
     "include"(project(":core"))

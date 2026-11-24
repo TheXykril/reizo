@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.loom) apply false
     alias(libs.plugins.spotless)
+    // Kotlin and the Compose compiler, for the editor screens built on OneConfig's UI (trial).
+    id("org.jetbrains.kotlin.jvm") version "2.4.21" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
 }
 
 repositories {

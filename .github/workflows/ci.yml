@@ -55,7 +55,8 @@ jobs:
     # Pinned to the image the tests pass on. On ubuntu-26.04 (Mesa 26.0) software rendering was so
     # slow that the test world never finished loading (run 45052144334 and the next three).
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    # 26.3 with OneConfig and Compose loaded passed every test at 25 min, one short of the end.
+    timeout-minutes: 35
     needs: build
     strategy:
       fail-fast: false

@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * format (only those the installed FFmpeg can encode), file name, and the range set in the
  * timeline. "Export" starts the frame-by-frame export.
  */
-public final class ExportSettingsScreen extends KitScreen {
+public final class ExportSettingsScreen extends KitScreen implements ExportSettingsView {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Export");
 
   /** Output sizes; 0x0 keeps the window size. */
@@ -76,6 +76,22 @@ public final class ExportSettingsScreen extends KitScreen {
   private int audioY;
   private int fileY;
   private int infoY;
+
+  /**
+   * The export settings screen: OneConfig's Compose version when OneConfig is installed (trial,
+   * ADR 0017), else this kit screen.
+   */
+  public static Screen create(Screen parent) {
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")
+        && !Boolean.getBoolean("reizo.kitScreens")) {
+      try {
+        return ComposeScreens.export(parent);
+      } catch (Throwable t) {
+        LOGGER.warn("OneConfig's Compose UI is not usable; using Reizo's own screen", t);
+      }
+    }
+    return new ExportSettingsScreen(parent);
+  }
 
   public ExportSettingsScreen(Screen parent) {
     super(Component.translatable("reizo.export.title"));
@@ -300,7 +316,7 @@ public final class ExportSettingsScreen extends KitScreen {
     }
   }
 
-  private static Resolution closest(int w, int h) {
+  static Resolution closest(int w, int h) {
     for (Resolution r : RESOLUTIONS) {
       if (r.width() == Math.max(0, w) && r.height() == Math.max(0, h)) {
         return r;
@@ -309,7 +325,7 @@ public final class ExportSettingsScreen extends KitScreen {
     return RESOLUTIONS.get(0);
   }
 
-  private static int closestQuality(int crf) {
+  static int closestQuality(int crf) {
     int best = QUALITIES.get(1);
     for (int q : QUALITIES) {
       if (Math.abs(q - crf) < Math.abs(best - crf)) {
@@ -319,11 +335,12 @@ public final class ExportSettingsScreen extends KitScreen {
     return best;
   }
 
-  private static Component qualityLabel(int crf) {
+  static Component qualityLabel(int crf) {
     return Component.translatable("reizo.export.quality." + QUALITIES.indexOf(crf));
   }
 
   /** For tests: the formats offered. */
+  @Override
   public List<ExportFormat> offeredFormats() {
     return formats;
   }

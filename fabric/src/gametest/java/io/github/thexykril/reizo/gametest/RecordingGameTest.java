@@ -27,7 +27,7 @@ import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
-import io.github.thexykril.reizo.fabric.ui.ExportSettingsScreen;
+import io.github.thexykril.reizo.fabric.ui.ExportSettingsView;
 import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
 import io.github.thexykril.reizo.fabric.ui.TimelineScreen;
 import io.netty.buffer.ByteBuf;
@@ -658,8 +658,11 @@ public final class RecordingGameTest implements FabricClientGameTest {
     check(stats.hudFrames > 0, "no HUD frames recorded");
     check(stats.screenFrames > 0, "the open inventory was not recorded");
     check(meta.state == RecordingMetadata.State.COMPLETE, "state " + meta.state);
-    // Without OneConfig, messages stay Minecraft toasts; the kinds used inside OneClient.
-    check(!RecorderClient.useOneConfigNotifications(), "OneConfig notifications without OneConfig");
+    // Messages use OneConfig's notifications exactly when OneConfig is loaded, else Minecraft toasts.
+    boolean oneConfig = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig");
+    check(
+        RecorderClient.useOneConfigNotifications() == oneConfig,
+        "OneConfig notifications " + (oneConfig ? "missing with" : "without") + " OneConfig");
     check(
         RecorderClient.toastKind("reizo.toast.save_failed").name().equals("ERROR")
             && RecorderClient.toastKind("reizo.toast.saved").name().equals("SUCCESS")
@@ -1570,6 +1573,20 @@ public final class RecordingGameTest implements FabricClientGameTest {
    * Opens the timeline editor with its key and edits with real mouse and key input: drag a
    * keyframe, undo and redo, set the export region, seek from the ruler.
    */
+  /** Dismisses every OneConfig notification on screen; does nothing without OneConfig. */
+  private static void clearOneConfigNotifications() {
+    if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
+      return;
+    }
+    try {
+      Class<?> manager =
+          Class.forName("org.polyfrost.oneconfig.api.notifications.v1.NotificationsManager");
+      manager.getMethod("clearAll").invoke(manager.getField("INSTANCE").get(null));
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError("could not clear OneConfig notifications", e);
+    }
+  }
+
   private void checkTimeline(ClientGameTestContext context) {
     long duration = ReplayPlayback.current().script().durationMs();
     long middle = duration / 2;
@@ -1591,6 +1608,9 @@ public final class RecordingGameTest implements FabricClientGameTest {
                 s.xOf(middle), s.cameraTrackY(), s.xOf(duration / 4), s.rulerTrackY()
               };
             });
+    // OneConfig's notifications (its first-launch toast, Reizo's own) sit over the window's
+    // bottom-right corner and take clicks there; clear them so the drag reaches the timeline.
+    context.runOnClient(mc -> clearOneConfigNotifications());
     // Drag the middle keyframe 30 GUI pixels to the left.
     context.getInput().setCursorPos((at[0] + 0.5) * scale, (at[1] + 0.5) * scale);
     context.getInput().holdMouse(InputConstants.MOUSE_BUTTON_LEFT);
@@ -1892,7 +1912,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
     var offered =
         context.computeOnClient(
             mc ->
-                mc.screen instanceof ExportSettingsScreen e
+                mc.screen instanceof ExportSettingsView e
                     ? e.offeredFormats()
                     : List.<ExportFormat>of());
     check(
