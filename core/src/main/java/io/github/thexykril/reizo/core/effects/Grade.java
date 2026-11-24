@@ -25,8 +25,14 @@ public record Grade(
     float bloom,
     float dof,
     float focus) {
-  /** Focus distance in blocks when none is set. */
-  public static final float DEFAULT_FOCUS = 8;
+  /**
+   * Focus distance meaning "automatic": depth of field focuses on whatever is at the centre of the
+   * picture, like a camera's autofocus.
+   */
+  public static final float AUTO_FOCUS = 0;
+
+  /** Focus distance in blocks when none is set: automatic. */
+  public static final float DEFAULT_FOCUS = AUTO_FOCUS;
 
   public static final Grade NEUTRAL = new Grade(0, 1, 1, 0, 0, 0);
 
@@ -42,7 +48,8 @@ public record Grade(
     letterbox = letterbox <= 0 ? 0 : clamp(letterbox, 1, 4);
     bloom = clamp(bloom, 0, 1);
     dof = clamp(dof, 0, 1);
-    focus = Float.isNaN(focus) ? DEFAULT_FOCUS : clamp(focus, 0.5f, 256);
+    focus =
+        Float.isNaN(focus) ? DEFAULT_FOCUS : focus <= 0.25f ? AUTO_FOCUS : clamp(focus, 0.5f, 256);
   }
 
   /** A grade without bloom or depth of field. */
@@ -90,7 +97,10 @@ public record Grade(
         t >= 1 ? to.letterbox : letterbox,
         bloom + (to.bloom - bloom) * t,
         dof + (to.dof - dof) * t,
-        focus + (to.focus - focus) * t);
+        // Automatic focus has no distance to blend from or to, so it switches at the end.
+        focus == AUTO_FOCUS || to.focus == AUTO_FOCUS
+            ? (t >= 1 ? to.focus : focus)
+            : focus + (to.focus - focus) * t);
   }
 
   public Grade withExposure(float v) {

@@ -954,6 +954,15 @@ public final class RecordingGameTest implements FabricClientGameTest {
         });
     context.waitTicks(3);
     java.awt.image.BufferedImage blurred = image(context.takeScreenshot("reizo-effects-dof"));
+    // Autofocus keeps what is at the centre of the picture sharp.
+    context.runOnClient(
+        mc -> {
+          ReplayEditor.effects().put(0, Grade.NEUTRAL.withDof(1).withFocus(Grade.AUTO_FOCUS));
+          ReplayEditor.effectsChanged();
+        });
+    context.waitTicks(3);
+    java.awt.image.BufferedImage autofocused =
+        image(context.takeScreenshot("reizo-effects-dof-auto"));
     context.runOnClient(
         mc -> {
           ReplayEditor.effects().put(0, Grade.NEUTRAL.withBloom(1));
@@ -969,12 +978,28 @@ public final class RecordingGameTest implements FabricClientGameTest {
     double sharp = detail(plain);
     double soft = detail(blurred);
     check(soft < sharp * 0.7, "depth of field did not blur: detail " + sharp + " -> " + soft);
+    double centrePlain = centreDetail(plain);
+    double centreNear = centreDetail(blurred);
+    double centreAuto = centreDetail(autofocused);
+    check(centrePlain > 1, "nothing with detail at the centre to focus on: " + centrePlain);
+    check(
+        centreAuto > centrePlain * 0.8 && centreAuto > centreNear * 1.2,
+        "autofocus did not keep the centre sharp: plain "
+            + centrePlain
+            + ", near focus "
+            + centreNear
+            + ", auto "
+            + centreAuto);
     double glow = glowing(plain, bloomed);
     check(glow > 0.02, "bloom lit too few pixels: " + glow);
     LOGGER.info(
-        "checkEffects OK: detail {} -> {} with depth of field, {}% of pixels lit by bloom",
+        "checkEffects OK: detail {} -> {} with depth of field (centre {} near, {} auto, {} plain),"
+            + " {}% of pixels lit by bloom",
         String.format("%.2f", sharp),
         String.format("%.2f", soft),
+        String.format("%.2f", centreNear),
+        String.format("%.2f", centreAuto),
+        String.format("%.2f", centrePlain),
         String.format("%.1f", glow * 100));
   }
 
@@ -992,6 +1017,25 @@ public final class RecordingGameTest implements FabricClientGameTest {
     int n = 0;
     for (int y = img.getHeight() / 10; y < img.getHeight() * 7 / 10; y++) {
       for (int x = img.getWidth() / 4; x < img.getWidth() - 1; x++) {
+        int a = img.getRGB(x, y);
+        int b = img.getRGB(x + 1, y);
+        for (int shift = 0; shift <= 16; shift += 8) {
+          sum += Math.abs(((a >> shift) & 0xFF) - ((b >> shift) & 0xFF));
+        }
+        n += 3;
+      }
+    }
+    return sum / n;
+  }
+
+  /** Like {@link #detail} for the middle tenth of the frame, where autofocus looks. */
+  private static double centreDetail(java.awt.image.BufferedImage img) {
+    double sum = 0;
+    int n = 0;
+    int w = img.getWidth();
+    int h = img.getHeight();
+    for (int y = h * 9 / 20; y < h * 11 / 20; y++) {
+      for (int x = w * 9 / 20; x < w * 11 / 20; x++) {
         int a = img.getRGB(x, y);
         int b = img.getRGB(x + 1, y);
         for (int shift = 0; shift <= 16; shift += 8) {

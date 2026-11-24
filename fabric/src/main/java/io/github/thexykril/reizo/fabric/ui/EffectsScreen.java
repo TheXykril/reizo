@@ -66,7 +66,7 @@ public final class EffectsScreen extends KitScreen {
     y = field(x, y, w, "vignette", 0, 1, 0, Grade::vignette, Grade::withVignette);
     y = field(x, y, w, "bloom", 0, 1, 0, Grade::bloom, Grade::withBloom);
     y = field(x, y, w, "dof", 0, 1, 0, Grade::dof, Grade::withDof);
-    y = field(x, y, w, "focus", 0.5f, 64, 8, Grade::focus, Grade::withFocus);
+    y = field(x, y, w, "focus", 0, 64, Grade.AUTO_FOCUS, Grade::focus, Grade::withFocus);
     addRenderableWidget(
         new FlatButton(
                 x,

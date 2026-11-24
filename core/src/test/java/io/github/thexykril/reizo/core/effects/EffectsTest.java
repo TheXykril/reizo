@@ -19,7 +19,12 @@ class EffectsTest {
     assertEquals(new Grade(3, 0, 2, 1, 1, 1), g);
     assertTrue(Grade.NEUTRAL.withFocus(30).isNeutral(), "focus alone changes nothing");
     assertFalse(Grade.NEUTRAL.withBloom(0.5f).isNeutral());
-    assertEquals(0.5f, Grade.NEUTRAL.withFocus(0).focus());
+    assertEquals(Grade.AUTO_FOCUS, Grade.NEUTRAL.withFocus(0).focus());
+    assertEquals(0.5f, Grade.NEUTRAL.withFocus(0.4f).focus());
+    assertEquals(
+        Grade.AUTO_FOCUS,
+        Grade.NEUTRAL.withFocus(Grade.AUTO_FOCUS).lerp(Grade.NEUTRAL.withFocus(20), 0.5).focus(),
+        "automatic focus does not blend");
     assertEquals(1, Grade.NEUTRAL.withDof(3).dof());
     assertFalse(g.isNeutral());
     assertEquals(0, new Grade(0, 1, 1, 0, 0, -2).letterbox());

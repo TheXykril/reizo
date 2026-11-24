@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.thexykril.reizo.core.effects.Grade
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits
 import io.github.thexykril.reizo.fabric.compat.Compat
 import io.github.thexykril.reizo.fabric.playback.EditorViewport
@@ -301,15 +302,19 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         LookSlider("reizo.look.vignette", g.vignette(), 0f, 1f) { v -> EffectEdits.edit { it.withVignette(v) } }
         LookSlider("reizo.look.bloom", g.bloom(), 0f, 1f) { v -> EffectEdits.edit { it.withBloom(v) } }
         LookSlider("reizo.look.dof", g.dof(), 0f, 1f) { v -> EffectEdits.edit { it.withDof(v) } }
-        LookSlider("reizo.look.focus", g.focus(), 0.5f, 64f) { v -> EffectEdits.edit { it.withFocus(v) } }
+        LookSlider("reizo.look.focus_short", g.focus(), 0f, 64f, auto = true) { v -> EffectEdits.edit { it.withFocus(v) } }
     }
 
     @Composable
-    private fun LookSlider(key: String, value: Float, min: Float, max: Float, set: (Float) -> Unit) {
+    private fun LookSlider(key: String, value: Float, min: Float, max: Float, auto: Boolean = false, set: (Float) -> Unit) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(t(key), Modifier.width(84.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Slider(value, { set(it); version++ }, Modifier.weight(1f), min..max)
-            Text("%.2f".format(value), Modifier.width(36.dp), style = OneConfigTheme.typography.small)
+            Text(
+                if (auto && value == Grade.AUTO_FOCUS) t("reizo.look.auto") else "%.2f".format(value),
+                Modifier.width(36.dp),
+                style = OneConfigTheme.typography.small,
+            )
         }
     }
 
