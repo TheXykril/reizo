@@ -27,6 +27,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import io.github.thexykril.reizo.core.audio.MusicItem
+import io.github.thexykril.reizo.fabric.settings.KeyframedSetting
+import io.github.thexykril.reizo.fabric.settings.KeyframedSettings
+import io.github.thexykril.reizo.fabric.playback.ReplayEntityHider
 import io.github.thexykril.reizo.fabric.export.MusicFiles
 import io.github.thexykril.reizo.fabric.RecorderClient
 import org.polyfrost.oneconfig.api.ui.v1.components.SegmentedChips
@@ -227,6 +230,9 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                     Tab.PROPERTIES -> {
                         CameraGroup(now, edited)
                         LookGroup()
+                        WorldGroup()
+                        EntitiesGroup()
+                        SettingsGroup()
                     }
                     Tab.MEDIA -> MediaTab(maxOf(0L, toVideo(now)))
                     Tab.EXPORT -> ExportTab()
@@ -318,6 +324,97 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         LookSlider("reizo.look.bloom", g.bloom(), 0f, 1f) { v -> EffectEdits.edit { it.withBloom(v) } }
         LookSlider("reizo.look.dof", g.dof(), 0f, 1f) { v -> EffectEdits.edit { it.withDof(v) } }
         LookSlider("reizo.look.focus_short", g.focus(), 0f, 64f, auto = true) { v -> EffectEdits.edit { it.withFocus(v) } }
+        val lb = g.letterbox()
+        TextButton(
+            t("reizo.effects.letterbox", if (lb <= 0) t("options.off") else String.format(java.util.Locale.ROOT, "%.2f:1", lb)),
+            { EffectEdits.cycleLetterbox(); version++ },
+            Modifier.fillMaxWidth(),
+            style = ControlStyle.Secondary,
+            fillWidth = true,
+        )
+    }
+
+    /** Time of day and weather at the playhead, keyframed like the look. */
+    @Composable
+    private fun WorldGroup() {
+        val world = WORLD_IDS.mapNotNull { KeyframedSettings.find(it) }
+        GroupHeader("world", t("reizo.section.time_weather"), world.any { SettingEdits.atKeyframe(it) }) {
+            // The diamond keys every world value here, or removes their keys.
+            val keyed = world.filter { SettingEdits.atKeyframe(it) }
+            if (keyed.isNotEmpty()) keyed.forEach { SettingEdits.removeHere(it) }
+            else world.forEach { SettingEdits.edit(it, SettingEdits.shownValue(it), false) }
+            SettingEdits.breakUndoGroup()
+            version++
+        }
+        if (folded["world"] == true) return
+        for (setting in world) SettingSlider(setting)
+    }
+
+    /** Entities hidden in the replay: hide the one in view, and how many are hidden. */
+    @Composable
+    private fun EntitiesGroup() {
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(t("reizo.section.entities"), Modifier.weight(1f), style = OneConfigTheme.typography.bodyMedium)
+            Text(
+                t("reizo.inspector.hidden_count", ReplayEntityHider.hiddenCount()),
+                color = OneConfigTheme.current.textColorSecondary,
+                style = OneConfigTheme.typography.small,
+            )
+        }
+        TextButton(
+            t("reizo.inspector.hide_looked"),
+            { RecorderKeys.hideLookedAt(Minecraft.getInstance()); version++ },
+            Modifier.fillMaxWidth(),
+            style = ControlStyle.Secondary,
+            fillWidth = true,
+        )
+    }
+
+    /** Every keyframeable game and mod setting, by owner, folded until opened. */
+    @Composable
+    private fun SettingsGroup() {
+        val all = KeyframedSettings.all().filter { it.id() !in WORLD_IDS && !it.id().startsWith(ReplayEntityHider.PREFIX) }
+        if (all.isEmpty()) return
+        if (!folded.containsKey("settings")) folded["settings"] = true
+        GroupHeader("settings", t("reizo.track.settings"), all.any { SettingEdits.atKeyframe(it) }) {
+            all.filter { SettingEdits.atKeyframe(it) }.forEach { SettingEdits.removeHere(it) }
+            version++
+        }
+        if (folded["settings"] == true) return
+        for ((owner, settings) in all.groupBy { it.group() }) {
+            Text(owner, color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.typography.small)
+            for (setting in settings) SettingSlider(setting)
+        }
+    }
+
+    /** One setting: its keyframe diamond, a slider (or a switch for on/off) and its value. */
+    @Composable
+    private fun SettingSlider(s: KeyframedSetting) {
+        val value = SettingEdits.shownValue(s)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            KeyDiamond(SettingEdits.atKeyframe(s)) {
+                if (!SettingEdits.removeHere(s)) SettingEdits.edit(s, SettingEdits.shownValue(s), false)
+                SettingEdits.breakUndoGroup()
+                version++
+            }
+            Text(t(s.label()), Modifier.width(78.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (s.kind() == io.github.thexykril.reizo.core.effects.PropertyTracks.Kind.TOGGLE) {
+                TextButton(
+                    if (value >= 0.5) t("options.on") else t("options.off"),
+                    { SettingEdits.edit(s, if (value >= 0.5) 0.0 else 1.0, false); version++ },
+                    Modifier.weight(1f),
+                    style = ControlStyle.Secondary,
+                )
+            } else {
+                Slider(
+                    value.toFloat(),
+                    { SettingEdits.edit(s, it.toDouble(), true); version++ },
+                    Modifier.weight(1f),
+                    s.min().toFloat()..s.max().toFloat(),
+                )
+                Text(s.format(value), Modifier.width(44.dp), style = OneConfigTheme.typography.small, maxLines = 1)
+            }
+        }
     }
 
     @Composable
@@ -1093,6 +1190,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val LANE = 40.dp
         const val MIN_SPAN = 1000L
         val VIEWS = listOf("free", "pov", "follow", "path")
+        val WORLD_IDS = listOf("reizo:time_of_day", "reizo:rain", "reizo:thunder")
         val TICKS = longArrayOf(100, 250, 500, 1000, 2000, 5000, 10_000, 30_000, 60_000, 300_000)
         const val LANES = 3
     }
