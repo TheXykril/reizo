@@ -1913,14 +1913,14 @@ public final class TimelineScreen extends Screen {
     updateLabels();
   }
 
-  private static String currentView() {
+  public static String currentView() {
     if (ReplayEditor.isPathPlaying()) {
       return "path";
     }
     return ReplayCamera.mode().name().toLowerCase(Locale.ROOT);
   }
 
-  private static void setView(String mode) {
+  public static void setView(String mode) {
     Minecraft mc = Minecraft.getInstance();
     if (mode.equals("path")) {
       ReplayCamera.set(mc, ReplayCamera.Mode.FREE);

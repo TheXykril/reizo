@@ -53,6 +53,9 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -466,10 +469,10 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val ruler = RULER.value * lastDensity
         val lane = (b.height - ruler - 4 * LANES * lastDensity) / LANES
         val d = videoDuration().toDouble()
-        val a = b.left + b.width * items[index].startMs() / d
-        val e = b.left + b.width * (items[index].startMs() + playedMs(items[index])) / d
+        val a = b.left + px(items[index].startMs(), b.width)
+        val e = b.left + px(items[index].startMs() + playedMs(items[index]), b.width)
         val y = b.top + ruler + 4 * lastDensity + 2 * (lane + 4 * lastDensity) + lane / 2
-        return doubleArrayOf(a + minOf(e - a, 40.0 * lastDensity) / 2, y.toDouble())
+        return doubleArrayOf((a + minOf(e - a, 40f * lastDensity) / 2).toDouble(), y.toDouble())
     }
 
     /** The selected music item; for tests. */
@@ -513,11 +516,18 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     @Composable
     private fun Transport(now: Long, duration: Long, running: Boolean, speed: Double, pill: Boolean = false) {
         val theme = OneConfigTheme.current
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Scrolls sideways when the window is too narrow, instead of squeezing the buttons.
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton("⏮", { ReplayPlayback.seekToMarker(-1) }, style = ControlStyle.Ghost)
             TextButton(if (running) "❚❚" else "▶", { ReplayPlayback.togglePause() }, style = ControlStyle.Secondary)
+            TextButton("⏭", { ReplayPlayback.seekToMarker(1) }, style = ControlStyle.Ghost)
             Text(ReplayHud.time(now), style = OneConfigTheme.typography.bodyMedium)
             Text("/ " + ReplayHud.time(duration), color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
-            Spacer(if (pill) Modifier.width(12.dp) else Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
             TextButton(t("reizo.timeline.split_short"), { splitAt(now) }, style = ControlStyle.Ghost)
             TextButton(
                 t("reizo.timeline.delete_clip"),
@@ -525,10 +535,25 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 style = ControlStyle.Ghost,
                 enabled = selectedClip >= 0 && ReplayEditor.sequence().size() > 1,
             )
+            if (ReplayEditor.sequence().isEmpty) {
+                // The export range, when there are no clips (clips set what is exported).
+                TextButton(t("reizo.timeline.in_short"), { ReplayEditor.setRegion(true, now); version++ }, style = ControlStyle.Ghost)
+                TextButton(t("reizo.timeline.out_short"), { ReplayEditor.setRegion(false, now); version++ }, style = ControlStyle.Ghost)
+            }
             Spacer(Modifier.width(8.dp))
             Text(ReplayHud.speed(speed) + "×", color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
             TextButton("−", { ReplayPlayback.stepSpeed(-1) }, style = ControlStyle.Ghost)
             TextButton("+", { ReplayPlayback.stepSpeed(1) }, style = ControlStyle.Ghost)
+            Spacer(Modifier.width(8.dp))
+            // Camera: free, the recorded player's view, following them, or the camera path.
+            SegmentedChips(
+                VIEWS,
+                TimelineScreen.currentView(),
+                { TimelineScreen.setView(it); version++ },
+                Modifier,
+                { t("reizo.editor.view.$it") },
+            )
+            if (zoomSpan > 0) TextButton(t("reizo.editor.fit"), { zoomSpan = 0L; zoomStart = 0L }, style = ControlStyle.Ghost)
         }
     }
 
@@ -626,6 +651,40 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         return if (seq.isEmpty) replayDuration() else maxOf(1L, seq.durationMs())
     }
 
+    /** The timeline's visible span in ms (0 = the whole video) and where it starts. */
+    private var zoomSpan by mutableLongStateOf(0L)
+    private var zoomStart by mutableLongStateOf(0L)
+
+    private fun viewSpan(): Long {
+        val d = videoDuration()
+        return if (zoomSpan <= 0) d else zoomSpan.coerceIn(MIN_SPAN, d)
+    }
+
+    private fun viewStart(): Long = zoomStart.coerceIn(0L, maxOf(0L, videoDuration() - viewSpan()))
+
+    /** A video time's x on a timeline [w] wide. */
+    private fun px(ms: Long, w: Float): Float = w * (ms - viewStart()) / viewSpan()
+
+    /** The video time at x on a timeline [w] wide. */
+    private fun msAt(x: Float, w: Float): Long = viewStart() + (x / w * viewSpan()).toLong()
+
+    /** Zooms by [factor] (below 1 zooms in) keeping the time at [anchorX] in place. */
+    private fun zoom(factor: Double, anchorX: Float, w: Float) {
+        val d = videoDuration()
+        val anchor = msAt(anchorX, w)
+        val span = (viewSpan() * factor).toLong().coerceIn(MIN_SPAN, d)
+        zoomSpan = if (span >= d) 0L else span
+        zoomStart = (anchor - (anchorX / w * span).toLong()).coerceIn(0L, maxOf(0L, d - span))
+    }
+
+    /** Moves the visible span by [dx] pixels. */
+    private fun pan(dx: Float, w: Float) {
+        zoomStart = (viewStart() + (dx / w * viewSpan()).toLong()).coerceIn(0L, maxOf(0L, videoDuration() - viewSpan()))
+    }
+
+    /** The visible span, for tests. */
+    fun visibleRange(): LongArray = longArrayOf(viewStart(), viewStart() + viewSpan())
+
     /** Where the timeline canvas is, in window pixels; for tests. */
     private var timelineBounds = Rect.Zero
 
@@ -647,7 +706,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val ruler = RULER.value * density
         val lane = (b.height - ruler - 4 * LANES * density) / LANES
         val y = b.top + ruler + 4 * density + lane + 4 * density + lane / 2
-        return doubleArrayOf((b.left + b.width * v / videoDuration()).toDouble(), y.toDouble())
+        return doubleArrayOf((b.left + px(v, b.width)).toDouble(), y.toDouble())
     }
 
     private var lastDensity = 1f
@@ -663,8 +722,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         val ruler = RULER.value * lastDensity
         val lane = (b.height - ruler - 4 * LANES * lastDensity) / LANES
         val d = videoDuration().toDouble()
-        val a = b.left + b.width * seq.startOf(index) / d
-        val e = b.left + b.width * (seq.startOf(index) + seq.clip(index).lengthMs()) / d
+        val a = b.left + px(seq.startOf(index), b.width)
+        val e = b.left + px(seq.startOf(index) + seq.clip(index).lengthMs(), b.width)
         return doubleArrayOf(a + (e - a) * fraction, (b.top + ruler + 4 * lastDensity + lane / 2).toDouble())
     }
 
@@ -714,8 +773,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             val d = videoDuration()
             val items = ReplayEditor.music()
             for (i in items.indices.reversed()) {
-                val a = w * items[i].startMs() / d
-                val b = w * (items[i].startMs() + playedMs(items[i])) / d
+                val a = px(items[i].startMs(), w)
+                val b = px(items[i].startMs() + playedMs(items[i]), w)
                 if (p.x >= a - hit / 2 && p.x <= maxOf(b, a + hit) + hit / 2) return i
             }
             return null
@@ -728,8 +787,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             return ReplayEditor.path().keyframes()
                 .map { it.timeMs() to toVideo(it.timeMs()) }
                 .filter { it.second >= 0 }
-                .minByOrNull { kotlin.math.abs(w * it.second / d - p.x) }
-                ?.takeIf { kotlin.math.abs(w * it.second / d - p.x) <= hit }
+                .minByOrNull { kotlin.math.abs(px(it.second, w) - p.x) }
+                ?.takeIf { kotlin.math.abs(px(it.second, w) - p.x) <= hit }
                 ?.first
         }
         /** The clip under a point in the video lane and whether an edge was hit, or null. */
@@ -738,8 +797,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             if (sq.isEmpty || p.y < clipsTop() || p.y > clipsTop() + laneH(h)) return null
             val d = videoDuration()
             for (i in 0 until sq.size()) {
-                val a = w * sq.startOf(i) / d
-                val b = w * (sq.startOf(i) + sq.clip(i).lengthMs()) / d
+                val a = px(sq.startOf(i), w)
+                val b = px(sq.startOf(i) + sq.clip(i).lengthMs(), w)
                 if (p.x < a - hit / 2 || p.x > b + hit / 2) continue
                 val edge = minOf(hit, (b - a) / 4)
                 return i to when {
@@ -752,13 +811,33 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
         fun seekAt(x: Float, w: Float) {
             val d = videoDuration()
-            ReplayEditor.seekVideo((x / w * d).toLong().coerceIn(0, d))
+            ReplayEditor.seekVideo(msAt(x, w).coerceIn(0, d))
         }
 
         lastDensity = density.density
         Canvas(
             modifier
+                .clipToBounds()
                 .onGloballyPositioned { timelineBounds = it.boundsInWindow() }
+                .pointerInput(Unit) {
+                    // Wheel zooms around the cursor; with Shift (or a sideways wheel) it scrolls.
+                    awaitPointerEventScope {
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            if (e.type != PointerEventType.Scroll) continue
+                            val c = e.changes.first()
+                            val d = c.scrollDelta
+                            val w = size.width.toFloat()
+                            val shift = Minecraft.getInstance().hasShiftDown()
+                            if (shift || kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) {
+                                pan((if (shift) d.y else d.x) * w * 0.1f, w)
+                            } else if (d.y != 0f) {
+                                zoom(if (d.y > 0) 1.25 else 0.8, c.position.x, w)
+                            }
+                            c.consume()
+                        }
+                    }
+                }
                 .pointerInput(Unit) {
                     detectTapGestures { p ->
                         val w = size.width.toFloat()
@@ -793,7 +872,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                         if (mode == Drag.MUSIC && recorded) ReplayEditor.changed()
                         if (mode == Drag.CLIP && kotlin.math.abs(lastX - startX) >= 4 * dp) {
                             val sq = ReplayEditor.sequence()
-                            val t = (lastX / w * videoDuration()).toLong().coerceIn(0, maxOf(0L, sq.durationMs() - 1))
+                            val t = msAt(lastX, w).coerceIn(0, maxOf(0L, sq.durationMs() - 1))
                             val to = sq.indexAt(t).coerceIn(0, sq.size() - 1)
                             val from = clip
                             if (to != from && ReplayEditor.editClips({ it.move(from, to) })) selectedClip = to
@@ -854,7 +933,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                                 val i = selectedMusic
                                 val items = ReplayEditor.music()
                                 if (i !in items.indices) return@detectDragGestures
-                                val delta = ((lastX - startX) / w * videoDuration()).toLong()
+                                val delta = ((lastX - startX) / w * viewSpan()).toLong()
                                 val start = (musicStart + delta).coerceIn(0L, videoDuration())
                                 if (start == items[i].startMs()) return@detectDragGestures
                                 if (!recorded) {
@@ -866,7 +945,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                                 return@detectDragGestures
                             }
                             Drag.TRIM_IN, Drag.TRIM_OUT -> {
-                                val delta = ((lastX - startX) / w * videoDuration()).toLong()
+                                val delta = ((lastX - startX) / w * viewSpan()).toLong()
                                 val replay = replayDuration()
                                 val i = clip
                                 if (mode == Drag.TRIM_IN) {
@@ -881,7 +960,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                             }
                             Drag.KEYFRAMES -> {}
                         }
-                        val delta = ((change.position.x - startX) / size.width * videoDuration()).toLong()
+                        val delta = ((change.position.x - startX) / size.width * viewSpan()).toLong()
                         val step = delta - applied
                         if (step == 0L) return@detectDragGestures
                         if (!recorded) {
@@ -900,22 +979,38 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 },
         ) {
             val w = size.width
-            fun x(ms: Long) = w * ms / duration
+            fun x(ms: Long) = px(ms, w)
             val rulerH = RULER.toPx()
             val laneH = (size.height - rulerH - 4.dp.toPx() * LANES) / LANES
             val clipsY = rulerH + 4.dp.toPx()
             val camY = clipsY + laneH + 4.dp.toPx()
             val musicY = camY + laneH + 4.dp.toPx()
-            // Ruler: ticks, with a time label every few seconds.
-            val labelEvery = if (duration > 120_000) 30_000L else if (duration > 30_000) 10_000L else 5_000L
-            var s = 0L
-            while (s <= duration) {
+            // Ruler: ticks over the visible span, with a time label every few ticks.
+            val span = viewSpan()
+            val tick = TICKS.firstOrNull { w * it / span >= 6.dp.toPx() } ?: TICKS.last()
+            val labelEvery = TICKS.firstOrNull { it % tick == 0L && w * it / span >= 56.dp.toPx() } ?: (tick * 10)
+            var s = viewStart() / tick * tick
+            while (s <= minOf(duration, viewStart() + span)) {
                 val labelled = s % labelEvery == 0L
                 drawLine(line, Offset(x(s), if (labelled) rulerH * 0.35f else rulerH * 0.65f), Offset(x(s), rulerH), 1f)
                 if (labelled && s < duration) {
                     drawText(measurer, ReplayHud.time(s), Offset(x(s) + 3.dp.toPx(), -2.dp.toPx()), labelStyle)
                 }
-                s += if (duration > 120_000) 5000 else 1000
+                s += tick
+            }
+            // The export range (In/Out), shaded outside it.
+            val inMs = ReplayEditor.inMs()
+            val outMs = ReplayEditor.outMs()
+            if (seq.isEmpty && (inMs >= 0 || outMs >= 0)) {
+                val shade = Color.Black.copy(alpha = 0.35f)
+                if (inMs > 0) drawRect(shade, Offset(0f, rulerH), Size(x(inMs).coerceAtLeast(0f), size.height - rulerH))
+                if (outMs in 0 until duration) {
+                    val ox = x(outMs).coerceAtMost(w)
+                    drawRect(shade, Offset(ox, rulerH), Size(w - ox, size.height - rulerH))
+                }
+                for (m in listOf(inMs, outMs)) {
+                    if (m >= 0) drawLine(accent.copy(alpha = 0.9f), Offset(x(m), 0f), Offset(x(m), size.height), 1.5f.dp.toPx())
+                }
             }
             // Video lane: one rounded block per clip, in play order.
             val gap = if (clips.size > 1) 1.dp.toPx() else 0f
@@ -996,6 +1091,9 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     private companion object {
         val RULER = 16.dp
         val LANE = 40.dp
+        const val MIN_SPAN = 1000L
+        val VIEWS = listOf("free", "pov", "follow", "path")
+        val TICKS = longArrayOf(100, 250, 500, 1000, 2000, 5000, 10_000, 30_000, 60_000, 300_000)
         const val LANES = 3
     }
 
