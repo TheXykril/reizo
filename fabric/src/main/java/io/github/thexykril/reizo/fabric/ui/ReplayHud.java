@@ -85,6 +85,7 @@ public final class ReplayHud {
     if (server == null
         || Compat.hudHidden(mc)
         || mc.screen instanceof TimelineScreen
+        || mc.screen instanceof EditorView
         || mc.screen instanceof ExportSettingsView) {
       return;
     }

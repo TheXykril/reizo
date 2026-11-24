@@ -1799,6 +1799,17 @@ public final class RecordingGameTest implements FabricClientGameTest {
             });
     check(saved.sequence().equals(moved), "clips not saved: " + saved.sequence());
     context.takeScreenshot("reizo-clips");
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
+      // The Compose editor (opt-in for now) opens over the same replay and edit.
+      context.runOnClient(
+          mc -> mc.setScreen(new io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen(null)));
+      context.waitTicks(5);
+      context.takeScreenshot("reizo-compose-timeline");
+      check(
+          context.computeOnClient(
+              mc -> mc.screen instanceof io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen),
+          "Compose timeline did not stay open");
+    }
     context.runOnClient(
         mc -> {
           ReplayEditor.clearClips();

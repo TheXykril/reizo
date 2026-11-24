@@ -141,7 +141,7 @@ public final class MenuButtons {
       buttons.add(
           Button.builder(
                   Component.translatable("reizo.menu.timeline"),
-                  b -> client.setScreen(new TimelineScreen()))
+                  b -> client.setScreen(TimelineScreen.create()))
               .bounds(4, y, 120, 20)
               .build());
       y += 24;

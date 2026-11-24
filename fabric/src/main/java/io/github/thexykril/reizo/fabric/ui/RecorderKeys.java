@@ -236,7 +236,7 @@ public final class RecorderKeys {
     cameraKeys(mc, active);
     while (timeline.consumeClick()) {
       if (active && mc.screen == null) {
-        mc.setScreen(new TimelineScreen());
+        mc.setScreen(TimelineScreen.create());
       }
     }
   }
