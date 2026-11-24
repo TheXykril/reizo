@@ -6,6 +6,12 @@ compatibility.
 
 ## [Unreleased]
 
+### Changed
+
+- Replays open in memory, like a singleplayer world, instead of joining a local server: no
+  connecting screen and no network port (ADR 0020). The game's terrain loading screen shows while
+  the replay loads.
+
 ### Fixed
 
 - The recorded player now shows the second skin layer (hat, jacket, sleeves, trousers) in replays.

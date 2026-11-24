@@ -235,6 +235,26 @@ public final class RecordingGameTest implements FabricClientGameTest {
               && mc.level.getChunkSource().getLoadedChunksCount() > 0;
         },
         20 * 60);
+    if (!ReplayServer.SOCKET) {
+      // ADR 0020: joined in memory, but the client treats the replay as a real server (so it
+      // applies the tags the replay sends, for one).
+      context.runOnClient(
+          mc -> {
+            net.minecraft.network.Connection c = mc.getConnection().getConnection();
+            check(
+                io.github.thexykril.reizo.fabric.playback.ReplayJoin.isReplay(c),
+                "replay connection is not the in-memory one: " + c.getRemoteAddress());
+            check(!c.isMemoryConnection(), "replay connection counts as the integrated server");
+            check(
+                !mc.level
+                    .registryAccess()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK)
+                    .getTags()
+                    .findAny()
+                    .isEmpty(),
+                "replay has no block tags");
+          });
+    }
     context.runOnClient(Minecraft::disconnectWithProgressScreen);
     context.waitFor(mc -> !ReplayPlayback.isActive(), 20 * 30);
     context.runOnClient(mc -> mc.setScreen(new net.minecraft.client.gui.screens.TitleScreen()));

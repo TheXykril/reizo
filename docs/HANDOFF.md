@@ -65,7 +65,7 @@ screen, effects, audio, shadow recording, multi-version.
 - `fabric`: decoder mixin capture, local player sampler, Shift+R toggle + pause/marker keys, HUD
   indicator, toasts, auto-record on join, startup recovery, debug commands (dev only).
 - Playback first slice (#7, ADR 0008): `core.playback` (PlaybackClock, ReplayScript) and
-  `fabric.playback` (ReplayServer on 127.0.0.1, ReplayPlayback), `/reizo-debug play [file]`,
+  `fabric.playback` (ReplayServer, joined in memory per ADR 0020, ReplayPlayback), `/reizo-debug play [file]`,
   capture suppressed during replays.
 - Recorded player in playback (#7 part 2, branch `feat/playback-recorded-player`, stacked on
   #28): `PlayTransformer` rewrites login/respawn for a spectator camera, drops packets aimed at the
