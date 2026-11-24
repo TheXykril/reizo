@@ -75,6 +75,7 @@ import io.github.thexykril.reizo.fabric.compat.Compat
 import io.github.thexykril.reizo.fabric.playback.EditorViewport
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback
+import com.mojang.blaze3d.platform.InputConstants
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
@@ -660,8 +661,8 @@ class ComposeTimelineScreen(private val parent: Screen?) :
 
     /** The editor's keys, as in the classic editor. */
     override fun handleKeyPressed(keyCode: Int, modifiers: Int): Boolean {
-        val ctrl = modifiers and 2 != 0 || Minecraft.getInstance().hasControlDown()
-        val shift = modifiers and 1 != 0 || Minecraft.getInstance().hasShiftDown()
+        val ctrl = modifiers and InputConstants.MOD_CONTROL != 0 || Minecraft.getInstance().hasControlDown()
+        val shift = modifiers and InputConstants.MOD_SHIFT != 0 || Minecraft.getInstance().hasShiftDown()
         val now = ReplayPlayback.current()?.replayTimeMs() ?: return super.handleKeyPressed(keyCode, modifiers)
         val handled = if (ctrl) {
             when (keyCode) {
@@ -1331,21 +1332,21 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     }
 
     private companion object {
-        // GLFW key codes.
-        const val KEY_SPACE = 32
-        const val KEY_A = 65
-        const val KEY_C = 67
-        const val KEY_I = 73
-        const val KEY_N = 78
-        const val KEY_O = 79
-        const val KEY_S = 83
-        const val KEY_V = 86
-        const val KEY_Y = 89
-        const val KEY_Z = 90
-        const val KEY_BACKSPACE = 259
-        const val KEY_DELETE = 261
-        const val KEY_RIGHT = 262
-        const val KEY_LEFT = 263
+        // Minecraft's key codes (GLFW's on 1.21.x, its own on 26.3).
+        val KEY_SPACE = InputConstants.KEY_SPACE
+        val KEY_A = InputConstants.KEY_A
+        val KEY_C = InputConstants.KEY_C
+        val KEY_I = InputConstants.KEY_I
+        val KEY_N = InputConstants.KEY_N
+        val KEY_O = InputConstants.KEY_O
+        val KEY_S = InputConstants.KEY_S
+        val KEY_V = InputConstants.KEY_V
+        val KEY_Y = InputConstants.KEY_Y
+        val KEY_Z = InputConstants.KEY_Z
+        val KEY_BACKSPACE = InputConstants.KEY_BACKSPACE
+        val KEY_DELETE = InputConstants.KEY_DELETE
+        val KEY_RIGHT = InputConstants.KEY_RIGHT
+        val KEY_LEFT = InputConstants.KEY_LEFT
         val RULER = 16.dp
         val LANE = 40.dp
         const val MIN_SPAN = 1000L
