@@ -1871,6 +1871,59 @@ public final class RecordingGameTest implements FabricClientGameTest {
         java.util.Arrays.toString(zoomed));
   }
 
+  /** The new editor's keys (select all, delete, undo) and its right-click menu on a keyframe. */
+  private static void composeKeysAndMenu(ClientGameTestContext context) {
+    var screen =
+        context.computeOnClient(
+            mc -> (io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen) mc.screen);
+    List<Long> before = keyframeTimes();
+    check(before.size() >= 2, "need keyframes for the key test: " + before);
+    context.getInput().holdKey(InputConstants.KEY_LCONTROL);
+    context.getInput().pressKey(InputConstants.KEY_A);
+    context.getInput().releaseKey(InputConstants.KEY_LCONTROL);
+    context.waitTicks(2);
+    Set<Long> all = context.computeOnClient(mc -> screen.selectedTimes());
+    check(all.size() == before.size(), "Ctrl+A did not select every keyframe: " + all);
+    context.getInput().pressKey(InputConstants.KEY_DELETE);
+    context.waitTicks(2);
+    check(keyframeTimes().isEmpty(), "Delete left keyframes: " + keyframeTimes());
+    context.getInput().holdKey(InputConstants.KEY_LCONTROL);
+    context.getInput().pressKey(InputConstants.KEY_Z);
+    context.getInput().releaseKey(InputConstants.KEY_LCONTROL);
+    context.waitTicks(2);
+    check(keyframeTimes().equals(before), "Ctrl+Z did not restore the keyframes: " + keyframeTimes());
+    // Right-click a keyframe: the menu selects it alone.
+    long target = -1;
+    double[] p = null;
+    for (long t : before) {
+      p = context.computeOnClient(mc -> screen.keyframePoint(t));
+      if (p != null && p[0] > 0) {
+        target = t;
+        break;
+      }
+    }
+    check(target >= 0, "no keyframe on the (zoomed) timeline: " + before);
+    context.getInput().setCursorPos(p[0], p[1]);
+    context.waitTicks(1);
+    context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_RIGHT);
+    context.waitTicks(3);
+    Set<Long> picked = context.computeOnClient(mc -> screen.selectedTimes());
+    long clicked = target;
+    check(
+        picked.equals(Set.of(clicked)),
+        "right-clicking keyframe " + target + " did not open its menu: selection " + picked);
+    check(
+        context.computeOnClient(mc -> mc.screen == screen),
+        "right-click left the editor");
+    context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+    context.waitTicks(2);
+    if (context.computeOnClient(mc -> mc.screen != screen)) {
+      context.runOnClient(mc -> mc.setScreen(screen));
+      context.waitTicks(2);
+    }
+    LOGGER.info("composeKeysAndMenu OK: {} keyframes, menu on {}", before.size(), target);
+  }
+
   private static double[] composePoint(ClientGameTestContext context, int clip, double fraction) {
     double[] p =
         context.computeOnClient(
@@ -2144,6 +2197,7 @@ public final class RecordingGameTest implements FabricClientGameTest {
       composeClipEdits(context);
       composeMusic(context);
       composeZoomAndViews(context);
+      composeKeysAndMenu(context);
     }
     context.runOnClient(
         mc -> {
