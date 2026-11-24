@@ -60,6 +60,12 @@ Each Minecraft version builds its own jar, in `fabric/versions/<version>/build/l
 | [docs/RESEARCH.md](docs/RESEARCH.md) | OneClient, Replay Mod, Flashback, Hindsight, Lunar Rewind findings |
 | [docs/HANDOFF.md](docs/HANDOFF.md) | Current state for the next session |
 
+## Third-party assets
+
+- [Inter](https://github.com/rsms/inter) (Inter Medium), the editor's UI font, is bundled under the
+  SIL Open Font License 1.1 (`fabric/src/main/resources/licenses/Inter-OFL.txt`). The font is not
+  covered by Reizo's GPL.
+
 ## License
 
 [GPL-3.0-or-later](LICENSE). See [ADR 0003](docs/DECISIONS/0003-license.md).

@@ -8,20 +8,21 @@ import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.core.storage.RecordingStorage;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
+import io.github.thexykril.reizo.fabric.ui.kit.Draw;
+import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
+import io.github.thexykril.reizo.fabric.ui.kit.KitConfirmScreen;
+import io.github.thexykril.reizo.fabric.ui.kit.KitScreen;
+import io.github.thexykril.reizo.fabric.ui.kit.Theme;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.ObjectSelectionList;
-import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -33,65 +34,77 @@ import org.slf4j.LoggerFactory;
  * Lists saved recordings and plays, renames or deletes them. Opened from the title screen and the
  * pause menu.
  */
-public final class ReplayBrowserScreen extends Screen {
+public final class ReplayBrowserScreen extends KitScreen {
   private static final Logger LOGGER = LoggerFactory.getLogger("Reizo/Browser");
   private static final DateTimeFormatter DATE =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT).withZone(ZoneId.systemDefault());
-  private static final int GRAY = 0xFFA0A0A0;
-  private static final int WHITE = 0xFFFFFFFF;
-  private static final int RED = 0xFFFF6060;
+  private static final int ITEM_H = 36;
 
   private final Screen parent;
-  private RecordingList list;
-  private Button play;
-  private Button rename;
-  private Button delete;
+  private final List<Row> rows = new ArrayList<>();
+  private int selected = -1;
+  private int scroll;
+  private int listY0;
+  private int listY1;
+  private FlatButton play;
+  private FlatButton rename;
+  private FlatButton delete;
   private Component error;
+  private long lastClick;
+  private int lastClickRow = -1;
 
   public ReplayBrowserScreen(Screen parent) {
     super(Component.translatable("reizo.browser.title"));
     this.parent = parent;
   }
 
+  /** One recording in the list. */
+  record Row(RecordingStorage.Entry entry) {
+    boolean playable() {
+      return entry.metadata().protocolVersion == SharedConstants.getProtocolVersion();
+    }
+  }
+
   @Override
   protected void init() {
-    list = addRenderableWidget(new RecordingList(minecraft, width, height - 32 - 64, 32, 36));
+    card(420, height - 24);
     reload();
-
-    int y = height - 52;
-    play =
-        addRenderableWidget(
-            Button.builder(Component.translatable("reizo.browser.play"), b -> playSelected())
-                .bounds(width / 2 - 154, y, 100, 20)
-                .build());
-    rename =
-        addRenderableWidget(
-            Button.builder(Component.translatable("reizo.browser.rename"), b -> renameSelected())
-                .bounds(width / 2 - 50, y, 100, 20)
-                .build());
+    int x = innerX();
+    int w = innerW();
+    listY0 = contentY();
+    listY1 = footerY() - ROW_H - GAP * 2;
+    int third = (w - GAP * 2) / 3;
+    int y = footerY() - ROW_H - GAP;
+    rename = button(x, y, third, Component.translatable("reizo.browser.rename"), this::renameSelected);
     delete =
-        addRenderableWidget(
-            Button.builder(Component.translatable("reizo.browser.delete"), b -> deleteSelected())
-                .bounds(width / 2 + 54, y, 100, 20)
-                .build());
-    addRenderableWidget(
-        Button.builder(Component.translatable("reizo.browser.open_folder"), b -> openFolder())
-            .bounds(width / 2 - 154, y + 24, 100, 20)
-            .build());
-    addRenderableWidget(
-        Button.builder(
-                Component.translatable("reizo.browser.settings"),
-                b -> minecraft.setScreen(new SettingsScreen(this)))
-            .bounds(width / 2 - 50, y + 24, 100, 20)
-            .build());
-    addRenderableWidget(
-        Button.builder(Component.translatable("gui.done"), b -> onClose())
-            .bounds(width / 2 + 54, y + 24, 100, 20)
-            .build());
+        button(
+            x + third + GAP, y, third, Component.translatable("reizo.browser.delete"), this::deleteSelected);
+    play =
+        accentButton(
+            x + (third + GAP) * 2,
+            y,
+            w - (third + GAP) * 2,
+            Component.translatable("reizo.browser.play"),
+            this::playSelected);
+    y = footerY();
+    button(x, y, third, Component.translatable("reizo.browser.open_folder"), this::openFolder);
+    button(
+        x + third + GAP,
+        y,
+        third,
+        Component.translatable("reizo.browser.settings"),
+        () -> minecraft.setScreen(new SettingsScreen(this)));
+    button(
+        x + (third + GAP) * 2,
+        y,
+        w - (third + GAP) * 2,
+        Component.translatable("gui.done"),
+        this::onClose);
     updateButtons();
   }
 
   private void reload() {
+    String keep = selected >= 0 && selected < rows.size() ? rows.get(selected).entry.path().toString() : null;
     List<RecordingStorage.Entry> entries;
     try {
       entries = storage().listRecordings();
@@ -100,11 +113,22 @@ public final class ReplayBrowserScreen extends Screen {
       error = Component.translatable("reizo.browser.list_failed");
       entries = List.of();
     }
-    list.set(entries);
+    rows.clear();
+    selected = -1;
+    for (RecordingStorage.Entry e : entries) {
+      if (e.path().toString().equals(keep)) {
+        selected = rows.size();
+      }
+      rows.add(new Row(e));
+    }
+  }
+
+  private Row selectedRow() {
+    return selected >= 0 && selected < rows.size() ? rows.get(selected) : null;
   }
 
   private void updateButtons() {
-    RecordingList.Row row = list.getSelected();
+    Row row = selectedRow();
     boolean any = row != null;
     play.active = any && row.playable();
     rename.active = any;
@@ -116,17 +140,92 @@ public final class ReplayBrowserScreen extends Screen {
     updateButtons();
   }
 
+  private int visibleRows() {
+    return Math.max(1, (listY1 - listY0) / ITEM_H);
+  }
+
   @Override
-  public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    super.render(g, mouseX, mouseY, partialTick);
-    g.drawCenteredString(font, title, width / 2, 12, WHITE);
-    if (list.children().isEmpty()) {
-      g.drawCenteredString(
-          font, Component.translatable("reizo.browser.empty"), width / 2, height / 2 - 20, GRAY);
+  protected void renderCard(GuiGraphics g, int mouseX, int mouseY) {
+    int x0 = innerX();
+    int x1 = x0 + innerW();
+    Draw.round(g, x0, listY0, x1, listY1, 5, Theme.GROUND | 0xFF000000);
+    if (rows.isEmpty()) {
+      String empty = Component.translatable("reizo.browser.empty").getString();
+      Draw.centered(g, font, empty, (x0 + x1) / 2, (listY0 + listY1) / 2 - 4, Theme.FAINT);
+    }
+    scroll = Math.max(0, Math.min(scroll, Math.max(0, rows.size() - visibleRows())));
+    for (int i = 0; i < visibleRows() && scroll + i < rows.size(); i++) {
+      int index = scroll + i;
+      Row row = rows.get(index);
+      int y = listY0 + 3 + i * ITEM_H;
+      boolean hot = mouseX >= x0 && mouseX < x1 && mouseY >= y && mouseY < y + ITEM_H - 2;
+      boolean sel = index == selected;
+      if (sel || hot) {
+        Draw.round(g, x0 + 3, y, x1 - 3, y + ITEM_H - 3, 4, sel ? Draw.mix(Theme.RAISED, Theme.ACCENT, 0.25) : Theme.RAISED);
+      }
+      if (sel) {
+        Draw.round(g, x0 + 3, y + 4, x0 + 5, y + ITEM_H - 7, 1, Theme.ACCENT);
+      }
+      renderRow(g, row, x0 + 10, y + 3, x1 - x0 - 20);
+    }
+    if (rows.size() > visibleRows()) {
+      int track = listY1 - listY0 - 6;
+      int thumb = Math.max(12, track * visibleRows() / rows.size());
+      int ty = listY0 + 3 + (track - thumb) * scroll / Math.max(1, rows.size() - visibleRows());
+      Draw.round(g, x1 - 5, ty, x1 - 2, ty + thumb, 1, Theme.FAINT);
     }
     if (error != null) {
-      g.drawCenteredString(font, error, width / 2, height - 64, RED);
+      Draw.label(g, font, Draw.fit(font, error.getString(), innerW()), x0, listY1 + 2, Theme.DANGER);
     }
+  }
+
+  private void renderRow(GuiGraphics g, Row row, int x, int y, int w) {
+    RecordingMetadata m = row.entry.metadata();
+    String length = duration(m.durationMs);
+    Draw.label(g, font, Draw.fit(font, m.name, w - Draw.width(font, length) - 8), x, y, Theme.TEXT);
+    Draw.label(g, font, length, x + w - Draw.width(font, length), y, Theme.DIM);
+    String server = m.serverName != null ? m.serverName : String.valueOf(m.serverType);
+    String line2 = DATE.format(Instant.ofEpochMilli(m.startedAtEpochMs)) + "  ·  " + server;
+    Draw.label(g, font, Draw.fit(font, line2, w), x, y + 10, Theme.DIM);
+    if (!row.playable()) {
+      String other = Component.translatable("reizo.browser.other_version", m.minecraftVersion).getString();
+      Draw.label(g, font, Draw.fit(font, other, w), x, y + 20, Theme.DANGER);
+    } else {
+      String line3 =
+          m.minecraftVersion
+              + "  ·  "
+              + size(row.entry.sizeBytes())
+              + (m.markers.isEmpty() ? "" : "  ·  " + m.markers.size() + " markers");
+      Draw.label(g, font, Draw.fit(font, line3, w), x, y + 20, Theme.FAINT);
+    }
+  }
+
+  @Override
+  public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    double mx = event.x();
+    double my = event.y();
+    if (mx >= innerX() && mx < innerX() + innerW() && my >= listY0 + 3 && my < listY1) {
+      int index = scroll + (int) ((my - listY0 - 3) / ITEM_H);
+      if (index < rows.size()) {
+        long now = Util.getMillis();
+        boolean again = index == lastClickRow && (doubleClick || now - lastClick < 250);
+        selected = index;
+        updateButtons();
+        lastClick = now;
+        lastClickRow = index;
+        if (again) {
+          playSelected();
+        }
+        return true;
+      }
+    }
+    return super.mouseClicked(event, doubleClick);
+  }
+
+  @Override
+  public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {
+    scroll = Math.max(0, scroll - (int) Math.signum(vertical));
+    return true;
   }
 
   @Override
@@ -138,12 +237,12 @@ public final class ReplayBrowserScreen extends Screen {
 
   /** The listed recordings, in list order. */
   public List<RecordingStorage.Entry> entries() {
-    return list.children().stream().map(r -> r.entry).toList();
+    return rows.stream().map(Row::entry).toList();
   }
 
   /** Selects a row like a click would. */
   public void select(int index) {
-    list.setSelected(list.children().get(index));
+    selected = index;
     updateButtons();
   }
 
@@ -155,7 +254,7 @@ public final class ReplayBrowserScreen extends Screen {
   // ---- actions ----
 
   private void playSelected() {
-    RecordingList.Row row = list.getSelected();
+    Row row = selectedRow();
     if (row == null || !row.playable()) {
       return;
     }
@@ -169,7 +268,7 @@ public final class ReplayBrowserScreen extends Screen {
   }
 
   private void renameSelected() {
-    RecordingList.Row row = list.getSelected();
+    Row row = selectedRow();
     if (row == null) {
       return;
     }
@@ -188,12 +287,12 @@ public final class ReplayBrowserScreen extends Screen {
   }
 
   private void deleteSelected() {
-    RecordingList.Row row = list.getSelected();
+    Row row = selectedRow();
     if (row == null) {
       return;
     }
     minecraft.setScreen(
-        new ConfirmScreen(
+        new KitConfirmScreen(
             yes -> {
               if (yes) {
                 try {
@@ -208,7 +307,8 @@ public final class ReplayBrowserScreen extends Screen {
             Component.translatable("reizo.browser.delete_question"),
             Component.translatable("reizo.browser.delete_warning", row.entry.metadata().name),
             Component.translatable("reizo.browser.delete"),
-            Component.translatable("gui.cancel")));
+            Component.translatable("gui.cancel"),
+            true));
   }
 
   private void openFolder() {
@@ -222,93 +322,6 @@ public final class ReplayBrowserScreen extends Screen {
 
   private static RecordingStorage storage() {
     return RecorderClient.get().storage();
-  }
-
-  // ---- list ----
-
-  final class RecordingList extends ObjectSelectionList<RecordingList.Row> {
-    RecordingList(Minecraft mc, int width, int height, int y, int itemHeight) {
-      super(mc, width, height, y, itemHeight);
-    }
-
-    void set(List<RecordingStorage.Entry> entries) {
-      Row selected = getSelected();
-      String selectedPath = selected == null ? null : selected.entry.path().toString();
-      clearEntries();
-      for (RecordingStorage.Entry e : entries) {
-        Row row = new Row(e);
-        addEntry(row);
-        if (e.path().toString().equals(selectedPath)) {
-          setSelected(row);
-        }
-      }
-    }
-
-    @Override
-    public int getRowWidth() {
-      return Math.min(320, width - 20);
-    }
-
-    final class Row extends ObjectSelectionList.Entry<Row> {
-      final RecordingStorage.Entry entry;
-      private long lastClick;
-
-      Row(RecordingStorage.Entry entry) {
-        this.entry = entry;
-      }
-
-      boolean playable() {
-        return entry.metadata().protocolVersion == SharedConstants.getProtocolVersion();
-      }
-
-      @Override
-      public Component getNarration() {
-        return Component.literal(entry.metadata().name);
-      }
-
-      @Override
-      public void renderContent(
-          GuiGraphics g, int mouseX, int mouseY, boolean hovered, float partialTick) {
-        RecordingMetadata m = entry.metadata();
-        int x = getContentX();
-        int y = getContentY();
-        g.drawString(font, m.name, x + 2, y + 1, WHITE);
-        String server = m.serverName != null ? m.serverName : String.valueOf(m.serverType);
-        String line2 =
-            DATE.format(Instant.ofEpochMilli(m.startedAtEpochMs))
-                + "  ·  "
-                + duration(m.durationMs)
-                + "  ·  "
-                + server;
-        g.drawString(font, line2, x + 2, y + 12, GRAY);
-        Component line3;
-        if (!playable()) {
-          line3 =
-              Component.translatable("reizo.browser.other_version", m.minecraftVersion)
-                  .withStyle(ChatFormatting.RED);
-        } else {
-          line3 =
-              Component.literal(
-                  m.minecraftVersion
-                      + "  ·  "
-                      + size(entry.sizeBytes())
-                      + (m.markers.isEmpty() ? "" : "  ·  " + m.markers.size() + " markers"));
-        }
-        g.drawString(font, line3, x + 2, y + 23, GRAY);
-      }
-
-      @Override
-      public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        setSelected(this);
-        updateButtons();
-        long now = Util.getMillis();
-        if (doubleClick || now - lastClick < 250) {
-          playSelected();
-        }
-        lastClick = now;
-        return true;
-      }
-    }
   }
 
   static String duration(int ms) {

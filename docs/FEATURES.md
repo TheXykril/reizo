@@ -130,11 +130,18 @@ Last verified: 2026-11-22, commit see HANDOFF.md. Gametest evidence (GT) holds f
   keyframe; Ctrl+Z and Ctrl+Y undo and redo it; I sets and Shift+I clears the export start; a click
   on the ruler seeks; the project is saved; screenshot `reizo-timeline`). Not visually checked by a
   person yet.
-  - Tracks: time ruler, markers, camera keyframes, export region (in/out), overview bar.
+  - Layout (ADR 0015, docked editor): top bar (transport, time, speed, view Free/POV/Follow/Path,
+    undo, redo, Export), tool rail (hide entity, effects, settings, panels), Scene outliner,
+    Inspector (Camera, Look, World tabs, drag-number fields in folding sections), a menu bar, right-click menus, panels that float or dock by their title bars and the timeline. The outliner shows from 560 GUI pixels
+    wide, the Inspector from 440; Tab folds both. The in-game tests run at 320x240, where only the
+    top bar, rail and timeline show, so the side panels are covered by screenshots only.
+  - Tracks: time ruler, markers, camera keyframes, look (effects), world (time and weather),
+    entities (hidden entities), settings, export region (in/out), overview bar. Tracks with keys
+    take the free rows first when the window is short. Clicking a key on a non-camera track seeks
+    to it.
   - Mouse: click the ruler to seek, drag keyframes (Shift adds to the selection), box-select,
     double-click a keyframe to go to it, wheel zooms around the cursor, Shift+wheel scrolls.
-  - Keys: Space, N, Delete, Ctrl+Z/Y, Ctrl+C/V (paste at the playhead), Ctrl+A, I/O, F, ← →.
-  - Buttons: play/pause, add, delete, path on/off, smoothing, in, out, undo, redo, export.
+  - Keys: Space, N, Delete, Ctrl+Z/Y, Ctrl+C/V (paste at the playhead), Ctrl+A, I/O, F, H, Tab, ← →.
   - Every change autosaves to the project; undo covers keyframes, smoothing and the export region.
 - Effect, video and sound tracks, trim/split, per-keyframe interpolation and fades, text/image
   overlays, media library: **planned**.

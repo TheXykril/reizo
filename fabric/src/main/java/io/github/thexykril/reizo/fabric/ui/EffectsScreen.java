@@ -9,12 +9,15 @@ import io.github.thexykril.reizo.core.effects.Grade;
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
+import io.github.thexykril.reizo.fabric.ui.kit.Draw;
+import io.github.thexykril.reizo.fabric.ui.kit.DragField;
+import io.github.thexykril.reizo.fabric.ui.kit.FlatButton;
+import io.github.thexykril.reizo.fabric.ui.kit.KitScreen;
+import io.github.thexykril.reizo.fabric.ui.kit.Theme;
 import java.util.Locale;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractSliderButton;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -24,72 +27,22 @@ import net.minecraft.network.chat.Component;
  * keyframe at the current replay time (or edits the keyframe there); between keyframes values
  * blend. The panel sits on the left so the replay stays visible.
  */
-public final class EffectsScreen extends Screen {
+public final class EffectsScreen extends KitScreen {
   /** Keyframes this close to the playhead are edited instead of adding another. */
-  static final long TOLERANCE_MS = 100;
+  static final long TOLERANCE_MS = EffectEdits.TOLERANCE_MS;
 
-  private static final int PANEL_WIDTH = 150;
+  private static final int PANEL_WIDTH = 170;
 
   private final Screen parent;
-  private Button removeButton;
-  private Button letterboxButton;
+  private FlatButton removeButton;
+  private int colorY;
+  private int lensY;
+  private int infoY;
 
   public EffectsScreen(Screen parent) {
     super(Component.translatable("reizo.effects.title"));
     this.parent = parent;
   }
-
-  /** One slider for one grade value. */
-  private final class ValueSlider extends AbstractSliderButton {
-    private final String key;
-    private final float min;
-    private final float max;
-    private final Function<Grade, Float> get;
-    private final BiFunction<Grade, Float, Grade> set;
-
-    ValueSlider(
-        int x,
-        int y,
-        String key,
-        float min,
-        float max,
-        Function<Grade, Float> get,
-        BiFunction<Grade, Float, Grade> set) {
-      super(x, y, PANEL_WIDTH - 8, rowHeight, Component.empty(), 0);
-      this.key = key;
-      this.min = min;
-      this.max = max;
-      this.get = get;
-      this.set = set;
-      refresh();
-    }
-
-    void refresh() {
-      value = (get.apply(ReplayEditor.gradeNow()) - min) / (max - min);
-      updateMessage();
-    }
-
-    private float current() {
-      return (float) (min + value * (max - min));
-    }
-
-    @Override
-    protected void updateMessage() {
-      setMessage(
-          Component.translatable(
-              key, String.format(Locale.ROOT, "%.2f", current()).replace("-0.00", "0.00")));
-    }
-
-    @Override
-    protected void applyValue() {
-      edit(g -> set.apply(g, current()));
-    }
-  }
-
-  private final java.util.List<ValueSlider> sliders = new java.util.ArrayList<>();
-  private long lastEditMs;
-  private int rowHeight = 20;
-  private int infoY;
 
   @Override
   protected void init() {
@@ -97,60 +50,74 @@ public final class EffectsScreen extends Screen {
       onClose();
       return;
     }
-    sliders.clear();
-    // Eight sliders, the letterbox button and the bottom row; rows shrink on short windows.
-    int step = Math.max(16, Math.min(22, (height - 22 - 30) / 9));
-    rowHeight = step - 2;
-    int x = 4;
-    int y = 22;
-    sliders.add(
-        slider(x, y, "reizo.effects.exposure", -3, 3, Grade::exposure, Grade::withExposure));
-    y += step;
-    sliders.add(slider(x, y, "reizo.effects.contrast", 0, 2, Grade::contrast, Grade::withContrast));
-    y += step;
-    sliders.add(
-        slider(x, y, "reizo.effects.saturation", 0, 2, Grade::saturation, Grade::withSaturation));
-    y += step;
-    sliders.add(
-        slider(
-            x, y, "reizo.effects.temperature", -1, 1, Grade::temperature, Grade::withTemperature));
-    y += step;
-    sliders.add(slider(x, y, "reizo.effects.vignette", 0, 1, Grade::vignette, Grade::withVignette));
-    y += step;
-    sliders.add(slider(x, y, "reizo.effects.bloom", 0, 1, Grade::bloom, Grade::withBloom));
-    y += step;
-    sliders.add(slider(x, y, "reizo.effects.dof", 0, 1, Grade::dof, Grade::withDof));
-    y += step;
-    sliders.add(slider(x, y, "reizo.effects.focus", 0.5f, 64, Grade::focus, Grade::withFocus));
-    y += step;
-    letterboxButton =
-        addRenderableWidget(
-            Button.builder(Component.empty(), b -> cycleLetterbox())
-                .bounds(x, y, PANEL_WIDTH - 8, rowHeight)
-                .build());
-    y += step + 4;
-    removeButton =
-        addRenderableWidget(
-            Button.builder(Component.translatable("reizo.effects.remove"), b -> removeHere())
-                .bounds(x, y, (PANEL_WIDTH - 10) / 2, 20)
-                .build());
+    sidePanel(PANEL_WIDTH);
+    int x = innerX();
+    int w = innerW();
+    int y = contentY();
+    colorY = y;
+    y += 12;
+    y = field(x, y, w, "exposure", -3, 3, 0, Grade::exposure, Grade::withExposure);
+    y = field(x, y, w, "contrast", 0, 2, 1, Grade::contrast, Grade::withContrast);
+    y = field(x, y, w, "saturation", 0, 2, 1, Grade::saturation, Grade::withSaturation);
+    y = field(x, y, w, "temperature", -1, 1, 0, Grade::temperature, Grade::withTemperature);
+    y += GAP;
+    lensY = y;
+    y += 12;
+    y = field(x, y, w, "vignette", 0, 1, 0, Grade::vignette, Grade::withVignette);
+    y = field(x, y, w, "bloom", 0, 1, 0, Grade::bloom, Grade::withBloom);
+    y = field(x, y, w, "dof", 0, 1, 0, Grade::dof, Grade::withDof);
+    y = field(x, y, w, "focus", 0.5f, 64, 8, Grade::focus, Grade::withFocus);
     addRenderableWidget(
-        Button.builder(Component.translatable("gui.done"), b -> onClose())
-            .bounds(x + (PANEL_WIDTH - 10) / 2 + 2, y, (PANEL_WIDTH - 10) / 2, 20)
-            .build());
-    infoY = y + 26;
-    refresh();
+        new FlatButton(
+                x,
+                y,
+                w,
+                ROW_H - 2,
+                Component.translatable("reizo.effects.letterbox_row"),
+                FlatButton.Style.ROW,
+                b -> EffectEdits.cycleLetterbox())
+            .value(EffectsScreen::letterboxName));
+    y += ROW_H + GAP;
+    infoY = y;
+    int half = (w - GAP) / 2;
+    removeButton = button(x, footerY(), half, Component.translatable("reizo.effects.remove"), this::removeHere);
+    accentButton(x + half + GAP, footerY(), w - half - GAP, Component.translatable("gui.done"), this::onClose);
+    refreshButtons();
   }
 
-  private ValueSlider slider(
+  private int field(
       int x,
       int y,
-      String key,
+      int w,
+      String name,
       float min,
       float max,
+      float reset,
       Function<Grade, Float> get,
       BiFunction<Grade, Float, Grade> set) {
-    return addRenderableWidget(new ValueSlider(x, y, key, min, max, get, set));
+    addRenderableWidget(
+        new DragField(
+                x,
+                y,
+                w,
+                Component.translatable("reizo.look." + name),
+                min,
+                max,
+                (max - min) / 200.0,
+                reset,
+                () -> get.apply(ReplayEditor.gradeNow()),
+                v -> EffectEdits.edit(g -> set.apply(g, (float) v)),
+                v -> String.format(Locale.ROOT, "%.2f", v).replace("-0.00", "0.00"))
+            .accent(Theme.TRACK_LOOK)
+            .markedWhen(EffectEdits::atKeyframe));
+    return y + 18;
+  }
+
+  static String letterboxName() {
+    float lb = ReplayEditor.gradeNow().letterbox();
+    return lb <= 0
+        ? Component.translatable("options.off").getString()
+        : String.format(Locale.ROOT, "%.2f:1", lb);
   }
 
   private long playhead() {
@@ -158,66 +125,21 @@ public final class EffectsScreen extends Screen {
     return server == null ? 0 : Math.min(server.replayTimeMs(), server.script().durationMs());
   }
 
-  /** The keyframe time edited now: one near the playhead, or the playhead. */
-  private long editTime() {
-    long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
-    return near >= 0 ? near : playhead();
-  }
-
   /** Sets the keyframe at the edit time to {@code change} applied to the grade shown now. */
   void edit(java.util.function.UnaryOperator<Grade> change) {
-    // One undo step per slider drag: changes less than a moment apart belong together.
-    long now = System.currentTimeMillis();
-    if (now - lastEditMs > 700) {
-      ReplayEditor.recordUndo();
-    }
-    lastEditMs = now;
-    EffectTrack track = ReplayEditor.effects();
-    long t = editTime();
-    track.put(t, change.apply(track.at(t)));
-    ReplayEditor.effectsChanged();
+    EffectEdits.edit(change);
     refreshButtons();
   }
 
-  private void cycleLetterbox() {
-    float now = ReplayEditor.gradeNow().letterbox();
-    float[] all = Grade.LETTERBOXES;
-    int i = 0;
-    while (i < all.length && Math.abs(all[i] - now) > 0.01f) {
-      i++;
-    }
-    float next = all[(i + 1) % all.length];
-    lastEditMs = 0;
-    edit(g -> g.withLetterbox(next));
-  }
-
   private void removeHere() {
-    long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
-    if (near >= 0) {
-      ReplayEditor.recordUndo();
-      lastEditMs = 0;
-      ReplayEditor.effects().remove(near);
-      ReplayEditor.effectsChanged();
-      refresh();
-    }
-  }
-
-  private void refresh() {
-    for (ValueSlider s : sliders) {
-      s.refresh();
-    }
+    EffectEdits.removeHere();
     refreshButtons();
   }
 
   private void refreshButtons() {
-    float lb = ReplayEditor.gradeNow().letterbox();
-    letterboxButton.setMessage(
-        Component.translatable(
-            "reizo.effects.letterbox",
-            lb <= 0
-                ? Component.translatable("options.off")
-                : Component.literal(String.format(Locale.ROOT, "%.2f:1", lb))));
-    removeButton.active = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS) >= 0;
+    if (removeButton != null) {
+      removeButton.active = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS) >= 0;
+    }
   }
 
   @Override
@@ -226,10 +148,7 @@ public final class EffectsScreen extends Screen {
       onClose();
       return;
     }
-    // Follow the replay while it plays, unless a slider is being dragged.
-    if (getFocused() == null || !isDragging()) {
-      refresh();
-    }
+    refreshButtons();
   }
 
   @Override
@@ -238,14 +157,9 @@ public final class EffectsScreen extends Screen {
   }
 
   @Override
-  public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    g.fill(0, 0, PANEL_WIDTH, height, 0xA0000000);
-  }
-
-  @Override
-  public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    super.render(g, mouseX, mouseY, partialTick);
-    g.drawString(font, title, 4, 6, 0xFFFFFFFF);
+  protected void renderCard(GuiGraphics g, int mouseX, int mouseY) {
+    sectionLabel(g, Component.translatable("reizo.section.color").getString(), colorY);
+    sectionLabel(g, Component.translatable("reizo.section.lens").getString(), lensY);
     int count = ReplayEditor.effects().size();
     long near = ReplayEditor.effects().nearest(playhead(), TOLERANCE_MS);
     Component info =
@@ -253,8 +167,8 @@ public final class EffectsScreen extends Screen {
             near >= 0 ? "reizo.effects.at_keyframe" : "reizo.effects.between",
             ReplayHud.time(playhead()),
             count);
-    if (infoY + font.lineHeight <= height) {
-      g.drawWordWrap(font, info, 4, infoY, PANEL_WIDTH - 8, 0xFFA0A0A0);
+    if (infoY + 10 < footerY()) {
+      Draw.wrap(g, font, info, innerX(), infoY, innerW(), Theme.DIM);
     }
   }
 

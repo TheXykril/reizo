@@ -3,7 +3,7 @@
 Snapshot of the project state for the next session. **Verify against `git log` and the source
 before trusting it** (docs/AGENT_PROTOCOL.md).
 
-Last updated: 2026-11-23 by Claude (recorded player's screens in POV, branch `feat/player-screens`).
+Last updated: 2026-11-23 by Claude (docked editor UI, branch `feat/editor-ui`, PR #69).
 
 ## 1. Current project phase
 
@@ -14,6 +14,14 @@ screen, effects, audio, shadow recording, multi-version.
 
 ## 2. Latest completed tasks
 
+- **Docked editor UI (ADR 0015, Proposed), PR #69, waiting for the owner's review.** Kit in
+  `fabric/ui/kit` (Theme, Draw, Icons, FlatButton, DragField, PopupMenu); `TimelineScreen` is now the whole
+  editor (top bar, rail, Scene outliner, Inspector tabs with drag fields and folding sections, menu bar, context menus, floating/docking panels, six timeline tracks). Widgets draw opaque pieces (no stacked translucent fills). Side panels need
+  560/440 GUI pixels, so the 320×240 gametests only cover the top bar, rail and timeline; panels
+  were checked by screenshots at GUI scale 2 on a 1280×720 window. Next: move Effects, Settings and
+  Export into Inspector tabs on the kit, then the M9 clip track. Do not name a kit method `text`,
+  `item` or other 26.x render names: Stonecutter's reverse renames rewrite them on 1.21.x.
+- **Time/weather keyframes (#66), hidden entities (#67) merged; 26.1.2 in PR #68.**
 - **1.21.10 and 26.2 (ADR 0007 notes, 2026-11-23).** Four Stonecutter versions now. Version blocks
   chain with `else if`; 26.2 mixes 26.x render names with 1.21.11 input and GPU APIs. 20/20
   gametests on 1.21.10 and 26.2 locally; CI tests 1.21.11 and 26.3 on PRs and all four on main.

@@ -20,3 +20,4 @@ in AGENTS.md needs an ADR.
 | [0012](0012-effects-pass.md) | Effects as one full-screen pass after the world | Accepted |
 | [0013](0013-export-sound-offline-mix.md) | Export sound mixed offline from the sounds that play | Accepted |
 | [0014](0014-keyframed-settings.md) | Keyframed game and mod settings | Accepted |
+| [0015](0015-editor-ui-kit.md) | A docked editor built on a small Reizo UI kit | Proposed |

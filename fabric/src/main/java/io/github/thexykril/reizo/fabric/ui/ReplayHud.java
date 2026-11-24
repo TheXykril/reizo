@@ -8,8 +8,11 @@ import io.github.thexykril.reizo.fabric.compat.Compat;
 import io.github.thexykril.reizo.core.format.RecordingMetadata;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.playback.ReplayCamera;
+import io.github.thexykril.reizo.fabric.playback.ReplayEditor;
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback;
 import io.github.thexykril.reizo.fabric.playback.ReplayServer;
+import io.github.thexykril.reizo.fabric.ui.kit.Draw;
+import io.github.thexykril.reizo.fabric.ui.kit.Theme;
 import java.util.Locale;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
@@ -22,14 +25,6 @@ import net.minecraft.resources.Identifier;
  * camera mode, a progress bar and the recording's markers. Hidden with F1 like the rest of the HUD.
  */
 public final class ReplayHud {
-  private static final int BACKGROUND = 0xA0000000;
-  private static final int TRACK = 0xFF3A3A3A;
-  private static final int PROGRESS = 0xFFE5484D;
-  private static final int MARKER = 0xFFF5A524;
-  private static final int KEYFRAME = 0xFF4CC9F0;
-  private static final int TEXT = 0xFFFFFFFF;
-  private static final int DIM = 0xFFB0B0B0;
-
   /** Space the replay bar takes at the bottom of the screen, margin included. */
   public static final int HEIGHT = 28;
 
@@ -47,47 +42,63 @@ public final class ReplayHud {
     if (server == null || Compat.hudHidden(mc) || mc.screen instanceof TimelineScreen) {
       return;
     }
+    Theme.refresh();
     long duration = Math.max(1, server.script().durationMs());
     long time = Math.min(server.replayTimeMs(), duration);
     Font font = mc.font;
     int width = Math.min(360, g.guiWidth() - 20);
     int x = (g.guiWidth() - width) / 2;
-    int height = HEIGHT - 4;
+    int height = HEIGHT - 6;
     int y = g.guiHeight() - HEIGHT;
-    g.fill(x, y, x + width, y + height, BACKGROUND);
+    Draw.round(g, x - 1, y - 1, x + width + 1, y + height + 1, 6, Theme.alpha(Theme.LINE, 0xC0));
+    Draw.round(g, x, y, x + width, y + height, 5, Theme.alpha(Theme.GROUND, 0xE0));
 
-    String state = server.clock().isRunning() ? "▶" : "❚❚";
-    String left =
-        state
-            + "  "
-            + RecordingIndicator.formatElapsed(time)
-            + " / "
-            + RecordingIndicator.formatElapsed(duration);
-    String right =
-        speed(server.clock().speed())
-            + "x  ·  "
-            + (io.github.thexykril.reizo.fabric.playback.ReplayEditor.isPathPlaying()
-                ? "path"
-                : ReplayCamera.mode().name().toLowerCase(Locale.ROOT));
-    g.drawString(font, left, x + 6, y + 4, TEXT, false);
-    g.drawString(font, right, x + width - 6 - font.width(right), y + 4, DIM, false);
+    // Play state icon.
+    int ix = x + 8;
+    int iy = y + 4;
+    if (server.clock().isRunning()) {
+      g.fill(ix, iy, ix + 2, iy + 7, Theme.TEXT);
+      g.fill(ix + 4, iy, ix + 6, iy + 7, Theme.TEXT);
+    } else {
+      for (int i = 0; i < 4; i++) {
+        g.fill(ix + i, iy + i, ix + i + 1, iy + 7 - i, Theme.TEXT);
+      }
+    }
+    String clock =
+        RecordingIndicator.formatElapsed(time) + " / " + RecordingIndicator.formatElapsed(duration);
+    Draw.label(g, font, clock, ix + 11, y + 3, Theme.TEXT);
 
-    int barX = x + 6;
-    int barW = width - 12;
-    int barY = y + height - 7;
-    g.fill(barX, barY, barX + barW, barY + 3, TRACK);
-    g.fill(barX, barY, barX + (int) (barW * time / duration), barY + 3, PROGRESS);
-    for (var k : io.github.thexykril.reizo.fabric.playback.ReplayEditor.path().keyframes()) {
-      int kx = barX + (int) (barW * Math.min(k.timeMs(), duration) / duration);
-      g.fill(kx - 1, barY - 1, kx + 2, barY + 4, KEYFRAME);
+    String mode =
+        ReplayEditor.isPathPlaying() ? "path" : ReplayCamera.mode().name().toLowerCase(Locale.ROOT);
+    String right = speed(server.clock().speed()) + "x  ·  " + mode;
+    String hint = RecorderKeys.timelineKeyName() + "  Editor";
+    int hw = Draw.width(font, hint) + 8;
+    int hx = x + width - 6 - hw;
+    Draw.round(g, hx, y + 2, hx + hw, y + 12, 3, Theme.RAISED);
+    Draw.label(g, font, hint, hx + 4, y + 3, Theme.DIM);
+    Draw.label(g, font, right, hx - 8 - Draw.width(font, right), y + 3, Theme.DIM);
+
+    int barX = x + 8;
+    int barW = width - 16;
+    int barY = y + height - 6;
+    Draw.round(g, barX, barY, barX + barW, barY + 3, 1, Theme.TRACK_BG);
+    int filled = (int) (barW * time / duration);
+    if (filled > 1) {
+      Draw.round(g, barX, barY, barX + filled, barY + 3, 1, Theme.ACCENT);
     }
     RecordingMetadata meta = ReplayPlayback.metadata();
     if (meta != null) {
       for (RecordingMetadata.Marker m : meta.markers) {
         int mx = barX + (int) (barW * Math.min(m.timeMs, duration) / duration);
-        g.fill(mx, barY - 2, mx + 1, barY + 5, MARKER);
+        g.fill(mx, barY - 2, mx + 1, barY + 5, Theme.TRACK_MARKER);
       }
     }
+    for (var k : ReplayEditor.path().keyframes()) {
+      int kx = barX + (int) (barW * Math.min(k.timeMs(), duration) / duration);
+      Draw.diamond(g, kx, barY + 1, 2, Theme.TEXT);
+    }
+    int px = barX + filled;
+    Draw.round(g, px - 2, barY - 2, px + 3, barY + 5, 2, Theme.TEXT);
   }
 
   public static String time(long ms) {

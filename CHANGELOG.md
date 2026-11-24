@@ -31,6 +31,22 @@ compatibility.
 
 ### Added
 
+- A new replay editor look (ADR 0015, proposed): docked panels in a dark theme with a blue accent,
+  in the spirit of OneClient. A top bar with play controls, the time, speed, the view (Free, POV,
+  Follow, Path), undo and Export; a tool rail; a Scene list of the replay's players and entities
+  (click to look at one, click its eye to hide it); an Inspector with Keyframe, Look and World tabs
+  (time of day, rain and thunder sliders); and a timeline with separate Markers, Camera, Look,
+  World, Entities and Settings tracks. Tab folds the side panels; small windows keep only the top
+  bar and the timeline. Text uses the Inter font and shapes have smooth corners, so the editor no
+  longer looks like a Minecraft menu. The Inspector's Look tab holds the effects. Numbers are drag fields (drag, Shift for fine steps,
+  scroll, double-click to reset), Inspector sections fold, and there is a menu bar (File, Edit,
+  View, Camera) and right-click menus on scene rows, the ruler and camera keyframes. The Scene and
+  Inspector panels can be dragged out by their title bars to float, and docked left or right.
+  The replay browser, settings, export, effects, settings-over-time and rename screens, the delete
+  question and the replay bar use the same look (switches, value rows, rounded text fields). Reizo's
+  screens lower the GUI scale while open when the window is too small for their layout.
+  With OneConfig installed (OneClient), Reizo's UI follows the selected OneConfig theme: its
+  colours, light or dark, and its flat, glass or pixel style.
 - Hide entities in a replay: press H while looking at a mob, item or player to hide it from that
   moment on (press again to show it). Hidden entities are keyframed switches in Timeline →
   Settings, undoable, saved with the project and hidden in exports too.

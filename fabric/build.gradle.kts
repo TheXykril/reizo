@@ -175,6 +175,19 @@ rename(
     "public void extractContent\\(",
     "public void renderContent(",
 )
+// Widget render hooks (Reizo's flat widgets override them).
+rename(
+    "protected void renderContents\\(",
+    "protected void extractContents(",
+    "protected void extractContents\\(",
+    "protected void renderContents(",
+)
+rename(
+    "public void renderWidget\\(",
+    "public void extractWidgetRenderState(",
+    "public void extractWidgetRenderState\\(",
+    "public void renderWidget(",
+)
 rename("\\.drawString\\(", ".text(", "\\.text\\(", ".drawString(")
 rename("\\.drawCenteredString\\(", ".centeredText(", "\\.centeredText\\(", ".drawCenteredString(")
 rename("\\.drawWordWrap\\(", ".textWithWordWrap(", "\\.textWithWordWrap\\(", ".drawWordWrap(")

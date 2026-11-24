@@ -6,9 +6,9 @@ package io.github.thexykril.reizo.fabric.ui;
 
 import io.github.thexykril.reizo.fabric.ClientConfig;
 import io.github.thexykril.reizo.fabric.RecorderClient;
+import io.github.thexykril.reizo.fabric.ui.kit.KitScreen;
+import java.util.List;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.controls.KeyBindsScreen;
 import net.minecraft.network.chat.Component;
@@ -17,8 +17,11 @@ import net.minecraft.network.chat.Component;
  * Reizo's own settings screen. It edits the same {@link ClientConfig} values that the optional
  * OneConfig page shows, so both stay in sync.
  */
-public final class SettingsScreen extends Screen {
+public final class SettingsScreen extends KitScreen {
   private final Screen parent;
+  private int recordingY;
+  private int shadowY;
+  private int replayY;
 
   public SettingsScreen(Screen parent) {
     super(Component.translatable("reizo.settings.title"));
@@ -28,119 +31,81 @@ public final class SettingsScreen extends Screen {
   @Override
   protected void init() {
     ClientConfig config = RecorderClient.get().config();
-    int x = width / 2 - 155;
-    int y = 40;
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.autoRecordOnJoin)
-            .create(
-                x,
-                y,
-                310,
-                20,
-                Component.translatable("reizo.settings.auto_record"),
-                (b, v) -> config.autoRecordOnJoin = v));
-    y += 24;
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.showIndicator)
-            .create(
-                x,
-                y,
-                310,
-                20,
-                Component.translatable("reizo.settings.indicator"),
-                (b, v) -> config.showIndicator = v));
-    y += 24;
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.showPlayerHud)
-            .create(
-                x,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.settings.player_hud_short"),
-                (b, v) -> config.showPlayerHud = v));
-    // Side by side so the screen still fits at GUI scale 3 on a 720p window.
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.showPlayerScreens)
-            .create(
-                x + 160,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.settings.player_screens_short"),
-                (b, v) -> config.showPlayerScreens = v));
-    y += 24;
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.storeServerName)
-            .create(
-                x,
-                y,
-                310,
-                20,
-                Component.translatable("reizo.settings.server_name"),
-                (b, v) -> config.storeServerName = v));
-    y += 24;
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(KeyModifier::label, KeyModifier.parse(config.toggleModifier))
-            .withValues(KeyModifier.values())
-            .create(
-                x,
-                y,
-                310,
-                20,
-                Component.translatable("reizo.settings.toggle_modifier"),
-                (b, v) -> config.toggleModifier = v.configValue()));
-    y += 24;
-    addRenderableWidget(
-        CycleButton.onOffBuilder(config.shadowEnabled)
-            .create(
-                x,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.settings.shadow"),
-                (b, v) -> {
-                  config.shadowEnabled = v;
-                  RecorderClient.get().applyShadowSettings();
-                }));
-    addRenderableWidget(
-        io.github.thexykril.reizo.fabric.compat.Compat.cycle(
-                (Integer v) -> Component.literal(ReplayHud.time(v * 1000L)),
-                RecorderClient.SHADOW_LENGTHS.contains(config.shadowSeconds)
-                    ? config.shadowSeconds
-                    : 120)
-            .withValues(RecorderClient.SHADOW_LENGTHS)
-            .create(
-                x + 160,
-                y,
-                150,
-                20,
-                Component.translatable("reizo.settings.shadow_length"),
-                (b, v) -> {
-                  config.shadowSeconds = v;
-                  RecorderClient.get().applyShadowSettings();
-                }));
-    y += 24;
-    addRenderableWidget(
-        Button.builder(
-                Component.translatable("reizo.settings.keys"),
-                b -> minecraft.setScreen(new KeyBindsScreen(this, minecraft.options)))
-            .bounds(x, y, 310, 20)
-            .build());
-    addRenderableWidget(
-        Button.builder(Component.translatable("gui.done"), b -> onClose())
-            .bounds(width / 2 - 100, height - 28, 200, 20)
-            .build());
+    card(320, 2 * PAD + TITLE_H + 3 * 12 + 7 * (ROW_H + 2) + 3 * GAP + 24);
+    int x = innerX();
+    int w = innerW();
+    int half = (w - GAP) / 2;
+    int y = contentY();
+
+    recordingY = y;
+    y += 12;
+    toggle(
+        x, y, w, Component.translatable("reizo.settings.auto_record"),
+        () -> config.autoRecordOnJoin, v -> config.autoRecordOnJoin = v);
+    y += ROW_H;
+    toggle(
+        x, y, w, Component.translatable("reizo.settings.indicator"),
+        () -> config.showIndicator, v -> config.showIndicator = v);
+    y += ROW_H;
+    toggle(
+        x, y, w, Component.translatable("reizo.settings.server_name"),
+        () -> config.storeServerName, v -> config.storeServerName = v);
+    y += ROW_H;
+    cycle(
+        x, y, w, Component.translatable("reizo.settings.toggle_modifier"),
+        List.of(KeyModifier.values()),
+        () -> KeyModifier.parse(config.toggleModifier),
+        KeyModifier::label,
+        v -> config.toggleModifier = v.configValue());
+    y += ROW_H + GAP;
+
+    shadowY = y;
+    y += 12;
+    toggle(
+        x, y, half, Component.translatable("reizo.settings.shadow"),
+        () -> config.shadowEnabled,
+        v -> {
+          config.shadowEnabled = v;
+          RecorderClient.get().applyShadowSettings();
+        });
+    cycle(
+        x + half + GAP, y, w - half - GAP, Component.translatable("reizo.settings.shadow_length"),
+        RecorderClient.SHADOW_LENGTHS,
+        () -> RecorderClient.SHADOW_LENGTHS.contains(config.shadowSeconds) ? config.shadowSeconds : 120,
+        v -> Component.literal(ReplayHud.time(v * 1000L)),
+        v -> {
+          config.shadowSeconds = v;
+          RecorderClient.get().applyShadowSettings();
+        });
+    y += ROW_H + GAP;
+
+    replayY = y;
+    y += 12;
+    toggle(
+        x, y, half, Component.translatable("reizo.settings.player_hud_short"),
+        () -> config.showPlayerHud, v -> config.showPlayerHud = v);
+    toggle(
+        x + half + GAP, y, w - half - GAP,
+        Component.translatable("reizo.settings.player_screens_short"),
+        () -> config.showPlayerScreens, v -> config.showPlayerScreens = v);
+
+    int fy = footerY();
+    button(
+        x, fy, half, Component.translatable("reizo.settings.keys"),
+        () -> minecraft.setScreen(new KeyBindsScreen(this, minecraft.options)));
+    accentButton(x + half + GAP, fy, w - half - GAP, Component.translatable("gui.done"), this::onClose);
   }
 
   @Override
-  public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-    super.render(g, mouseX, mouseY, partialTick);
-    g.drawCenteredString(font, title, width / 2, 15, 0xFFFFFFFF);
+  protected void renderCard(GuiGraphics g, int mouseX, int mouseY) {
+    sectionLabel(g, Component.translatable("reizo.settings.section.recording").getString(), recordingY);
+    sectionLabel(g, Component.translatable("reizo.settings.section.shadow").getString(), shadowY);
+    sectionLabel(g, Component.translatable("reizo.settings.section.replay").getString(), replayY);
   }
 
   @Override
   public void removed() {
+    super.removed();
     RecorderClient.get().saveConfig();
   }
 
