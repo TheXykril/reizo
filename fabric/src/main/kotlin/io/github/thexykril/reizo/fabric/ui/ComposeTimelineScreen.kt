@@ -20,6 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import org.polyfrost.oneconfig.api.ui.v1.components.SegmentedChips
+import org.polyfrost.oneconfig.api.ui.v1.components.Slider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,18 +42,21 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.thexykril.reizo.core.timeline.KeyframeEdits
+import io.github.thexykril.reizo.fabric.playback.EditorViewport
 import io.github.thexykril.reizo.fabric.playback.ReplayEditor
 import io.github.thexykril.reizo.fabric.playback.ReplayPlayback
 import net.minecraft.client.Minecraft
@@ -84,6 +94,12 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             dismiss()
             return
         }
+        // The world shows in a box, so the HUD (sized for the whole window) stays hidden meanwhile.
+        if (hudHidden == null) {
+            val options = Minecraft.getInstance().options
+            hudHidden = options.hideGui
+            options.hideGui = true
+        }
         // Replay time moves on its own; read it every frame.
         var now by remember { mutableLongStateOf(0L) }
         LaunchedEffect(Unit) {
@@ -100,18 +116,35 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         BoxWithConstraints(Modifier.fillMaxSize()) {
         // The timeline takes about a third of the height, more on small windows.
         val wide = maxWidth >= 560.dp
-        val timelineHeight = if (maxHeight < 400.dp) maxHeight * 0.55f else (maxHeight * 0.32f).coerceIn(170.dp, 260.dp)
+        val rootW = constraints.maxWidth.toFloat()
+        val rootH = constraints.maxHeight.toFloat()
+        val backdrop = OneConfigTheme.current.pageBackground.toArgb()
+        if (!wide) EditorViewport.clear()
+        // Slim lanes like a video editor; the transport moves into the panel on small windows.
+        val timelineHeight = if (wide) RULER + LANE * 2 + 36.dp else (maxHeight * 0.55f)
         Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TopBar()
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Spacer(Modifier.weight(1f))
+                Box(
+                    Modifier.weight(1f).fillMaxHeight().onGloballyPositioned {
+                        if (wide) frameWorld(it.boundsInRoot(), rootW, rootH, backdrop) else EditorViewport.clear()
+                    },
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    // Over the world, like a player's controls.
+                    if (wide) {
+                        Box(Modifier.themedSurface(SurfaceKind.Panel).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                            Transport(maxOf(0L, toVideo(now)), videoDuration(), server.clock().isRunning, server.clock().speed(), pill = true)
+                        }
+                    }
+                }
                 if (wide) Inspector(now, ::edited)
             }
             Column(
                 Modifier.fillMaxWidth().height(timelineHeight).themedSurface(SurfaceKind.Panel).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Transport(maxOf(0L, toVideo(now)), videoDuration(), server.clock().isRunning, server.clock().speed())
+                if (!wide) Transport(maxOf(0L, toVideo(now)), videoDuration(), server.clock().isRunning, server.clock().speed())
                 Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TrackLabels(Modifier.width(56.dp).fillMaxHeight())
                     Timeline(now, ::edited, Modifier.weight(1f).fillMaxHeight())
@@ -149,60 +182,150 @@ class ComposeTimelineScreen(private val parent: Screen?) :
         }
     }
 
+    private enum class Tab { PROPERTIES, EXPORT }
+
+    private var tab by mutableStateOf(Tab.PROPERTIES)
+
+    /** Groups the user folded away, by name. */
+    private val folded = mutableStateMapOf<String, Boolean>()
+
+    /** The right panel: tabs, then property groups that each fold and keyframe on their own. */
     @Composable
     private fun Inspector(now: Long, edited: () -> Unit) {
-        val theme = OneConfigTheme.current
         Column(
-            Modifier.width(260.dp).fillMaxHeight().themedSurface(SurfaceKind.Panel).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.width(300.dp).fillMaxHeight().themedSurface(SurfaceKind.Panel).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(t("reizo.timeline.camera").uppercase(), color = theme.textColorSecondary, style = OneConfigTheme.typography.eyebrow)
-            val key = ReplayEditor.nearest(now, 50)
-            val cam = key ?: ReplayEditor.cameraNow()
-            if (cam != null) {
-                CameraValues(cam.x(), cam.y(), cam.z(), cam.yaw(), cam.pitch(), cam.roll(), cam.fov())
-            } else {
-                // No keyframe here: show where the camera is now.
-                val mc = Minecraft.getInstance()
-                val e = mc.cameraEntity
-                if (e != null) {
-                    val roll = ReplayEditor.rollNow().let { if (it.isNaN()) 0f else it }
-                    val fov = ReplayEditor.fovNow().let { if (it.isNaN()) mc.options.fov().get().toFloat() else it }
-                    CameraValues(e.x, e.y, e.z, e.yRot, e.xRot, roll, fov)
+            SegmentedChips(
+                Tab.values().toList(),
+                tab,
+                { tab = it },
+                Modifier.fillMaxWidth(),
+                { if (it == Tab.PROPERTIES) t("reizo.timeline.properties") else t("reizo.timeline.export_tab") },
+            )
+            Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                when (tab) {
+                    Tab.PROPERTIES -> {
+                        CameraGroup(now, edited)
+                        LookGroup()
+                    }
+                    Tab.EXPORT -> ExportTab()
                 }
             }
-            Spacer(Modifier.weight(1f))
-            Text(
-                ReplayEditor.path().keyframes().size.toString() + " " + t("reizo.timeline.keyframes"),
-                color = theme.textColorSecondary,
-                style = OneConfigTheme.typography.small,
-            )
-            if (key != null) {
-                TextButton(
-                    t("reizo.timeline.remove_keyframe"),
-                    {
-                        ReplayEditor.recordUndo()
-                        ReplayEditor.removeNearestKeyframe()
-                        edited()
-                    },
-                    Modifier.fillMaxWidth(),
-                    style = ControlStyle.Danger,
-                    fillWidth = true,
-                )
+        }
+    }
+
+    /** A group header: fold chevron, title, and a keyframe diamond (filled when one is here). */
+    @Composable
+    private fun GroupHeader(name: String, title: String, keyed: Boolean, onKey: () -> Unit) {
+        val open = folded[name] != true
+        Row(
+            Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            TextButton(if (open) "▾" else "▸", { folded[name] = open }, style = ControlStyle.Ghost)
+            Text(title, Modifier.weight(1f), style = OneConfigTheme.typography.bodyMedium)
+            KeyDiamond(keyed, onKey)
+        }
+    }
+
+    /** A keyframe button drawn as a diamond: outlined when no keyframe is at the playhead. */
+    @Composable
+    private fun KeyDiamond(keyed: Boolean, onClick: () -> Unit) {
+        val accent = OneConfigTheme.accent
+        val dim = OneConfigTheme.current.textColorSecondary
+        Canvas(Modifier.size(22.dp).pointerInput(Unit) { detectTapGestures { onClick() } }) {
+            val c = Offset(size.width / 2, size.height / 2)
+            val r = 6.dp.toPx()
+            if (keyed) {
+                diamond(c, r, accent)
             } else {
-                TextButton(
-                    t("reizo.timeline.add_keyframe"),
-                    {
-                        ReplayEditor.recordUndo()
-                        ReplayEditor.addKeyframe(Minecraft.getInstance())
-                        edited()
-                    },
-                    Modifier.fillMaxWidth(),
-                    style = ControlStyle.Primary,
-                    fillWidth = true,
-                )
+                val p = Path().apply {
+                    moveTo(c.x, c.y - r)
+                    lineTo(c.x + r, c.y)
+                    lineTo(c.x, c.y + r)
+                    lineTo(c.x - r, c.y)
+                    close()
+                }
+                drawPath(p, dim, style = Stroke(1.5f.dp.toPx()))
             }
         }
+    }
+
+    @Composable
+    private fun CameraGroup(now: Long, edited: () -> Unit) {
+        val key = ReplayEditor.nearest(now, 50)
+        GroupHeader("camera", t("reizo.timeline.camera"), key != null) {
+            if (key != null) ReplayEditor.removeNearestKeyframe() else ReplayEditor.addKeyframe(Minecraft.getInstance())
+            edited()
+        }
+        if (folded["camera"] == true) return
+        val cam = key ?: ReplayEditor.cameraNow()
+        if (cam != null) {
+            CameraValues(cam.x(), cam.y(), cam.z(), cam.yaw(), cam.pitch(), cam.roll(), cam.fov())
+        } else {
+            // No keyframe here: show where the camera is now.
+            val mc = Minecraft.getInstance()
+            val e = mc.cameraEntity
+            if (e != null) {
+                val roll = ReplayEditor.rollNow().let { if (it.isNaN()) 0f else it }
+                val fov = ReplayEditor.fovNow().let { if (it.isNaN()) mc.options.fov().get().toFloat() else it }
+                CameraValues(e.x, e.y, e.z, e.yRot, e.xRot, roll, fov)
+            }
+        }
+        Text(
+            ReplayEditor.path().keyframes().size.toString() + " " + t("reizo.timeline.keyframes"),
+            color = OneConfigTheme.current.textColorSecondary,
+            style = OneConfigTheme.typography.caption,
+        )
+    }
+
+    /** The look (effects) at the playhead; moving a slider keys it here. */
+    @Composable
+    private fun LookGroup() {
+        GroupHeader("look", t("reizo.timeline.effects"), EffectEdits.atKeyframe()) {
+            if (!EffectEdits.removeHere()) EffectEdits.edit { it }
+            version++
+        }
+        if (folded["look"] == true) return
+        val g = ReplayEditor.gradeNow()
+        LookSlider("reizo.look.exposure", g.exposure(), -3f, 3f) { v -> EffectEdits.edit { it.withExposure(v) } }
+        LookSlider("reizo.look.contrast", g.contrast(), 0f, 2f) { v -> EffectEdits.edit { it.withContrast(v) } }
+        LookSlider("reizo.look.saturation", g.saturation(), 0f, 2f) { v -> EffectEdits.edit { it.withSaturation(v) } }
+        LookSlider("reizo.look.temperature", g.temperature(), -1f, 1f) { v -> EffectEdits.edit { it.withTemperature(v) } }
+        LookSlider("reizo.look.vignette", g.vignette(), 0f, 1f) { v -> EffectEdits.edit { it.withVignette(v) } }
+        LookSlider("reizo.look.bloom", g.bloom(), 0f, 1f) { v -> EffectEdits.edit { it.withBloom(v) } }
+        LookSlider("reizo.look.dof", g.dof(), 0f, 1f) { v -> EffectEdits.edit { it.withDof(v) } }
+        LookSlider("reizo.look.focus", g.focus(), 0.5f, 64f) { v -> EffectEdits.edit { it.withFocus(v) } }
+    }
+
+    @Composable
+    private fun LookSlider(key: String, value: Float, min: Float, max: Float, set: (Float) -> Unit) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(t(key), Modifier.width(84.dp), color = OneConfigTheme.current.textColorSecondary, style = OneConfigTheme.typography.small, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Slider(value, { set(it); version++ }, Modifier.weight(1f), min..max)
+            Text("%.2f".format(value), Modifier.width(36.dp), style = OneConfigTheme.typography.small)
+        }
+    }
+
+    @Composable
+    private fun ExportTab() {
+        Text(
+            t("reizo.timeline.export_hint"),
+            color = OneConfigTheme.current.textColorSecondary,
+            style = OneConfigTheme.typography.small,
+        )
+        TextButton(
+            t("reizo.export.title"),
+            { Minecraft.getInstance().setScreen(ExportSettingsScreen.create(this@ComposeTimelineScreen)) },
+            Modifier.fillMaxWidth(),
+            style = ControlStyle.Primary,
+            fillWidth = true,
+        )
     }
 
     @Composable
@@ -225,13 +348,13 @@ class ComposeTimelineScreen(private val parent: Screen?) :
     }
 
     @Composable
-    private fun Transport(now: Long, duration: Long, running: Boolean, speed: Double) {
+    private fun Transport(now: Long, duration: Long, running: Boolean, speed: Double, pill: Boolean = false) {
         val theme = OneConfigTheme.current
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(if (running) "❚❚" else "▶", { ReplayPlayback.togglePause() }, style = ControlStyle.Secondary)
             Text(ReplayHud.time(now), style = OneConfigTheme.typography.bodyMedium)
             Text("/ " + ReplayHud.time(duration), color = theme.textColorSecondary, style = OneConfigTheme.typography.small)
-            Spacer(Modifier.weight(1f))
+            Spacer(if (pill) Modifier.width(12.dp) else Modifier.weight(1f))
             TextButton(t("reizo.timeline.split_short"), { splitAt(now) }, style = ControlStyle.Ghost)
             TextButton(
                 t("reizo.timeline.delete_clip"),
@@ -271,6 +394,37 @@ class ComposeTimelineScreen(private val parent: Screen?) :
             }
         }
     }
+
+    /**
+     * Shows the world in [area] (root pixels) at the window's shape, centred, like a video
+     * editor's viewer; the rest of the screen gets the [backdrop].
+     */
+    private fun frameWorld(area: Rect, rootW: Float, rootH: Float, backdrop: Int) {
+        if (rootW <= 0f || rootH <= 0f || area.width <= 0f || area.height <= 0f) {
+            EditorViewport.clear()
+            return
+        }
+        val aspect = rootW / rootH
+        var w = area.width
+        var h = w / aspect
+        if (h > area.height) {
+            h = area.height
+            w = h * aspect
+        }
+        val x = area.left + (area.width - w) / 2
+        val y = area.top + (area.height - h) / 2
+        EditorViewport.set(x / rootW, y / rootH, w / rootW, h / rootH, backdrop)
+    }
+
+    override fun removed() {
+        super.removed()
+        EditorViewport.clear()
+        hudHidden?.let { Minecraft.getInstance().options.hideGui = it }
+        hudHidden = null
+    }
+
+    /** Whether the HUD was hidden before the editor hid it; null while the editor has not. */
+    private var hudHidden: Boolean? = null
 
     /** The selected camera keyframes, by replay time. */
     private val selection = mutableStateListOf<Long>()
@@ -585,6 +739,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
 
     private companion object {
         val RULER = 16.dp
+        val LANE = 40.dp
     }
 
     private fun DrawScope.diamond(c: Offset, r: Float, color: Color) {

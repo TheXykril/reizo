@@ -69,7 +69,7 @@ import net.minecraft.resources.Identifier;
  * plane 0.05, as in {@code GameRenderer}).
  */
 public final class EffectRenderer {
-  private static final int UBO_SIZE = 64; // four vec4
+  private static final int UBO_SIZE = 96; // six vec4
 
   private static RenderPipeline pipeline;
   private static TextureTarget copy;
@@ -154,7 +154,13 @@ public final class EffectRenderer {
   /** Called after the world is rendered, before the HUD. */
   public static void afterWorld(Minecraft mc) {
     Grade grade = ReplayEditor.gradeNow();
-    if (grade.isNeutral() || !ReplayPlayback.isActive()) {
+    // Only while the editor is open: a box left behind by a closed editor never applies.
+    float[] box =
+        mc.screen instanceof io.github.thexykril.reizo.fabric.ui.EditorView
+            ? EditorViewport.rect()
+            : null;
+    int backdrop = EditorViewport.backdrop();
+    if (!ReplayPlayback.isActive() || (grade.isNeutral() && box == null)) {
       lastApplied = null;
       return;
     }
@@ -200,7 +206,18 @@ public final class EffectRenderer {
           .putVec4(grade.exposure(), grade.contrast(), grade.saturation(), grade.temperature())
           .putVec4(grade.vignette(), (float) grade.letterboxBar(w, h), w / (float) h, 0)
           .putVec4(grade.bloom(), grade.dof(), grade.focus(), 0)
-          .putVec4(1f / w, 1f / h, depth0, depth1);
+          .putVec4(1f / w, 1f / h, depth0, depth1)
+          // The shader's texture coordinates start at the bottom; the box's y starts at the top.
+          .putVec4(
+              box == null ? 0 : box[0],
+              box == null ? 0 : 1 - box[1] - box[3],
+              box == null ? 1 : box[2],
+              box == null ? 1 : box[3])
+          .putVec4(
+              (backdrop >> 16 & 0xFF) / 255f,
+              (backdrop >> 8 & 0xFF) / 255f,
+              (backdrop & 0xFF) / 255f,
+              1f);
     }
     //? if >=26.3 {
     /*try (RenderPass pass =
@@ -277,6 +294,6 @@ public final class EffectRenderer {
     }
     *///?}
     ubo.rotate();
-    lastApplied = grade;
+    lastApplied = grade.isNeutral() ? null : grade;
   }
 }
