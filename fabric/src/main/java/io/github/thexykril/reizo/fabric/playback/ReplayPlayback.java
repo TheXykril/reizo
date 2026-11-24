@@ -201,9 +201,6 @@ public final class ReplayPlayback {
       return false;
     }
     boolean pause = server.clock().isRunning();
-    if (!pause && server.replayTimeMs() >= server.script().durationMs()) {
-      seekTo(server.script().startMs()); // play again from the start
-    }
     server.setPaused(pause);
     return pause;
   }
