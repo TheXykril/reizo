@@ -958,7 +958,13 @@ public final class RecordingGameTest implements FabricClientGameTest {
         context.computeOnClient(mc -> EffectRenderer.lastApplied() == null),
         "effects pass still running after removing the keyframe");
     // Depth of field focused right in front of the camera blurs the world; bloom brightens the
-    // bright sky. Both compared with the same frame without effects.
+    // bright sky. Both compared with the same frame without effects. The camera path markers float
+    // in front of the ground, so they are hidden: only the world is measured.
+    boolean pathShown = context.computeOnClient(mc -> PathVisualizer.isVisible());
+    if (pathShown) {
+      context.runOnClient(mc -> PathVisualizer.toggle());
+      context.waitTicks(2);
+    }
     java.awt.image.BufferedImage plain = image(context.takeScreenshot("reizo-effects-none"));
     context.runOnClient(
         mc -> {
@@ -976,6 +982,18 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitTicks(3);
     java.awt.image.BufferedImage autofocused =
         image(context.takeScreenshot("reizo-effects-dof-auto"));
+    // Bloom is measured on the bright path markers, against a plain frame that shows them too.
+    if (pathShown) {
+      context.runOnClient(
+          mc -> {
+            ReplayEditor.effects().remove(0);
+            ReplayEditor.effectsChanged();
+            PathVisualizer.toggle();
+          });
+      context.waitTicks(3);
+    }
+    java.awt.image.BufferedImage plainPath =
+        pathShown ? image(context.takeScreenshot("reizo-effects-none-path")) : plain;
     context.runOnClient(
         mc -> {
           ReplayEditor.effects().put(0, Grade.NEUTRAL.withBloom(1));
@@ -1003,7 +1021,14 @@ public final class RecordingGameTest implements FabricClientGameTest {
             + centreNear
             + ", auto "
             + centreAuto);
-    double glow = glowing(plain, bloomed);
+    // Autofocus still blurs what is nearer or farther than the centre. A depth that reads the same
+    // everywhere (as when Minecraft cleared it for the hand) would blur nothing here.
+    double softAuto = detail(autofocused);
+    LOGGER.info("checkEffects: whole-picture detail plain {}, auto {}", sharp, softAuto);
+    check(
+        softAuto < sharp * 0.9,
+        "autofocus blurred nothing away from the centre: detail " + sharp + " -> " + softAuto);
+    double glow = glowing(plainPath, bloomed);
     check(glow > 0.02, "bloom lit too few pixels: " + glow);
     LOGGER.info(
         "checkEffects OK: detail {} -> {} with depth of field (centre {} near, {} auto, {} plain),"
