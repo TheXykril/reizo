@@ -4,6 +4,7 @@
  */
 package io.github.thexykril.reizo.core.storage;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -50,6 +51,30 @@ class RecordingStorageTest {
     }
     working.close(); // the OS releases locks when a process dies
     return working.dir();
+  }
+
+  @Test
+  void thumbnailIsPackedAndSurvivesRename() throws IOException {
+    RecordingStorage storage = storage();
+    byte[] png = {(byte) 0x89, 'P', 'N', 'G', 1, 2, 3};
+    RecordingMetadata meta = RecordingMetadata.create("thumb", 0L);
+    RecordingStorage.WorkingDirectory working = storage.createWorking(meta);
+    FrameStreamWriter.create(working.streamFile(), 1024).close();
+    Files.write(working.thumbnailFile(), png);
+    working.close();
+    Path archive = storage.finalizeRecording(working.dir());
+
+    assertArrayEquals(png, RecordingArchive.readThumbnail(archive));
+    storage.rename(archive, "renamed");
+    assertArrayEquals(png, RecordingArchive.readThumbnail(archive));
+  }
+
+  @Test
+  void recordingWithoutThumbnailHasNone() throws IOException {
+    RecordingStorage storage = storage();
+    Path archive = storage.recover(crashedRecording(storage, 3, false)).archive();
+    assertNull(RecordingArchive.readThumbnail(archive));
+    assertNull(RecordingArchive.readThumbnail(dir.resolve("missing.reizo")));
   }
 
   @Test

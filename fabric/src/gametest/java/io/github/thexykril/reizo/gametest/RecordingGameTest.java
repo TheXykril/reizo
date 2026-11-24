@@ -84,8 +84,53 @@ public final class RecordingGameTest implements FabricClientGameTest {
     recordMidSessionWhileWalking(context);
     saveShadowAfterWalking(context);
     browseAndPlay(context);
+    checkPolyPlusReplays(context);
     recoverAfterCrash(context);
     measureRecordingCost(context);
+  }
+
+  /**
+   * OneClient's Replays page (ADR 0019). Runs only when PolyPlus is in the test's mods folder,
+   * which CI does not do: drop its jar into build/run/clientGameTest/mods to check by hand.
+   */
+  private void checkPolyPlusReplays(ClientGameTestContext context) {
+    if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("polyplus")) {
+      LOGGER.info("checkPolyPlusReplays skipped: PolyPlus is not loaded");
+      return;
+    }
+    String result =
+        context.computeOnClient(
+            mc -> {
+              try {
+                Class<?> providers =
+                    Class.forName("org.polyfrost.polyplus.compat.replay.ReplayProviders");
+                Object instance = providers.getField("INSTANCE").get(null);
+                List<?> all = (List<?>) providers.getMethod("getAll").invoke(instance);
+                Object reizo = null;
+                for (Object p : all) {
+                  if ("reizo".equals(p.getClass().getMethod("getId").invoke(p))) {
+                    reizo = p;
+                  }
+                }
+                check(reizo != null, "Reizo is not in PolyPlus's providers: " + all);
+                java.lang.reflect.Method available = reizo.getClass().getMethod("getAvailable");
+                check((Boolean) available.invoke(reizo), "Reizo provider is not available");
+                List<?> entries = (List<?>) reizo.getClass().getMethod("list").invoke(reizo);
+                check(!entries.isEmpty(), "Reizo provider lists no recordings");
+                int withIcon = 0;
+                for (Object e : entries) {
+                  if (e.getClass().getMethod("readIcon").invoke(e) != null) {
+                    withIcon++;
+                  }
+                }
+                check(withIcon > 0, "no recording has a thumbnail in PolyPlus");
+                return all.size() + " providers, " + entries.size() + " recordings, " + withIcon
+                    + " with thumbnails";
+              } catch (ReflectiveOperationException e) {
+                throw new AssertionError("PolyPlus replay API changed", e);
+              }
+            });
+    LOGGER.info("checkPolyPlusReplays OK: {}", result);
   }
 
   /**
@@ -1354,7 +1399,24 @@ public final class RecordingGameTest implements FabricClientGameTest {
     double moved = stats.lastPlayer.distanceSq(stats.firstPlayer);
     check(moved > 1.0, "player did not move in recording (dist^2=" + moved + ")");
     check(meta.durationMs > 1000, "duration too short: " + meta.durationMs);
-    LOGGER.info("recordMidSessionWhileWalking OK: {} -> {}", archive.getFileName(), stats);
+    // The thumbnail is taken 1.5 s in, after the pause menu closed: a picture of the world.
+    byte[] thumbnail = RecordingArchive.readThumbnail(archive);
+    check(thumbnail != null, "recording has no thumbnail");
+    java.awt.image.BufferedImage thumb;
+    try {
+      thumb = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(thumbnail));
+    } catch (java.io.IOException e) {
+      throw new AssertionError("thumbnail is not an image", e);
+    }
+    check(
+        thumb != null && thumb.getWidth() <= 480 && thumb.getHeight() > 0,
+        "thumbnail has a bad size");
+    LOGGER.info(
+        "recordMidSessionWhileWalking OK: {} -> {}, thumbnail {}x{}",
+        archive.getFileName(),
+        stats,
+        thumb.getWidth(),
+        thumb.getHeight());
     playBackWalk(context, archive, stats);
   }
 

@@ -153,6 +153,7 @@ public final class EffectRenderer {
 
   /** Called after the world is rendered, before the HUD. */
   public static void afterWorld(Minecraft mc) {
+    io.github.thexykril.reizo.fabric.capture.RecordingThumbnail.afterWorld(mc);
     Grade grade = ReplayEditor.gradeNow();
     // Only while the editor is open: a box left behind by a closed editor never applies.
     float[] box =
