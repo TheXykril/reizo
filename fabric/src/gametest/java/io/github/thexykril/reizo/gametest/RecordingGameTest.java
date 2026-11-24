@@ -330,15 +330,28 @@ public final class RecordingGameTest implements FabricClientGameTest {
     context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     context.waitTicks(2);
     context.takeScreenshot("reizo-replay-browser");
-    // Reizo's settings open from the browser and return to it.
+    // Reizo's settings open from the browser: its OneConfig page with OneConfig, else its own.
     context.runOnClient(
         mc -> {
           Screen browser = mc.screen;
-          mc.setScreen(io.github.thexykril.reizo.fabric.ui.SettingsScreen.create(browser));
+          io.github.thexykril.reizo.fabric.ui.SettingsScreen.open(browser);
           browserBeforeSettings = browser;
         });
-    context.waitTicks(3);
+    context.waitTicks(20);
     context.takeScreenshot("reizo-client-settings");
+    String settingsScreen =
+        context.computeOnClient(
+            mc -> mc.screen == null ? "none" : mc.screen.getClass().getName());
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
+      check(
+          context.computeOnClient(
+              mc -> org.polyfrost.oneconfig.api.ui.v1.OneConfigUI.isOneConfigScreen(mc.screen)),
+          "settings did not open OneConfig's menu: " + settingsScreen);
+    } else {
+      check(
+          settingsScreen.endsWith(".SettingsScreen"),
+          "settings did not open Reizo's screen: " + settingsScreen);
+    }
     context.runOnClient(mc -> mc.setScreen(browserBeforeSettings));
     context.waitFor(mc -> mc.screen instanceof ReplayBrowserView, 20 * 5);
     int listed = context.computeOnClient(mc -> ((ReplayBrowserView) mc.screen).entries().size());

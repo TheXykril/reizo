@@ -7,7 +7,6 @@ package io.github.thexykril.reizo.fabric.compat;
 import io.github.thexykril.reizo.fabric.ClientConfig;
 import io.github.thexykril.reizo.fabric.RecorderClient;
 import io.github.thexykril.reizo.fabric.ui.ReplayBrowserScreen;
-import io.github.thexykril.reizo.fabric.ui.SettingsScreen;
 import net.minecraft.client.Minecraft;
 import org.polyfrost.oneconfig.api.config.v1.Config;
 import org.polyfrost.oneconfig.api.config.v1.ConfigEntrypoint;
@@ -26,11 +25,23 @@ import org.polyfrost.oneconfig.api.config.v1.annotations.Text;
 public final class OneConfigIntegration implements ConfigEntrypoint {
   @Override
   public void registerConfigs(Context context) {
-    context.register(new Page());
+    page = new Page();
+    context.register(page);
     OneConfigRecordingHud.register();
-    context.originalScreen(
-        () ->
-            Minecraft.getInstance().setScreen(SettingsScreen.create(Minecraft.getInstance().screen)));
+  }
+
+  /** Reizo's registered page, or null before OneConfig ran this entrypoint. */
+  private static Page page;
+
+  /** Opens Reizo's page in OneConfig's menu (OneConfig finds it by its config tree's id). */
+  public static void openPage() {
+    if (page == null) {
+      throw new IllegalStateException("Reizo's OneConfig page is not registered");
+    }
+    String id = page.getTree() != null ? page.getTree().getID() : page.id;
+    org.polyfrost.oneconfig.api.ui.v1.OneConfigUI.open(
+        new org.polyfrost.oneconfig.api.ui.v1.page.OneConfigDestination.ModConfig(
+            org.polyfrost.oneconfig.api.ui.v1.page.OneConfigPages.modConfig(id)));
   }
 
   /** Reizo's page in OneConfig. Field names are the property ids. */
