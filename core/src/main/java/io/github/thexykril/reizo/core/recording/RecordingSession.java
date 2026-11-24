@@ -177,6 +177,29 @@ public final class RecordingSession {
     }
   }
 
+  /**
+   * Stores a PNG preview that is packed into the finished recording. Ignored once the session is
+   * stopping, so it never races the archive being written.
+   *
+   * @return whether the thumbnail was stored
+   */
+  public boolean saveThumbnail(byte[] png) throws IOException {
+    Objects.requireNonNull(png, "png");
+    if (png.length > io.github.thexykril.reizo.core.storage.RecordingArchive.MAX_THUMBNAIL_BYTES) {
+      return false;
+    }
+    orderLock.lock();
+    try {
+      if (state != State.RECORDING && state != State.PAUSED) {
+        return false;
+      }
+      io.github.thexykril.reizo.core.util.AtomicFiles.write(working.thumbnailFile(), png);
+      return true;
+    } finally {
+      orderLock.unlock();
+    }
+  }
+
   /** Freezes the recording clock. Packets keep being captured (see class docs). */
   public void pause() {
     orderLock.lock();

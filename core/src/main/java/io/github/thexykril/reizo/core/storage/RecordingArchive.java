@@ -27,6 +27,12 @@ public final class RecordingArchive implements Closeable {
   public static final String META_ENTRY = "meta.json";
   public static final String STREAM_ENTRY = "stream.bin";
 
+  /** Optional small PNG preview, taken when the recording started. */
+  public static final String THUMBNAIL_ENTRY = "thumbnail.png";
+
+  /** Largest thumbnail that is read back; anything bigger is ignored. */
+  public static final int MAX_THUMBNAIL_BYTES = 1 << 20;
+
   private final Path path;
   private final ZipFile zip;
   private final RecordingMetadata metadata;
@@ -68,6 +74,26 @@ public final class RecordingArchive implements Closeable {
   /** A copy of the metadata; changing it does not modify the file. */
   public RecordingMetadata metadata() {
     return metadata.copy();
+  }
+
+  /**
+   * Reads the thumbnail of a finalized recording without opening the stream.
+   *
+   * @return the PNG bytes, or {@code null} when the recording has none or it is unreadable
+   */
+  public static byte[] readThumbnail(Path path) {
+    try (ZipFile zip = new ZipFile(path.toFile())) {
+      ZipEntry entry = zip.getEntry(THUMBNAIL_ENTRY);
+      if (entry == null || entry.getSize() > MAX_THUMBNAIL_BYTES) {
+        return null;
+      }
+      try (InputStream in = zip.getInputStream(entry)) {
+        byte[] bytes = in.readNBytes(MAX_THUMBNAIL_BYTES + 1);
+        return bytes.length > MAX_THUMBNAIL_BYTES ? null : bytes;
+      }
+    } catch (IOException | RuntimeException e) {
+      return null;
+    }
   }
 
   /** Opens the frame stream for strict sequential reading. The caller closes the reader. */

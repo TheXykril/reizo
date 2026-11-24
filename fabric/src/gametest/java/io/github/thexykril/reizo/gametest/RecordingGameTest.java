@@ -1379,7 +1379,24 @@ public final class RecordingGameTest implements FabricClientGameTest {
     double moved = stats.lastPlayer.distanceSq(stats.firstPlayer);
     check(moved > 1.0, "player did not move in recording (dist^2=" + moved + ")");
     check(meta.durationMs > 1000, "duration too short: " + meta.durationMs);
-    LOGGER.info("recordMidSessionWhileWalking OK: {} -> {}", archive.getFileName(), stats);
+    // The thumbnail is taken 1.5 s in, after the pause menu closed: a picture of the world.
+    byte[] thumbnail = RecordingArchive.readThumbnail(archive);
+    check(thumbnail != null, "recording has no thumbnail");
+    java.awt.image.BufferedImage thumb;
+    try {
+      thumb = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(thumbnail));
+    } catch (java.io.IOException e) {
+      throw new AssertionError("thumbnail is not an image", e);
+    }
+    check(
+        thumb != null && thumb.getWidth() <= 480 && thumb.getHeight() > 0,
+        "thumbnail has a bad size");
+    LOGGER.info(
+        "recordMidSessionWhileWalking OK: {} -> {}, thumbnail {}x{}",
+        archive.getFileName(),
+        stats,
+        thumb.getWidth(),
+        thumb.getHeight());
     playBackWalk(context, archive, stats);
   }
 

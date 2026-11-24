@@ -6,6 +6,7 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
+      "io.github.thexykril.reizo.gametest.PolyPlusGameTest",
       "io.github.thexykril.reizo.gametest.ShaderEffectsGameTest",
       "io.github.thexykril.reizo.gametest.RecordingGameTest"
     ]

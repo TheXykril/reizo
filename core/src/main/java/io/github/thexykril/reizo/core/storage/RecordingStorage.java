@@ -49,6 +49,7 @@ public final class RecordingStorage {
   public static final String STREAM_FILE = "stream.bin";
   public static final String META_FILE = "meta.json";
   public static final String LOCK_FILE = "owner.lock";
+  public static final String THUMBNAIL_FILE = "thumbnail.png";
 
   private static final DateTimeFormatter FILE_DATE =
       DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss", Locale.ROOT);
@@ -91,6 +92,10 @@ public final class RecordingStorage {
 
     public Path metaFile() {
       return dir.resolve(META_FILE);
+    }
+
+    public Path thumbnailFile() {
+      return dir.resolve(THUMBNAIL_FILE);
     }
 
     public void writeMetadata(RecordingMetadata meta) throws IOException {
@@ -164,6 +169,13 @@ public final class RecordingStorage {
       zip.putNextEntry(new ZipEntry(RecordingArchive.STREAM_ENTRY));
       Files.copy(workingDir.resolve(STREAM_FILE), zip);
       zip.closeEntry();
+      Path thumbnail = workingDir.resolve(THUMBNAIL_FILE);
+      if (Files.isRegularFile(thumbnail)
+          && Files.size(thumbnail) <= RecordingArchive.MAX_THUMBNAIL_BYTES) {
+        zip.putNextEntry(new ZipEntry(RecordingArchive.THUMBNAIL_ENTRY));
+        Files.copy(thumbnail, zip);
+        zip.closeEntry();
+      }
     } catch (IOException | RuntimeException e) {
       Files.deleteIfExists(temp);
       throw e;

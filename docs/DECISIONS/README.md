@@ -24,3 +24,4 @@ in AGENTS.md needs an ADR.
 | [0016](0016-clip-track.md) | A clip track that maps video time to replay time | Accepted |
 | [0017](0017-compose-screens.md) | Reizo screens on OneConfig's Compose components | Accepted |
 | [0018](0018-imported-music-track.md) | Imported music on its own track, mixed into the export | Accepted |
+| [0019](0019-oneclient-replays-page.md) | Reizo recordings in OneClient's Replays page and Record card | Proposed |

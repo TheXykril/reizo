@@ -3,7 +3,7 @@
   "minVersion": "0.8",
   "package": "io.github.thexykril.reizo.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
-  "client": ["CameraMixin", "InventoryScreenMixin", "MenuScreensAccessor", "EntityDataAccessors", "LivingEntityDataAccessors", "GameRendererMixin", "IrisPipelineMixin", "MinecraftMixin", "PacketDecoderMixin", "SoundEngineMixin", "SoundManagerMixin", "WindowMixin", "LevelWeatherMixin", "ClockTimeMixin", "EntityRenderDispatcherMixin", "ClientLevelEffectsMixin", "LevelSoundMixin", "LocalPlayerSoundMixin", "QuickPlayLogMixin"],
+  "client": ["CameraMixin", "InventoryScreenMixin", "MenuScreensAccessor", "EntityDataAccessors", "LivingEntityDataAccessors", "GameRendererMixin", "IrisPipelineMixin", "MinecraftMixin", "PacketDecoderMixin", "SoundEngineMixin", "SoundManagerMixin", "WindowMixin", "LevelWeatherMixin", "ClockTimeMixin", "EntityRenderDispatcherMixin", "ClientLevelEffectsMixin", "LevelSoundMixin", "LocalPlayerSoundMixin", "QuickPlayLogMixin", "PolyPlusReplayProvidersMixin"],
   "injectors": {
     "defaultRequire": 1
   }
