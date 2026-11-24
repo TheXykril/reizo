@@ -1838,6 +1838,24 @@ public final class RecordingGameTest implements FabricClientGameTest {
   }
 
   private void checkTimeline(ClientGameTestContext context) {
+    if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("oneconfig")) {
+      // With OneConfig the editor key opens the new editor; the classic one is a setting away.
+      context.runOnClient(mc -> RecorderClient.get().config().classicEditor = false);
+      context.getInput().pressKey(InputConstants.KEY_Y);
+      context.waitTicks(3);
+      check(
+          context.computeOnClient(
+              mc -> mc.screen instanceof io.github.thexykril.reizo.fabric.ui.ComposeTimelineScreen),
+          "Y did not open the new editor: " + context.computeOnClient(mc -> String.valueOf(mc.screen)));
+      context.runOnClient(mc -> TimelineScreen.useClassicEditor(true));
+      context.waitTicks(2);
+      check(
+          context.computeOnClient(mc -> mc.screen instanceof TimelineScreen)
+              && context.computeOnClient(mc -> RecorderClient.get().config().classicEditor),
+          "switching to the classic editor did not open it");
+      context.runOnClient(mc -> mc.setScreen(null));
+      context.waitTicks(2);
+    }
     long duration = ReplayPlayback.current().script().durationMs();
     long middle = duration / 2;
     context.runOnClient(

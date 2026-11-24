@@ -79,8 +79,8 @@ import org.polyfrost.oneconfig.api.ui.v1.theme.OneConfigTheme
 /**
  * The replay editor on OneConfig's Compose UI (ADR 0017), first slice: a top bar, a camera
  * inspector, the transport and a timeline with the ruler, the video clips, camera keyframes,
- * markers and the playhead. The world stays visible in the middle. Opened only with
- * `-Dreizo.composeTimeline=true` until it matches [TimelineScreen].
+ * markers and the playhead. The world stays visible in the middle. The default editor with
+ * OneConfig; [TimelineScreen] stays as the classic editor.
  */
 class ComposeTimelineScreen(private val parent: Screen?) :
     OneConfigComposeScreen(Component.translatable("reizo.timeline.title"), parent),
@@ -177,6 +177,7 @@ class ComposeTimelineScreen(private val parent: Screen?) :
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            TextButton(t("reizo.timeline.classic_editor"), { TimelineScreen.useClassicEditor(true) }, style = ControlStyle.Ghost)
             TextButton(t("reizo.timeline.undo_short"), { ReplayEditor.undo(); version++ }, style = ControlStyle.Ghost, enabled = ReplayEditor.canUndo())
             TextButton(t("reizo.timeline.redo_short"), { ReplayEditor.redo(); version++ }, style = ControlStyle.Ghost, enabled = ReplayEditor.canRedo())
             TextButton(
